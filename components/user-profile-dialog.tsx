@@ -4,7 +4,9 @@ import { CalendarDays, Clock, Mail, MapPin, Pencil, Phone, ShieldCheck, UserRoun
 import { useState, useTransition } from 'react'
 
 import { saveUserProfile } from '@/app/actions/profile'
+import { AvatarUploader } from '@/components/avatar-uploader'
 import { ProfileFields } from '@/components/profile-fields'
+import { UserAvatar } from '@/components/user-avatar'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
 import type { ProfileValues, UserProfile } from '@/lib/profile'
@@ -61,6 +63,7 @@ export function UserProfileDialog({ profile, onClose, onSaved }: { profile: User
   const [editing, setEditing] = useState(false)
   const [error, setError] = useState('')
   const [pending, startTransition] = useTransition()
+  const [image, setImage] = useState<string | null>(profile.image)
   const [values, setValues] = useState<ProfileValues>({
     civility: profile.civility, firstName: profile.firstName, lastName: profile.lastName, city: profile.city, country: profile.country,
     profession: profile.profession, company: profile.company, addressLine1: profile.addressLine1, addressLine2: profile.addressLine2,
@@ -71,7 +74,7 @@ export function UserProfileDialog({ profile, onClose, onSaved }: { profile: User
     event.preventDefault()
     setError('')
     startTransition(async () => {
-      const result = await saveUserProfile({ userId: profile.id, ...values })
+      const result = await saveUserProfile({ userId: profile.id, ...values, ...(image !== profile.image ? { image: image ?? '' } : {}) })
       if (!result.ok) {
         setError(result.message)
         return
@@ -88,7 +91,11 @@ export function UserProfileDialog({ profile, onClose, onSaved }: { profile: User
     <Modal open onClose={onClose} title={fullName || 'Fiche utilisateur'} size="xl" bare>
       <div className="relative overflow-hidden border-b bg-gradient-to-br from-accent via-card to-card px-6 pb-6 pt-8 sm:px-8">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-          <span className="grid size-16 shrink-0 place-items-center rounded-2xl bg-primary text-xl font-semibold text-primary-foreground shadow-sm" aria-hidden>{initialsOf(profile)}</span>
+          {profile.image ? (
+            <UserAvatar image={profile.image} initials={initialsOf(profile)} name={fullName} className="size-20 rounded-2xl shadow-sm ring-4 ring-card" />
+          ) : (
+            <span className="grid size-20 shrink-0 place-items-center rounded-2xl bg-primary text-2xl font-semibold text-primary-foreground shadow-sm ring-4 ring-card" aria-hidden>{initialsOf(profile)}</span>
+          )}
           <div className="min-w-0 flex-1">
             <p className="text-xs font-medium text-muted-foreground">{profile.civility || 'Fiche utilisateur'}</p>
             <h2 aria-hidden className="mt-1 font-serif text-4xl leading-tight tracking-tight text-balance sm:text-5xl">
@@ -110,6 +117,7 @@ export function UserProfileDialog({ profile, onClose, onSaved }: { profile: User
           {editing ? (
             <Section icon={Pencil} title="Modifier la fiche">
               <form id="profile-form" className="flex flex-col gap-4" onSubmit={submit}>
+                <AvatarUploader value={image} initials={initialsOf(profile)} name={fullName} onChange={setImage} />
                 <ProfileFields value={values} onChange={setValues} />
                 {error && <p role="alert" className="rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</p>}
               </form>

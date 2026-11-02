@@ -13,6 +13,7 @@ import { OrganizationPanel } from '@/components/organization-panel'
 import { Button } from '@/components/ui/button'
 import { Modal, fieldClass } from '@/components/ui/modal'
 import { UserActionsMenu } from '@/components/user-actions-menu'
+import { UserAvatar } from '@/components/user-avatar'
 import { Sidebar } from '@/components/veillio-dashboard'
 import type { ActionResult, AdminAdmission, AdminInvitation, AdminOrganization, AdminUser, AdminViewer } from '@/lib/admin-types'
 import { authClient } from '@/lib/auth-client'
@@ -37,8 +38,8 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={cn('inline-flex rounded-full px-2.5 py-1 text-xs font-semibold', statusStyles[status] ?? 'bg-muted text-muted-foreground')}>{status}</span>
 }
 
-function Avatar({ initials }: { initials: string }) {
-  return <div className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-xs font-semibold text-secondary-foreground">{initials}</div>
+function Avatar({ initials, image, name }: { initials: string; image?: string | null; name?: string }) {
+  return <UserAvatar initials={initials} image={image} name={name} />
 }
 
 function SearchField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder: string }) {
@@ -212,7 +213,7 @@ export function UsersAdmissions({ viewer, users, admissions, invitations, organi
                       <thead><tr className="border-b bg-muted/40 text-xs text-muted-foreground"><th className="px-6 py-3 font-medium">Utilisateur</th><th className="px-4 py-3 font-medium">Rôle</th><th className="px-4 py-3 font-medium">Équipe</th><th className="px-4 py-3 font-medium">Statut</th><th className="px-4 py-3 font-medium">Dernière activité</th><th className="px-6 py-3"><span className="sr-only">Actions</span></th></tr></thead>
                       <tbody>{filteredUsers.map((user) => (
                         <tr key={user.id} className="border-b last:border-0 hover:bg-muted/30">
-                          <td className="px-6 py-4"><button type="button" onClick={() => openProfile({ userId: user.id })} className="flex items-center gap-3 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Ouvrir la fiche de ${user.name}`}><Avatar initials={user.initials} /><div><p className="text-sm font-semibold hover:underline">{user.name}</p><p className="mt-0.5 text-xs text-muted-foreground">{user.email}</p></div></button></td>
+                          <td className="px-6 py-4"><button type="button" onClick={() => openProfile({ userId: user.id })} className="flex items-center gap-3 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Ouvrir la fiche de ${user.name}`}><Avatar initials={user.initials} image={user.image} name={user.name} /><div><p className="text-sm font-semibold hover:underline">{user.name}</p><p className="mt-0.5 text-xs text-muted-foreground">{user.email}</p></div></button></td>
                           <td className="px-4 py-4 text-sm">{user.role}</td>
                           <td className="px-4 py-4 text-sm text-muted-foreground">{user.team}</td>
                           <td className="px-4 py-4"><StatusBadge status={user.status} /></td>

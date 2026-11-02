@@ -12,6 +12,7 @@ export type AdminUser = {
   id: string
   name: string
   email: string
+  image: string | null
   initials: string
   roleKey: RoleKey
   role: string

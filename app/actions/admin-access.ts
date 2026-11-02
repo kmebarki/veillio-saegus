@@ -76,7 +76,7 @@ export async function getAdminAccessData() {
 
   const [userRows, admissionRows, invitationRows, teamRows, memberCounts, domainRows, organization] = await Promise.all([
     db.select({
-      id: users.id, name: users.name, email: users.email, role: users.role, status: users.status,
+      id: users.id, name: users.name, email: users.email, image: users.image, role: users.role, status: users.status,
       teamId: users.teamId, lastLoginAt: users.lastLoginAt,
     }).from(users).where(scopedTeamId ? eq(users.teamId, scopedTeamId) : undefined).orderBy(desc(users.createdAt)),
     db.select().from(admissionRequests)
@@ -106,6 +106,7 @@ export async function getAdminAccessData() {
       id: user.id,
       name: user.name,
       email: user.email,
+      image: user.image,
       initials: getInitials(user.name),
       roleKey,
       role: ROLE_LABELS[roleKey],

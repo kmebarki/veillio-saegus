@@ -63,6 +63,7 @@ export async function getUserProfile(input: unknown) {
   const roleKey = (isRoleKey(target.role) ? target.role : 'reader') as RoleKey
   const profile: UserProfile = {
     id: target.id,
+    image: target.image,
     email: target.email,
     civility: target.civility ?? '',
     firstName: target.firstName ?? fallback.firstName,

@@ -33,7 +33,16 @@ export const emptyProfile: ProfileValues = {
 const optionalText = (max: number) =>
   z.string().trim().max(max).optional().transform((value) => (value ? value : null))
 
+const imageSchema = z
+  .string()
+  .max(200_000)
+  .regex(/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/)
+  .or(z.literal(''))
+  .optional()
+  .transform((value) => (value === undefined ? undefined : value || null))
+
 export const profileSchema = z.object({
+  image: imageSchema,
   civility: z.enum(CIVILITIES),
   firstName: z.string().trim().min(1).max(80),
   lastName: z.string().trim().min(1).max(80),
@@ -56,6 +65,7 @@ export const profileSchema = z.object({
 
 export type UserProfile = ProfileValues & {
   id: string
+  image: string | null
   email: string
   role: string
   team: string
