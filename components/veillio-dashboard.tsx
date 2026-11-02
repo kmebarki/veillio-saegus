@@ -47,7 +47,7 @@ const workspaceItems = [
 ]
 
 const steeringItems = [
-  { label: 'Sources', icon: Database, href: '#' },
+  { label: 'Sources', icon: Database, href: '/admin/sources' },
   {
     label: 'Intégrations',
     icon: Plug,

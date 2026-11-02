@@ -1,11 +1,14 @@
 'use client'
 
-import { LogOut } from 'lucide-react'
+import { LogOut, UserRoundCog } from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
 
+import { getUserProfile } from '@/app/actions/profile'
 import { signOutAction } from '@/app/actions/session'
 import { UserAvatar } from '@/components/user-avatar'
+import { UserProfileDialog } from '@/components/user-profile-dialog'
 import { authClient } from '@/lib/auth-client'
+import type { UserProfile } from '@/lib/profile'
 import { useViewer } from '@/lib/use-viewer'
 
 function initialsOf(name: string, email: string) {
@@ -18,6 +21,9 @@ export function UserMenu() {
   const { data: session, isPending } = authClient.useSession()
   const [open, setOpen] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
+  const [loadingProfile, setLoadingProfile] = useState(false)
+  const [profileError, setProfileError] = useState('')
+  const [profile, setProfile] = useState<UserProfile | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const menuId = useId()
 
@@ -44,6 +50,20 @@ export function UserMenu() {
       await authClient.signOut().catch(() => undefined)
     }
     window.location.assign('/sign-in')
+  }
+
+  async function openProfile() {
+    if (!email || loadingProfile) return
+    setProfileError('')
+    setLoadingProfile(true)
+    const result = await getUserProfile({ email })
+    setLoadingProfile(false)
+    if (!result.ok) {
+      setProfileError(result.message)
+      return
+    }
+    setOpen(false)
+    setProfile(result.profile)
   }
 
   const { viewer, isLoading } = useViewer()
@@ -75,7 +95,19 @@ export function UserMenu() {
             {email && <p className="mt-0.5 truncate text-xs text-muted-foreground">{email}</p>}
             {roleLabel && <p className="mt-2 inline-flex rounded-md bg-secondary px-2 py-0.5 text-[11px] font-semibold text-secondary-foreground">{roleLabel}</p>}
           </div>
-          <div className="p-1.5">
+          <div className="flex flex-col gap-1 p-1.5">
+            <button
+              type="button"
+              role="menuitem"
+              onClick={openProfile}
+              disabled={loadingProfile || !email}
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium outline-none transition-colors hover:bg-muted focus-visible:bg-muted disabled:opacity-60"
+            >
+              <UserRoundCog className="size-4" />
+              {loadingProfile ? 'Chargement du compte…' : 'Compte et environnement'}
+            </button>
+            {profileError && <p role="alert" className="px-3 py-1 text-xs text-destructive">{profileError}</p>}
+            <div className="my-0.5 border-t" />
             <button
               type="button"
               role="menuitem"
@@ -88,6 +120,14 @@ export function UserMenu() {
             </button>
           </div>
         </div>
+      )}
+
+      {profile && (
+        <UserProfileDialog
+          profile={profile}
+          onClose={() => setProfile(null)}
+          onSaved={() => window.location.reload()}
+        />
       )}
     </div>
   )
