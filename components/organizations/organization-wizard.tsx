@@ -57,22 +57,20 @@ function RequiredMark() {
   return <><span aria-hidden="true" className="text-primary">*</span><span className="sr-only"> (obligatoire)</span></>
 }
 
-function WizardStepper({ currentStep }: { currentStep: number }) {
+function WizardStepper({ currentStep, isEditing, onStepChange }: { currentStep: number; isEditing: boolean; onStepChange: (step: number) => void }) {
   return (
-    <nav aria-label="Étapes de création" className="rounded-lg border bg-card p-3">
+    <nav aria-label={isEditing ? 'Sections de modification' : 'Étapes de création'} className="rounded-lg border bg-card p-3">
+      {isEditing && <p className="mb-3 px-1 text-xs text-muted-foreground"><strong className="font-medium text-foreground">Accès direct :</strong> cliquez sur une section pour la modifier.</p>}
       <ol className="flex gap-2 overflow-x-auto lg:grid lg:grid-cols-5">
         {steps.map((step, index) => {
           const Icon = step.icon
-          const completed = index < currentStep
+          const completed = !isEditing && index < currentStep
           const active = index === currentStep
+          const content = <><span className={cn('grid size-8 shrink-0 place-items-center rounded-md border', active && 'border-primary-foreground/20 bg-primary-foreground/10', !active && 'border-border bg-background')}>{completed ? <Check className="size-4" /> : <Icon className="size-4" />}</span><span className="min-w-0"><strong className="block truncate text-sm font-semibold">{step.title}</strong><span className={cn('mt-0.5 hidden truncate text-xs xl:block', active ? 'text-primary-foreground/70' : 'text-muted-foreground')}>{step.description}</span></span></>
+          const stepClassName = cn('flex h-full w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors', active && 'bg-primary text-primary-foreground', !active && completed && 'bg-primary/8 text-primary', !active && !completed && 'text-muted-foreground', isEditing && !active && 'cursor-pointer hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring')
           return (
             <li key={step.title} className="min-w-44 lg:min-w-0">
-              <div className={cn('flex h-full items-center gap-3 rounded-md px-3 py-2.5 transition-colors', active && 'bg-primary text-primary-foreground', !active && completed && 'bg-primary/8 text-primary', !active && !completed && 'text-muted-foreground')} aria-current={active ? 'step' : undefined}>
-                <span className={cn('grid size-8 shrink-0 place-items-center rounded-md border', active && 'border-primary-foreground/20 bg-primary-foreground/10', !active && 'border-border bg-background')}>
-                  {completed ? <Check className="size-4" /> : <Icon className="size-4" />}
-                </span>
-                <span className="min-w-0"><strong className="block truncate text-sm font-semibold">{step.title}</strong><span className={cn('mt-0.5 hidden truncate text-xs xl:block', active ? 'text-primary-foreground/70' : 'text-muted-foreground')}>{step.description}</span></span>
-              </div>
+              {isEditing ? <button type="button" className={stepClassName} aria-current={active ? 'step' : undefined} onClick={() => onStepChange(index)}>{content}</button> : <div className={stepClassName} aria-current={active ? 'step' : undefined}>{content}</div>}
             </li>
           )
         })}
@@ -183,7 +181,7 @@ export function OrganizationWizard({ organization }: { organization?: Organizati
 
   function submit() {
     if (!confirmed) {
-      setError('Confirmez l’exactitude des informations avant de créer l’organisation.')
+      setError(isEditing ? 'Confirmez l’exactitude des informations avant d’enregistrer les modifications.' : 'Confirmez l’exactitude des informations avant de créer l’organisation.')
       return
     }
     setError('')
@@ -230,9 +228,9 @@ export function OrganizationWizard({ organization }: { organization?: Organizati
             <section><Button render={<Link href="/admin/organizations" />} nativeButton={false} variant="ghost" className="-ml-2 mb-3"><ArrowLeft data-icon="inline-start" />Retour aux organisations</Button><p className="mb-2 text-xs font-medium text-primary">{isEditing ? 'Mise à jour guidée' : 'Création guidée'}</p><h1 className="text-2xl font-semibold tracking-[-0.04em] sm:text-[30px]">{isEditing ? `Modifier ${organization?.name}` : 'Nouvelle organisation'}</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">{isEditing ? 'Mettez à jour les informations, le périmètre et le statut de cette organisation.' : 'Configurez le périmètre, l’administration et l’état initial de la nouvelle organisation.'}</p></section>
 
             <div className="flex flex-col gap-4">
-              <WizardStepper currentStep={currentStep} />
+              <WizardStepper currentStep={currentStep} isEditing={isEditing} onStepChange={(step) => { setCurrentStep(step); setError('') }} />
               <section className="rounded-lg border bg-card shadow-sm">
-                <div className="flex flex-col gap-3 border-b px-5 py-5 sm:flex-row sm:items-end sm:justify-between sm:px-7"><div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">Étape {currentStep + 1} sur {steps.length}</p><h2 className="mt-2 text-xl font-semibold tracking-[-0.02em]">{steps[currentStep].title}</h2><p className="mt-1 text-sm text-muted-foreground">{steps[currentStep].description}</p></div><p className="shrink-0 text-xs text-muted-foreground"><RequiredMark /> Champs obligatoires</p></div>
+                <div className="flex flex-col gap-3 border-b px-5 py-5 sm:flex-row sm:items-end sm:justify-between sm:px-7"><div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">{isEditing ? 'Section' : 'Étape'} {currentStep + 1} sur {steps.length}</p><h2 className="mt-2 text-xl font-semibold tracking-[-0.02em]">{steps[currentStep].title}</h2><p className="mt-1 text-sm text-muted-foreground">{steps[currentStep].description}</p></div><p className="shrink-0 text-xs text-muted-foreground"><RequiredMark /> Champs obligatoires</p></div>
                 <div className="px-5 py-6 sm:px-7">
                   {currentStep === 0 && (
                     <FieldGroup>
