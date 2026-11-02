@@ -5,11 +5,16 @@ import Link from 'next/link'
 import { useState } from 'react'
 
 import { acceptInvitation } from '@/app/actions/admin-access'
+import { saveUserProfile } from '@/app/actions/profile'
+import { ProfileFields } from '@/components/profile-fields'
 import { Button } from '@/components/ui/button'
 import { authClient } from '@/lib/auth-client'
+import { emptyProfile, type ProfileValues } from '@/lib/profile'
+
+const authFieldClass = 'h-12 w-full rounded-xl border bg-card px-4 text-sm font-normal outline-none focus:border-ring focus:ring-2 focus:ring-ring/20'
 
 export function AuthForm({ mode, invitationToken }: { mode: 'sign-in' | 'sign-up'; invitationToken?: string }) {
-  const [name, setName] = useState('')
+  const [profile, setProfile] = useState<ProfileValues>(emptyProfile)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -23,14 +28,23 @@ export function AuthForm({ mode, invitationToken }: { mode: 'sign-in' | 'sign-up
     setError('')
 
     const result = isSignUp
-      ? await authClient.signUp.email({ name: name.trim(), email: email.trim(), password, callbackURL: '/admission' })
+      ? await authClient.signUp.email({ name: `${profile.firstName} ${profile.lastName}`.trim(), email: email.trim(), password, callbackURL: '/admission' })
       : await authClient.signIn.email({ email: email.trim(), password })
 
-    setPending(false)
     if (result.error) {
+      setPending(false)
       setError('Impossible de vous authentifier. Vérifiez vos informations et réessayez.')
       return
     }
+    if (isSignUp) {
+      const saved = await saveUserProfile(profile)
+      if (!saved.ok) {
+        setPending(false)
+        setError(saved.message)
+        return
+      }
+    }
+    setPending(false)
     if (isSignUp && invitationToken) {
       const acceptance = await acceptInvitation({ token: invitationToken })
       if (!acceptance.ok) {
@@ -57,7 +71,7 @@ export function AuthForm({ mode, invitationToken }: { mode: 'sign-in' | 'sign-up
           <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em]">{isSignUp ? 'Créer votre compte' : 'Se connecter'}</h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">{isSignUp ? 'Le premier compte créé devient super administrateur.' : 'Accédez à l’administration de votre organisation.'}</p>
           <form onSubmit={submit} className="mt-8 flex flex-col gap-5">
-            {isSignUp && <label className="flex flex-col gap-2 text-sm font-medium">Nom complet<input required minLength={2} maxLength={120} value={name} onChange={(event) => setName(event.target.value)} className="h-12 rounded-xl border bg-card px-4 outline-none focus:border-ring focus:ring-2 focus:ring-ring/20" autoComplete="name" /></label>}
+            {isSignUp && <ProfileFields value={profile} onChange={setProfile} fieldClassName={authFieldClass} />}
             <label className="flex flex-col gap-2 text-sm font-medium">Adresse e-mail<div className="relative"><Mail className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="h-12 w-full rounded-xl border bg-card pl-11 pr-4 outline-none focus:border-ring focus:ring-2 focus:ring-ring/20" autoComplete="email" /></div></label>
             <label className="flex flex-col gap-2 text-sm font-medium">Mot de passe<div className="relative"><LockKeyhole className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><input required minLength={12} type={showPassword ? 'text' : 'password'} value={password} onChange={(event) => setPassword(event.target.value)} className="h-12 w-full rounded-xl border bg-card pl-11 pr-12 outline-none focus:border-ring focus:ring-2 focus:ring-ring/20" autoComplete={isSignUp ? 'new-password' : 'current-password'} /><button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-3 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-lg text-muted-foreground hover:bg-muted" aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}>{showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}</button></div>{isSignUp && <span className="text-xs font-normal text-muted-foreground">12 caractères minimum.</span>}</label>
             {error && <p role="alert" className="rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</p>}

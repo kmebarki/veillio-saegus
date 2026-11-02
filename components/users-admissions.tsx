@@ -1,11 +1,14 @@
 'use client'
 
-import { Ban, Bell, Building2, Check, ChevronDown, CircleHelp, Download, Filter, LogOut, Mail, Menu, Search, Send, Settings, ShieldCheck, UserCheck, UserPlus, UserRoundX, Users } from 'lucide-react'
+import { Ban, Bell, Building2, Check, ChevronDown, CircleHelp, Download, Filter, IdCard, LogOut, Mail, Menu, Search, Send, Settings, ShieldCheck, UserCheck, UserPlus, UserRoundX, Users } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useMemo, useState, useTransition } from 'react'
 
 import { cancelInvitation, createInvitation, getExportRows, resendInvitation } from '@/app/actions/admin-access'
+import { getUserProfile } from '@/app/actions/profile'
 import { AdmissionReviewDialog } from '@/components/admission-review-dialog'
+import { UserProfileDialog } from '@/components/user-profile-dialog'
+import type { UserProfile } from '@/lib/profile'
 import { OrganizationPanel } from '@/components/organization-panel'
 import { Button } from '@/components/ui/button'
 import { Modal, fieldClass } from '@/components/ui/modal'
@@ -85,6 +88,7 @@ export function UsersAdmissions({ viewer, users, admissions, invitations, organi
   const [invitationFilter, setInvitationFilter] = useState('Toutes')
   const [inviteOpen, setInviteOpen] = useState(false)
   const [review, setReview] = useState<{ admission: AdminAdmission; mode: 'approve' | 'reject' } | null>(null)
+  const [profile, setProfile] = useState<UserProfile | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const [formError, setFormError] = useState('')
   const [invite, setInvite] = useState<{ name: string; email: string; role: InvitationRole; teamId: string }>({ name: '', email: '', role: 'Reader', teamId: '' })
@@ -106,6 +110,14 @@ export function UsersAdmissions({ viewer, users, admissions, invitations, organi
       const result = await action()
       notify(result.message)
       if (result.ok) router.refresh()
+    })
+  }
+
+  function openProfile(target: { userId: string } | { email: string }) {
+    startTransition(async () => {
+      const result = await getUserProfile(target)
+      if (result.ok) setProfile(result.profile)
+      else notify(result.message)
     })
   }
 
@@ -200,7 +212,7 @@ export function UsersAdmissions({ viewer, users, admissions, invitations, organi
                       <thead><tr className="border-b bg-muted/40 text-xs text-muted-foreground"><th className="px-6 py-3 font-medium">Utilisateur</th><th className="px-4 py-3 font-medium">Rôle</th><th className="px-4 py-3 font-medium">Équipe</th><th className="px-4 py-3 font-medium">Statut</th><th className="px-4 py-3 font-medium">Dernière activité</th><th className="px-6 py-3"><span className="sr-only">Actions</span></th></tr></thead>
                       <tbody>{filteredUsers.map((user) => (
                         <tr key={user.id} className="border-b last:border-0 hover:bg-muted/30">
-                          <td className="px-6 py-4"><div className="flex items-center gap-3"><Avatar initials={user.initials} /><div><p className="text-sm font-semibold">{user.name}</p><p className="mt-0.5 text-xs text-muted-foreground">{user.email}</p></div></div></td>
+                          <td className="px-6 py-4"><button type="button" onClick={() => openProfile({ userId: user.id })} className="flex items-center gap-3 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Ouvrir la fiche de ${user.name}`}><Avatar initials={user.initials} /><div><p className="text-sm font-semibold hover:underline">{user.name}</p><p className="mt-0.5 text-xs text-muted-foreground">{user.email}</p></div></button></td>
                           <td className="px-4 py-4 text-sm">{user.role}</td>
                           <td className="px-4 py-4 text-sm text-muted-foreground">{user.team}</td>
                           <td className="px-4 py-4"><StatusBadge status={user.status} /></td>
@@ -225,7 +237,7 @@ export function UsersAdmissions({ viewer, users, admissions, invitations, organi
                           <p className="mt-1 text-xs text-muted-foreground">{admission.email} · Demande reçue le {admission.requestedAt}</p>
                           <p className="mt-2 text-sm">{admission.message}</p>
                         </div>
-                        <div className="flex gap-2 lg:shrink-0"><Button variant="outline" disabled={isPending} onClick={() => setReview({ admission, mode: 'reject' })}><UserRoundX data-icon="inline-start" />Refuser</Button><Button disabled={isPending} onClick={() => setReview({ admission, mode: 'approve' })}><UserCheck data-icon="inline-start" />Approuver</Button></div>
+                        <div className="flex flex-wrap gap-2 lg:shrink-0"><Button variant="ghost" disabled={isPending} onClick={() => openProfile({ email: admission.email })}><IdCard data-icon="inline-start" />Voir la fiche</Button><Button variant="outline" disabled={isPending} onClick={() => setReview({ admission, mode: 'reject' })}><UserRoundX data-icon="inline-start" />Refuser</Button><Button disabled={isPending} onClick={() => setReview({ admission, mode: 'approve' })}><UserCheck data-icon="inline-start" />Approuver</Button></div>
                       </article>
                     ))}</div>
                   ) : (
@@ -281,6 +293,8 @@ export function UsersAdmissions({ viewer, users, admissions, invitations, organi
           <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setInviteOpen(false)}>Annuler</Button><Button type="submit" disabled={isPending}><Send data-icon="inline-start" />{isPending ? 'Envoi…' : 'Envoyer l’invitation'}</Button></div>
         </form>
       </Modal>
+
+      {profile && <UserProfileDialog key={profile.id} profile={profile} onClose={() => setProfile(null)} onSaved={(message) => { notify(message); router.refresh() }} />}
 
       <AdmissionReviewDialog admission={review?.admission ?? null} mode={review?.mode ?? 'approve'} viewer={viewer} teams={teams} busy={isPending} onClose={() => setReview(null)} run={run} />
 
