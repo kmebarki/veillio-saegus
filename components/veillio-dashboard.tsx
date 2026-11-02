@@ -68,7 +68,7 @@ const childHrefs: Record<string, string> = { Connecteurs: '/admin/connectors', C
 const childAccess: Partial<Record<string, keyof ViewerInfo['access']>> = { Connecteurs: 'connectors', Connexions: 'connections', Collectes: 'collections' }
 
 const administrationItems: { label: string; icon: typeof Settings; href: string; access?: keyof ViewerInfo['access'] }[] = [
-  { label: 'Organisations', icon: Building2, href: '#', access: 'users' },
+  { label: 'Organisations', icon: Building2, href: '/admin/organizations', access: 'organizations' },
   { label: 'Utilisateurs et admissions', icon: UserRoundCheck, href: '/admin/users', access: 'users' },
   { label: 'Équipes', icon: Workflow, href: '/admin/teams', access: 'teams' },
   { label: 'Groupes et permissions', icon: ShieldCheck, href: '/admin/groups', access: 'groups' },

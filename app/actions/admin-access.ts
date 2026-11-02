@@ -214,6 +214,7 @@ export async function createInvitation(input: unknown) {
     name: parsed.data.name,
     email: parsed.data.email,
     role: parsed.data.role,
+    organizationId: actor.organizationId,
     teamId: parsed.data.teamId ?? null,
     tokenHash,
     expiresAt: new Date(Date.now() + INVITATION_VALIDITY_MS),
@@ -292,7 +293,7 @@ export async function acceptInvitation(input: unknown) {
       .update(invitations)
       .set({ status: 'Accepted', updatedAt: new Date() })
       .where(and(eq(invitations.tokenHash, tokenHash), eq(invitations.email, identity.email), eq(invitations.status, 'Pending'), gt(invitations.expiresAt, new Date())))
-      .returning({ id: invitations.id, role: invitations.role, teamId: invitations.teamId, createdByUserId: invitations.createdByUserId })
+      .returning({ id: invitations.id, role: invitations.role, teamId: invitations.teamId, organizationId: invitations.organizationId, createdByUserId: invitations.createdByUserId })
 
     if (!invitation) return null
     const [inviter] = await tx.select({ organizationId: users.organizationId }).from(users).where(eq(users.id, invitation.createdByUserId)).limit(1)
@@ -301,7 +302,7 @@ export async function acceptInvitation(input: unknown) {
       role: assignedRole,
       status: 'active',
       emailVerified: true,
-      organizationId: inviter?.organizationId ?? defaultOrganization?.id ?? null,
+      organizationId: invitation.organizationId ?? inviter?.organizationId ?? defaultOrganization?.id ?? null,
       teamId: invitation.teamId,
       updatedAt: new Date(),
     }).where(eq(users.id, identity.id))

@@ -24,6 +24,7 @@ export async function GET() {
         roleLabel: isRoleKey(identity.role) ? ROLE_LABELS[identity.role] : identity.role,
         permissions,
         access: {
+          organizations: permissions.includes('organizations.view'),
           users: isAdmin || (identity.role === 'pilot' && Boolean(identity.teamId)),
           teams: isAdmin || permissions.includes('teams.view'),
           groups: isAdmin || permissions.includes('groups.view'),

@@ -10,7 +10,7 @@ export type ViewerInfo = {
   role: string
   roleLabel: string
   permissions: string[]
-  access: { users: boolean; teams: boolean; groups: boolean; connectors: boolean; connections: boolean; collections: boolean }
+  access: { organizations: boolean; users: boolean; teams: boolean; groups: boolean; connectors: boolean; connections: boolean; collections: boolean }
 }
 
 async function fetchViewer(url: string): Promise<ViewerInfo | null> {
