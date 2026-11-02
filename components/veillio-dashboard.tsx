@@ -63,7 +63,7 @@ const steeringItems = [
 const administrationItems = [
   { label: 'Utilisateurs et admissions', icon: UserRoundCheck, href: '/admin/users' },
   { label: 'Équipes', icon: Workflow, href: '/admin/teams' },
-  { label: 'Groupes et permissions', icon: ShieldCheck, href: '#' },
+  { label: 'Groupes et permissions', icon: ShieldCheck, href: '/admin/groups' },
   { label: 'Paramètres', icon: Settings, href: '#' },
 ]
 

@@ -1,4 +1,4 @@
-import { bigserial, boolean, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
+import { bigserial, boolean, integer, jsonb, pgTable, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core'
 
 export const users = pgTable('user', {
   id: text('id').primaryKey(),
@@ -109,6 +109,29 @@ export const teams = pgTable('teams', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
+
+export const permissionGroups = pgTable('permission_groups', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organizationId').notNull(),
+  name: text('name').notNull(),
+  description: text('description'),
+  permissions: text('permissions').array().notNull().default([]),
+  version: integer('version').notNull().default(1),
+  createdByUserId: text('createdByUserId'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const permissionGroupMembers = pgTable(
+  'permission_group_members',
+  {
+    groupId: uuid('groupId').notNull().references(() => permissionGroups.id, { onDelete: 'cascade' }),
+    userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    addedByUserId: text('addedByUserId'),
+    createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.groupId, table.userId] })],
+)
 
 export const authorizedDomains = pgTable('authorized_domains', {
   id: uuid('id').primaryKey().defaultRandom(),

@@ -1,10 +1,12 @@
 import { eq } from 'drizzle-orm'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { cache } from 'react'
 
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { organizations, users } from '@/lib/db/schema'
+import { organizations, permissionGroupMembers, permissionGroups, users } from '@/lib/db/schema'
+import { getRolePermissions, normalizePermissions } from '@/lib/permissions'
 import { isAdminRole } from '@/lib/roles'
 
 export async function getCurrentIdentity() {
@@ -46,6 +48,22 @@ export async function requireManager() {
   const identity = await requireIdentity()
   if (!isAdminRole(identity.role) && !(identity.role === 'pilot' && identity.teamId)) redirect('/')
   return identity
+}
+
+export const getEffectivePermissions = cache(async (userId: string, role: string) => {
+  const groupRows = await db
+    .select({ permissions: permissionGroups.permissions })
+    .from(permissionGroupMembers)
+    .innerJoin(permissionGroups, eq(permissionGroups.id, permissionGroupMembers.groupId))
+    .where(eq(permissionGroupMembers.userId, userId))
+  return normalizePermissions([...getRolePermissions(role), ...groupRows.flatMap((row) => row.permissions)])
+})
+
+export async function requirePermission(permission: string) {
+  const identity = await requireIdentity()
+  const permissions = await getEffectivePermissions(identity.id, identity.role)
+  if (!permissions.includes(permission)) redirect('/')
+  return { ...identity, permissions }
 }
 
 export async function getDefaultOrganization() {
