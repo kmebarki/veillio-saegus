@@ -14,6 +14,7 @@ export type ConnectionSummary = {
   id: string
   name: string
   description: string
+  logoUrl: string
   connectorId: string
   connectorName: string
   connectorLogoUrl: string

@@ -44,9 +44,11 @@ type Props = {
   sourceUrl: string
   onChange: (logoUrl: string) => void
   disabled?: boolean
+  label?: string
+  helper?: string
 }
 
-export function ConnectorLogoField({ kind, value, sourceUrl, onChange, disabled }: Props) {
+export function ConnectorLogoField({ kind, value, sourceUrl, onChange, disabled, label = 'Logo (facultatif)', helper }: Props) {
   const inputId = useId()
   const fileInput = useRef<HTMLInputElement>(null)
   const [message, setMessage] = useState('')
@@ -86,7 +88,7 @@ export function ConnectorLogoField({ kind, value, sourceUrl, onChange, disabled 
 
   return (
     <div className="flex flex-col gap-2 text-xs font-medium">
-      <span id={`${inputId}-label`}>Logo (facultatif)</span>
+      <span id={`${inputId}-label`}>{label}</span>
       <div className="flex flex-wrap items-center gap-3" role="group" aria-labelledby={`${inputId}-label`}>
         <ConnectorLogo kind={kind} logoUrl={value} className="size-14 rounded-xl" />
         <div className="flex flex-wrap items-center gap-2">
@@ -125,7 +127,7 @@ export function ConnectorLogoField({ kind, value, sourceUrl, onChange, disabled 
         />
       </label>
       <p className="min-h-4 text-xs font-normal text-muted-foreground" role="status" aria-live="polite">
-        {message || 'Importé, il est redimensionné automatiquement. Le logo du site est récupéré à partir de l’adresse de la section Source.'}
+        {message || helper || 'Importé, il est redimensionné automatiquement. Le logo du site est récupéré à partir de l’adresse de la section Source.'}
       </p>
     </div>
   )

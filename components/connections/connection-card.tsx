@@ -18,7 +18,7 @@ export function ConnectionCard({ connection, busy, onOpen, onEdit, onTest, onDel
   return (
     <article className="group relative flex flex-col gap-4 rounded-2xl border bg-card p-5 transition-shadow hover:shadow-md">
       <div className="flex items-start gap-3">
-        <ConnectorLogo kind={connection.connectorKind} logoUrl={connection.connectorLogoUrl} className="size-11 rounded-xl" />
+        <ConnectorLogo kind={connection.connectorKind} logoUrl={connection.logoUrl || connection.connectorLogoUrl} className="size-11 rounded-xl" />
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-base font-semibold tracking-[-0.02em]">
             <button type="button" onClick={onOpen} className="text-left after:absolute after:inset-0 after:rounded-2xl focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-ring">{connection.name}</button>

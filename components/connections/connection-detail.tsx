@@ -34,7 +34,7 @@ export function ConnectionDetail({ connection, activity, busy, onEdit, onTest, o
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className="flex min-w-0 flex-col gap-6">
         <div className="flex items-center gap-3">
-          <ConnectorLogo kind={connection.connectorKind} logoUrl={connection.connectorLogoUrl} className="size-12 rounded-xl" />
+          <ConnectorLogo kind={connection.connectorKind} logoUrl={connection.logoUrl || connection.connectorLogoUrl} className="size-12 rounded-xl" />
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">{connection.connectorName}</p>
             <p className="truncate text-xs text-muted-foreground">{connection.host || connection.connectorUrl}</p>

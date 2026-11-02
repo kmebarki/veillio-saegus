@@ -192,6 +192,7 @@ export const connections = pgTable('connections', {
   secretRotatedAt: timestamp('secretRotatedAt', { withTimezone: true }),
   expiresAt: timestamp('expiresAt', { withTimezone: true }),
   description: text('description'),
+  logoUrl: text('logoUrl'),
   version: integer('version').notNull().default(1),
   lastCheckAt: timestamp('lastCheckAt', { withTimezone: true }),
   lastCheckStatus: text('lastCheckStatus'),

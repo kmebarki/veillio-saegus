@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowLeft, PlugZap, ShieldCheck, TriangleAlert, User, Users } from 'lucide-react'
+import { ChevronDown, PlugZap, ShieldCheck, TriangleAlert, User, Users } from 'lucide-react'
 import { useMemo, useState, useTransition } from 'react'
 
 import { createConnection, testConnection, testDraftConnection, updateConnection } from '@/app/actions/connections'
@@ -9,6 +9,7 @@ import { ConnectorPicker } from '@/components/connections/connector-picker'
 import { RequestPreview } from '@/components/connections/request-preview'
 import { SecretField } from '@/components/connections/secret-field'
 import { TestResult } from '@/components/connections/test-result'
+import { ConnectorLogoField } from '@/components/connector-logo-field'
 import { ConnectorLogo } from '@/components/connector-ui'
 import { Button } from '@/components/ui/button'
 import { analyzeSecret, analyzeUsername } from '@/lib/connection-secret'
@@ -33,9 +34,9 @@ export function ConnectionForm({ target, overview, onClose, onDone }: Props) {
   const initialConnector = editing?.connectorId ?? (target.mode === 'create' ? target.connectorId : undefined) ?? (usableConnectors.length === 1 ? usableConnectors[0].id : '')
 
   const [connectorId, setConnectorId] = useState(initialConnector)
-  const [picking, setPicking] = useState(!editing && !initialConnector)
   const [name, setName] = useState(editing?.name ?? '')
   const [description, setDescription] = useState(editing?.description ?? '')
+  const [logoUrl, setLogoUrl] = useState(editing?.logoUrl ?? '')
   const [scope, setScope] = useState<ConnectionScope>(editing?.scope ?? (overview.viewer.canManage ? 'organization' : 'user'))
   const [username, setUsername] = useState(editing?.username ?? '')
   const [secret, setSecret] = useState('')
@@ -75,33 +76,38 @@ export function ConnectionForm({ target, overview, onClose, onDone }: Props) {
     setError(null)
     startTransition(async () => {
       if (editing) {
-        const result = await updateConnection({ id: editing.id, version: editing.version, name, description, username, expiresAt, secret: replacing ? { mode: 'set', value: secret } : { mode: 'keep', value: '' } })
+        const result = await updateConnection({ id: editing.id, version: editing.version, name, description, logoUrl, username, expiresAt, secret: replacing ? { mode: 'set', value: secret } : { mode: 'keep', value: '' } })
         if (!result.ok) return setError(result.message)
         return onDone(result.message)
       }
-      const created = await createConnection({ connectorId, name, description, scope, username, secret, expiresAt })
+      const created = await createConnection({ connectorId, name, description, logoUrl, scope, username, secret, expiresAt })
       if (!created.ok) return setError(created.message)
       const tested = await testConnection({ id: created.id })
       onDone(tested.ok ? `Connexion créée · ${tested.outcome.status === 'success' ? 'test réussi' : tested.outcome.status === 'warning' ? 'test réussi avec réserves' : 'test en échec, vérifiez les identifiants'}.` : created.message)
     })
   }
 
-  if (picking) {
+  const connectorField = (
+    <div className="flex flex-col gap-1.5">
+      <div>
+        <h3 className="text-sm font-semibold">Connecteur</h3>
+        <p className="text-xs text-muted-foreground">Le fournisseur de données auquel cette connexion donnera accès.</p>
+      </div>
+      <ConnectorPicker
+        connectors={overview.connectors}
+        value={connectorId}
+        onSelect={(id) => {
+          setConnectorId(id)
+          setDraft(null)
+        }}
+      />
+    </div>
+  )
+
+  if (!editing && !connectorId) {
     return (
       <div className="flex flex-col gap-4">
-        <div>
-          <h3 className="text-sm font-semibold">1. Choisissez le connecteur</h3>
-          <p className="text-xs text-muted-foreground">Le fournisseur de données auquel cette connexion donnera accès.</p>
-        </div>
-        <ConnectorPicker
-          connectors={overview.connectors}
-          value={connectorId}
-          onSelect={(id) => {
-            setConnectorId(id)
-            setDraft(null)
-            setPicking(false)
-          }}
-        />
+        {connectorField}
         <div className="flex justify-end border-t pt-4"><Button type="button" variant="ghost" onClick={onClose}>Annuler</Button></div>
       </div>
     )
@@ -110,17 +116,11 @@ export function ConnectionForm({ target, overview, onClose, onDone }: Props) {
   return (
     <form onSubmit={submit} className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_330px]">
       <div className="flex min-w-0 flex-col gap-5">
-        {!editing && choice && (
-          <div className="flex items-center gap-3 rounded-xl border bg-muted/40 p-3">
-            <ConnectorLogo kind={choice.kind} logoUrl={choice.logoUrl} className="size-9 rounded-lg" />
-            <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{choice.name}</p><p className="truncate text-xs text-muted-foreground">{choice.host || 'URL à renseigner'} · {AUTH_LABELS[authType]?.label}</p></div>
-            {usableConnectors.length > 1 && <Button type="button" variant="outline" size="sm" onClick={() => setPicking(true)}><ArrowLeft data-icon="inline-start" />Changer</Button>}
-          </div>
-        )}
+        {!editing && connectorField}
 
         {editing && (
           <div className="flex items-center gap-3 rounded-xl border bg-muted/40 p-3">
-            <ConnectorLogo kind={editing.connectorKind} logoUrl={editing.connectorLogoUrl} className="size-9 rounded-lg" />
+            <ConnectorLogo kind={editing.connectorKind} logoUrl={logoUrl || editing.connectorLogoUrl} className="size-9 rounded-lg" />
             <div className="min-w-0"><p className="truncate text-sm font-semibold">{editing.connectorName}</p><p className="truncate text-xs text-muted-foreground">{editing.host} · {AUTH_LABELS[authType]?.label}</p></div>
           </div>
         )}
@@ -135,6 +135,24 @@ export function ConnectionForm({ target, overview, onClose, onDone }: Props) {
             <input value={description} onChange={(event) => setDescription(event.target.value)} className={inputClass} placeholder="Ex. Quota 10 requêtes/s, compte de Marie" maxLength={240} />
           </label>
         </div>
+
+        <details className="group rounded-xl border bg-card" open={Boolean(logoUrl)}>
+          <summary className="flex cursor-pointer list-none items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 [&::-webkit-details-marker]:hidden">
+            <ConnectorLogo kind={editing?.connectorKind ?? choice?.kind ?? 'api'} logoUrl={logoUrl || editing?.connectorLogoUrl || choice?.logoUrl} className="size-8 rounded-lg" />
+            <span className="flex-1">Logo de la connexion <span className="font-normal text-muted-foreground">· {logoUrl ? 'Personnalisé' : 'Celui du connecteur par défaut'}</span></span>
+            <ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden />
+          </summary>
+          <div className="border-t p-3">
+            <ConnectorLogoField
+              kind={editing?.connectorKind ?? choice?.kind ?? 'api'}
+              value={logoUrl}
+              sourceUrl={endpoint}
+              onChange={setLogoUrl}
+              label="Logo ou image"
+              helper="Importez une image ou récupérez le logo du site du fournisseur. Vide, le logo du connecteur est utilisé."
+            />
+          </div>
+        </details>
 
         {!editing && (
           <fieldset className="flex flex-col gap-2">
