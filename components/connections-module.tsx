@@ -1,182 +1,93 @@
 'use client'
 
-import { Bell, CircleHelp, KeyRound, Menu, Pencil, PlugZap, Plus, Search, Settings, Trash2, User, Users } from 'lucide-react'
+import { Bell, CircleHelp, KeyRound, Menu, Plus, Search, Settings, TriangleAlert } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useMemo, useState, useTransition } from 'react'
+import { useMemo, useState } from 'react'
 
-import { createConnection, deleteConnection, testConnection, updateConnection } from '@/app/actions/connections'
-import { HealthDot, KindIcon } from '@/components/connector-ui'
+import { deleteConnection, getConnectionActivity, testConnection } from '@/app/actions/connections'
+import { ConnectionCard } from '@/components/connections/connection-card'
+import { ConnectionDetail } from '@/components/connections/connection-detail'
+import { ConnectionForm, type FormTarget } from '@/components/connections/connection-form'
+import { inputClass, needsAttention } from '@/components/connections/helpers'
+import { TestResult } from '@/components/connections/test-result'
+import { KindIcon } from '@/components/connector-ui'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
-import { Sidebar } from '@/components/veillio-dashboard'
 import { UserMenu } from '@/components/user-menu'
-import { secretLabel, type AuthType } from '@/lib/connector-catalog'
-import type { ConnectionScope, ConnectionSummary, ConnectionsOverview } from '@/lib/connection-types'
+import { Sidebar } from '@/components/veillio-dashboard'
+import type { ConnectionActivityEntry, ConnectionSummary, ConnectionsOverview } from '@/lib/connection-types'
+import type { TestOutcome } from '@/lib/connector-types'
 import { cn } from '@/lib/utils'
 
-type ScopeFilter = 'all' | ConnectionScope
-
-const AUTH_LABELS: Record<string, string> = { basic: 'Identifiant + mot de passe', bearer: 'Jeton Bearer', api_key_header: 'Clé API (en-tête)', api_key_query: 'Clé API (paramètre d’URL)' }
-const inputClass = 'h-10 w-full rounded-xl border bg-card px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/20'
-
-function authLabel(type: string) {
-  return AUTH_LABELS[type] ?? 'Clé API'
-}
-
-function ConnectionCard({ connection, onEdit, onTest, onDelete, busy }: { connection: ConnectionSummary; onEdit: () => void; onTest: () => void; onDelete: () => void; busy: boolean }) {
-  const personal = connection.scope === 'user'
-  return (
-    <article className="flex flex-col gap-4 rounded-2xl border bg-card p-5">
-      <div className="flex items-start gap-3">
-        <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><KindIcon kind={connection.connectorKind} className="size-5" /></span>
-        <div className="min-w-0 flex-1">
-          <h2 className="truncate text-base font-semibold tracking-[-0.02em]">{connection.name}</h2>
-          <p className="mt-0.5 truncate text-sm text-muted-foreground">{connection.connectorName} · {authLabel(connection.authType)}</p>
-        </div>
-        <span className={cn('inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold', personal ? 'bg-secondary text-secondary-foreground' : 'bg-primary/10 text-primary')}>
-          {personal ? <User className="size-3.5" aria-hidden /> : <Users className="size-3.5" aria-hidden />}
-          {personal ? 'Personnelle' : 'Partagée'}
-        </span>
-      </div>
-
-      <dl className="grid grid-cols-2 gap-3 text-sm">
-        <div><dt className="text-xs text-muted-foreground">{secretLabel(connection.authType as AuthType)}</dt><dd className="mt-0.5 flex items-center gap-1.5 font-medium"><KeyRound className="size-3.5 text-muted-foreground" aria-hidden />{connection.hasSecret ? '•••••••• (chiffré)' : 'Non renseigné'}</dd></div>
-        <div><dt className="text-xs text-muted-foreground">{personal ? 'Propriétaire' : 'Portée'}</dt><dd className="mt-0.5 truncate font-medium">{connection.ownerName}</dd></div>
-        {connection.username && <div className="col-span-2"><dt className="text-xs text-muted-foreground">Identifiant</dt><dd className="mt-0.5 truncate font-medium">{connection.username}</dd></div>}
-      </dl>
-
-      <div className="flex flex-col gap-1 border-t pt-3">
-        <HealthDot connector={connection} />
-        <p className="line-clamp-2 min-h-8 text-xs leading-4 text-muted-foreground">{connection.lastCheckMessage ?? 'Testez la connexion pour vérifier les identifiants.'}{connection.lastCheckAt ? ` (${connection.lastCheckAt})` : ''}</p>
-      </div>
-
-      {connection.canEdit && (
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" disabled={busy} onClick={onTest}><PlugZap data-icon="inline-start" />Tester</Button>
-          <Button size="sm" variant="ghost" disabled={busy} onClick={onEdit}><Pencil data-icon="inline-start" />Modifier</Button>
-          <Button size="sm" variant="ghost" disabled={busy} onClick={onDelete} className="ml-auto text-destructive hover:text-destructive"><Trash2 data-icon="inline-start" />Supprimer</Button>
-        </div>
-      )}
-    </article>
-  )
-}
-
-type FormTarget = { mode: 'create' } | { mode: 'edit'; connection: ConnectionSummary }
-
-function ConnectionForm({ target, overview, onClose, onDone }: { target: FormTarget; overview: ConnectionsOverview; onClose: () => void; onDone: (message: string) => void }) {
-  const editing = target.mode === 'edit' ? target.connection : null
-  const [connectorId, setConnectorId] = useState(editing?.connectorId ?? overview.connectors[0]?.id ?? '')
-  const [name, setName] = useState(editing?.name ?? '')
-  const [scope, setScope] = useState<ConnectionScope>(editing?.scope ?? (overview.viewer.canManage ? 'organization' : 'user'))
-  const [username, setUsername] = useState(editing?.username ?? '')
-  const [secret, setSecret] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [pending, startTransition] = useTransition()
-
-  const connector = overview.connectors.find((item) => item.id === connectorId)
-  const authType = (editing?.authType ?? connector?.authType ?? 'api_key_header') as AuthType
-  const needsUsername = authType === 'basic'
-  const label = secretLabel(authType)
-
-  function submit(event: React.FormEvent) {
-    event.preventDefault()
-    setError(null)
-    startTransition(async () => {
-      const result = editing
-        ? await updateConnection({ id: editing.id, version: editing.version, name, username, secret: secret ? { mode: 'set', value: secret } : { mode: 'keep', value: '' } })
-        : await createConnection({ connectorId, name, scope, username, secret })
-      if (!result.ok) return setError(result.message)
-      onDone(result.message)
-    })
-  }
-
-  return (
-    <form onSubmit={submit} className="flex flex-col gap-4">
-      {!editing && (
-        <label className="flex flex-col gap-1.5 text-sm font-medium">
-          Connecteur
-          <select value={connectorId} onChange={(event) => setConnectorId(event.target.value)} className={inputClass} required>
-            {overview.connectors.map((item) => <option key={item.id} value={item.id}>{item.name}{item.host ? ` · ${item.host}` : ''}</option>)}
-          </select>
-          {connector && <span className="text-xs font-normal text-muted-foreground">Authentification requise : {authLabel(connector.authType)}{connector.keyName && (authType === 'api_key_header' || authType === 'api_key_query') ? ` (« ${connector.keyName} »)` : ''}.</span>}
-        </label>
-      )}
-
-      <label className="flex flex-col gap-1.5 text-sm font-medium">
-        Nom de la connexion
-        <input value={name} onChange={(event) => setName(event.target.value)} className={inputClass} placeholder="Ex. Clé API NCBI de l’équipe" maxLength={80} required />
-      </label>
-
-      {!editing && (
-        <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1.5 text-sm font-medium">Qui peut l’utiliser ?</legend>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {([
-              { id: 'organization', title: 'Partagée', text: 'Toute l’organisation (veilles, collectes).', disabled: !overview.viewer.canManage },
-              { id: 'user', title: 'Personnelle', text: 'Vous seul pouvez la voir et l’utiliser.', disabled: false },
-            ] as const).map((option) => (
-              <label key={option.id} className={cn('flex cursor-pointer flex-col gap-0.5 rounded-xl border p-3 text-sm', scope === option.id ? 'border-primary bg-primary/5' : 'bg-card', option.disabled && 'cursor-not-allowed opacity-50')}>
-                <span className="flex items-center gap-2 font-medium"><input type="radio" name="scope" value={option.id} checked={scope === option.id} disabled={option.disabled} onChange={() => setScope(option.id)} className="accent-primary" />{option.title}</span>
-                <span className="pl-6 text-xs text-muted-foreground">{option.text}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
-      )}
-
-      {needsUsername && (
-        <label className="flex flex-col gap-1.5 text-sm font-medium">
-          Identifiant
-          <input value={username} onChange={(event) => setUsername(event.target.value)} className={inputClass} autoComplete="off" required />
-        </label>
-      )}
-
-      <label className="flex flex-col gap-1.5 text-sm font-medium">
-        {label}
-        <input type="password" value={secret} onChange={(event) => setSecret(event.target.value)} className={inputClass} autoComplete="new-password" required={!editing} placeholder={editing ? 'Laisser vide pour conserver le secret actuel' : ''} />
-        <span className="text-xs font-normal text-muted-foreground">Chiffré avant stockage et jamais réaffiché.</span>
-      </label>
-
-      {error && <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">{error}</p>}
-
-      <div className="flex justify-end gap-2 border-t pt-4">
-        <Button type="button" variant="ghost" onClick={onClose} disabled={pending}>Annuler</Button>
-        <Button type="submit" disabled={pending || (!editing && !connectorId)}>{pending ? 'Enregistrement…' : editing ? 'Enregistrer' : 'Créer la connexion'}</Button>
-      </div>
-    </form>
-  )
-}
+type Filter = 'all' | 'organization' | 'user' | 'attention'
 
 export function ConnectionsModule({ overview }: { overview: ConnectionsOverview }) {
   const router = useRouter()
   const { viewer, connections, connectors, stats } = overview
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [query, setQuery] = useState('')
-  const [scopeFilter, setScopeFilter] = useState<ScopeFilter>('all')
+  const [filter, setFilter] = useState<Filter>('all')
   const [form, setForm] = useState<FormTarget | null>(null)
   const [toDelete, setToDelete] = useState<ConnectionSummary | null>(null)
+  const [detailId, setDetailId] = useState<string | null>(null)
+  const [activity, setActivity] = useState<ConnectionActivityEntry[] | null>(null)
+  const [result, setResult] = useState<{ connection: ConnectionSummary; outcome: TestOutcome } | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
 
+  const detail = connections.find((item) => item.id === detailId) ?? null
+  const uncovered = viewer.canManage ? connectors.filter((item) => item.sharedCount === 0) : []
+
+  const counts = useMemo(() => ({ all: connections.length, organization: stats.shared, user: stats.personal, attention: stats.attention }), [connections.length, stats])
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase()
-    return connections.filter((item) => (scopeFilter === 'all' || item.scope === scopeFilter) && (!needle || `${item.name} ${item.connectorName} ${item.username}`.toLowerCase().includes(needle)))
-  }, [connections, query, scopeFilter])
+    return connections.filter((item) => {
+      const inFilter = filter === 'all' || (filter === 'attention' ? needsAttention(item) : item.scope === filter)
+      return inFilter && (!needle || `${item.name} ${item.connectorName} ${item.username} ${item.host}`.toLowerCase().includes(needle))
+    })
+  }, [connections, query, filter])
 
   function notify(message: string) {
     setToast(message)
-    window.setTimeout(() => setToast(null), 4200)
+    window.setTimeout(() => setToast(null), 4800)
   }
 
-  async function run(id: string, action: () => Promise<{ ok: boolean; message: string }>) {
-    setBusyId(id)
-    const result = await action()
+  function openDetail(connection: ConnectionSummary) {
+    setDetailId(connection.id)
+    setActivity(null)
+    void loadActivity(connection.id)
+  }
+
+  async function loadActivity(id: string) {
+    const response = await getConnectionActivity({ id })
+    setActivity(response.ok ? response.entries : [])
+  }
+
+  async function test(connection: ConnectionSummary) {
+    setBusyId(connection.id)
+    setDetailId(null)
+    const response = await testConnection({ id: connection.id })
     setBusyId(null)
-    notify(result.message)
+    if (response.ok) setResult({ connection, outcome: response.outcome })
+    else notify(response.message)
     router.refresh()
   }
 
+  async function remove(connection: ConnectionSummary) {
+    setBusyId(connection.id)
+    const response = await deleteConnection({ id: connection.id })
+    setBusyId(null)
+    notify(response.message)
+    router.refresh()
+  }
+
+  const filters: { id: Filter; label: string }[] = [
+    { id: 'all', label: 'Toutes' },
+    { id: 'organization', label: 'Partagées' },
+    { id: 'user', label: 'Personnelles' },
+    { id: 'attention', label: 'À surveiller' },
+  ]
   const canCreate = connectors.length > 0
 
   return (
@@ -204,19 +115,34 @@ export function ConnectionsModule({ overview }: { overview: ConnectionsOverview 
               <div className="metric-card"><p>Connexions</p><strong>{stats.total}</strong><span>Visibles par vous</span></div>
               <div className="metric-card"><p>Partagées</p><strong>{stats.shared}</strong><span>Utilisables par l’organisation</span></div>
               <div className="metric-card"><p>Personnelles</p><strong>{stats.personal}</strong><span>Réservées à leur propriétaire</span></div>
-              <div className="metric-card"><p>À surveiller</p><strong>{stats.attention}</strong><span>{stats.attention > 0 ? 'Erreur, réserve ou à retester' : 'Rien à signaler'}</span></div>
+              <div className="metric-card"><p>À surveiller</p><strong>{stats.attention}</strong><span>{stats.attention > 0 ? 'Échec, expiration proche ou à retester' : 'Rien à signaler'}</span></div>
             </section>
 
+            {uncovered.length > 0 && (
+              <section aria-label="Connecteurs sans connexion partagée" className="flex flex-col gap-3 rounded-2xl border border-chart-4/40 bg-chart-4/10 p-4">
+                <p className="flex items-start gap-2 text-sm font-medium"><TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />{uncovered.length === 1 ? 'Un connecteur authentifié n’a aucune connexion partagée' : `${uncovered.length} connecteurs authentifiés n’ont aucune connexion partagée`} : les veilles ne pourront pas les interroger.</p>
+                <div className="flex flex-wrap gap-2">
+                  {uncovered.map((item) => (
+                    <button key={item.id} type="button" onClick={() => setForm({ mode: 'create', connectorId: item.id })} className="inline-flex h-9 items-center gap-2 rounded-full border bg-card px-3 text-sm font-medium transition-colors hover:border-primary hover:text-primary">
+                      <KindIcon kind={item.kind} className="size-4" />{item.name}<Plus className="size-3.5" aria-hidden />
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
+
             {connections.length > 0 && (
-              <section className="flex flex-col gap-3 sm:flex-row sm:items-center" aria-label="Filtres">
+              <section className="flex flex-col gap-3 lg:flex-row lg:items-center" aria-label="Filtres">
                 <label className="relative flex-1">
                   <span className="sr-only">Rechercher une connexion</span>
                   <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <input value={query} onChange={(event) => setQuery(event.target.value)} className={cn(inputClass, 'pl-9')} placeholder="Rechercher par nom, connecteur ou identifiant" />
+                  <input value={query} onChange={(event) => setQuery(event.target.value)} className={cn(inputClass, 'pl-9')} placeholder="Rechercher par nom, connecteur, hôte ou identifiant" />
                 </label>
-                <div className="flex gap-1" role="tablist" aria-label="Filtrer par portée">
-                  {([['all', 'Toutes'], ['organization', 'Partagées'], ['user', 'Personnelles']] as const).map(([id, label]) => (
-                    <button key={id} type="button" role="tab" aria-selected={scopeFilter === id} onClick={() => setScopeFilter(id)} className={cn('h-9 shrink-0 rounded-full border px-3.5 text-sm font-medium transition-colors', scopeFilter === id ? 'border-primary bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:text-foreground')}>{label}</button>
+                <div className="flex gap-1 overflow-x-auto" role="tablist" aria-label="Filtrer les connexions">
+                  {filters.map((item) => (
+                    <button key={item.id} type="button" role="tab" aria-selected={filter === item.id} onClick={() => setFilter(item.id)} className={cn('inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium transition-colors', filter === item.id ? 'border-primary bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:text-foreground')}>
+                      {item.label}<span className={cn('text-xs', filter === item.id ? 'text-primary-foreground/80' : 'text-muted-foreground')}>{counts[item.id]}</span>
+                    </button>
                   ))}
                 </div>
               </section>
@@ -225,14 +151,7 @@ export function ConnectionsModule({ overview }: { overview: ConnectionsOverview 
             {visible.length > 0 ? (
               <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" aria-label="Liste des connexions">
                 {visible.map((connection) => (
-                  <ConnectionCard
-                    key={connection.id}
-                    connection={connection}
-                    busy={busyId === connection.id}
-                    onEdit={() => setForm({ mode: 'edit', connection })}
-                    onTest={() => run(connection.id, () => testConnection({ id: connection.id }))}
-                    onDelete={() => setToDelete(connection)}
-                  />
+                  <ConnectionCard key={connection.id} connection={connection} busy={busyId === connection.id} onOpen={() => openDetail(connection)} onEdit={() => setForm({ mode: 'edit', connection })} onTest={() => void test(connection)} onDelete={() => setToDelete(connection)} />
                 ))}
               </section>
             ) : (
@@ -259,7 +178,7 @@ export function ConnectionsModule({ overview }: { overview: ConnectionsOverview 
       <Modal open={form !== null} onClose={() => setForm(null)} size="xl" title={form?.mode === 'edit' ? 'Modifier la connexion' : 'Nouvelle connexion'} description="Les identifiants sont chiffrés et ne sont jamais renvoyés au navigateur.">
         {form && (
           <ConnectionForm
-            key={form.mode === 'edit' ? form.connection.id : 'new'}
+            key={form.mode === 'edit' ? form.connection.id : `new-${form.connectorId ?? ''}`}
             target={form}
             overview={overview}
             onClose={() => setForm(null)}
@@ -272,6 +191,48 @@ export function ConnectionsModule({ overview }: { overview: ConnectionsOverview 
         )}
       </Modal>
 
+      <Modal open={detail !== null} onClose={() => setDetailId(null)} size="xl" title={detail?.name ?? ''} description="Paramètres techniques et historique de la connexion.">
+        {detail && (
+          <ConnectionDetail
+            connection={detail}
+            activity={activity}
+            busy={busyId === detail.id}
+            onTest={() => void test(detail)}
+            onEdit={() => {
+              setDetailId(null)
+              setForm({ mode: 'edit', connection: detail })
+            }}
+            onDelete={() => {
+              setDetailId(null)
+              setToDelete(detail)
+            }}
+          />
+        )}
+      </Modal>
+
+      <Modal open={result !== null} onClose={() => setResult(null)} size="md" title={result ? `Test de « ${result.connection.name} »` : ''} description={result ? `${result.connection.connectorName} · ${result.connection.host}` : undefined}>
+        {result && (
+          <div className="flex flex-col gap-4">
+            <TestResult outcome={result.outcome} />
+            <div className="flex justify-end gap-2 border-t pt-4">
+              {result.outcome.status === 'error' && result.connection.canEdit && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const connection = result.connection
+                    setResult(null)
+                    setForm({ mode: 'edit', connection })
+                  }}
+                >
+                  Modifier les identifiants
+                </Button>
+              )}
+              <Button onClick={() => setResult(null)}>Fermer</Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
       <Modal open={toDelete !== null} onClose={() => setToDelete(null)} size="md" title="Supprimer la connexion ?" description={toDelete ? `« ${toDelete.name} » sera supprimée définitivement. Les collectes qui l’utilisent ne pourront plus s’authentifier.` : undefined}>
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={() => setToDelete(null)}>Annuler</Button>
@@ -280,7 +241,7 @@ export function ConnectionsModule({ overview }: { overview: ConnectionsOverview 
             onClick={() => {
               const target = toDelete
               setToDelete(null)
-              if (target) void run(target.id, () => deleteConnection({ id: target.id }))
+              if (target) void remove(target)
             }}
           >
             Supprimer

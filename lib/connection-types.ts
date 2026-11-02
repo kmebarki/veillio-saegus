@@ -13,15 +13,24 @@ export type ConnectionOption = {
 export type ConnectionSummary = {
   id: string
   name: string
+  description: string
   connectorId: string
   connectorName: string
   connectorKind: ConnectorKind
+  connectorUrl: string
+  host: string
+  insecure: boolean
   authType: string
   keyName: string
   scope: ConnectionScope
   ownerName: string
   username: string
   hasSecret: boolean
+  secretHint: string | null
+  secretRotatedAt: string
+  secretAgeDays: number
+  expiresAt: string | null
+  expiresInDays: number | null
   health: ConnectorHealth
   version: number
   lastCheckAt: string | null
@@ -40,6 +49,8 @@ export type ConnectorChoice = {
   authType: string
   keyName: string
   host: string
+  insecure: boolean
+  sharedCount: number
 }
 
 export type ConnectionsOverview = {
@@ -49,3 +60,5 @@ export type ConnectionsOverview = {
   connectors: ConnectorChoice[]
   stats: { total: number; shared: number; personal: number; attention: number }
 }
+
+export type ConnectionActivityEntry = { id: number; label: string; detail: string; actor: string; at: string }
