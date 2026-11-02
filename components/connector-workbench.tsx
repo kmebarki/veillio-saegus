@@ -28,7 +28,6 @@ export function ConnectorWorkbench({ kind, existing, canManage, onSaved, onCance
     () => ({
       name: existing?.connector.name ?? '',
       description: existing?.connector.description ?? '',
-      intervalMinutes: existing?.connector.intervalMinutes ?? 360,
       config: existing?.config ?? defaultConfig(kind),
       secret: { mode: existing?.connector.hasSecret ? 'keep' : 'set', value: '' },
     }),
@@ -73,7 +72,7 @@ export function ConnectorWorkbench({ kind, existing, canManage, onSaved, onCance
       return
     }
     startSaving(async () => {
-      const base = { name: draft.name, description: draft.description, intervalMinutes: draft.intervalMinutes, config: draft.config, secret: payloadSecret() }
+      const base = { name: draft.name, description: draft.description, config: draft.config, secret: payloadSecret() }
       if (existing) {
         const updated = await updateConnector({ ...base, id: existing.connector.id, version: existing.connector.version })
         if (!updated.ok) {

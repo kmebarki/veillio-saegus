@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowLeft, Bell, ChevronRight, CircleHelp, Clock, Lock, LogOut, Menu, Plug, Plus, Search, Settings, Timer } from 'lucide-react'
+import { ArrowLeft, Bell, ChevronRight, CircleHelp, Lock, LogOut, Menu, Plug, Plus, Search, Settings, Timer } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 
@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
 import { Sidebar } from '@/components/veillio-dashboard'
 import { authClient } from '@/lib/auth-client'
-import { CONNECTOR_CATALOG, COMING_SOON_KINDS, getKindInfo, intervalLabel, type ConnectorKind, type ConnectorStatus } from '@/lib/connector-catalog'
+import { CONNECTOR_CATALOG, COMING_SOON_KINDS, getKindInfo, type ConnectorKind, type ConnectorStatus } from '@/lib/connector-catalog'
 import type { ConnectorSummary, ConnectorsOverview } from '@/lib/connector-types'
 import { cn } from '@/lib/utils'
 
@@ -51,7 +51,6 @@ function ConnectorCard({ connector, onOpen }: { connector: ConnectorSummary; onO
         <div className="mt-auto flex flex-col gap-3 border-t pt-4">
           <div className="flex items-center justify-between gap-3"><HealthDot connector={connector} /><ChevronRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden /></div>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1.5"><Clock className="size-3.5" aria-hidden />{intervalLabel(connector.intervalMinutes)}</span>
             {connector.lastLatencyMs !== null && <span className="flex items-center gap-1.5"><Timer className="size-3.5" aria-hidden />{formatDuration(connector.lastLatencyMs)}</span>}
             {connector.hasSecret && <span className="flex items-center gap-1.5"><Lock className="size-3.5" aria-hidden />Secret chiffré</span>}
           </div>

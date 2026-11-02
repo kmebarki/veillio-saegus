@@ -8,7 +8,6 @@ import { z } from 'zod'
 
 import {
   CONNECTOR_KINDS,
-  SCHEDULE_OPTIONS,
   configSchema,
   defaultConfig,
   isConnectorKind,
@@ -36,11 +35,10 @@ const TEST_MAX_PER_WINDOW = 30
 
 const nameField = z.string().trim().min(2, 'Le nom doit contenir au moins 2 caractères.').max(80, 'Le nom ne peut pas dépasser 80 caractères.').transform((value) => value.replace(/\s+/g, ' '))
 const descriptionField = z.string().trim().max(300, 'La description ne peut pas dépasser 300 caractères.')
-const intervalField = z.number().int().refine((value) => SCHEDULE_OPTIONS.some((option) => option.value === value), 'Fréquence de collecte invalide.')
 const secretField = z.object({ mode: z.enum(['keep', 'set', 'clear']), value: z.string().max(2000, 'Le secret est trop long (2000 caractères maximum).') })
 const kindField = z.enum(CONNECTOR_KINDS)
 
-const createSchema = z.object({ kind: kindField, name: nameField, description: descriptionField.optional(), intervalMinutes: intervalField, config: configSchema, secret: secretField })
+const createSchema = z.object({ kind: kindField, name: nameField, description: descriptionField.optional(), config: configSchema, secret: secretField })
 const updateSchema = createSchema.omit({ kind: true }).extend({ id: z.string().uuid(), version: z.number().int().positive() })
 const draftTestSchema = z.object({ id: z.string().uuid().optional(), kind: kindField, config: configSchema, secret: secretField })
 const idSchema = z.object({ id: z.string().uuid() })
@@ -105,7 +103,7 @@ function toSummary(row: Row): ConnectorSummary {
     status: (['draft', 'active', 'paused'].includes(row.status) ? row.status : 'draft') as ConnectorStatus,
     health: healthOf(row.lastCheckStatus),
     host: hostOf(config.url),
-    intervalMinutes: row.intervalMinutes,
+
     version: row.version,
     hasSecret: Boolean(row.secretCiphertext),
     authType: config.auth.type,
@@ -248,7 +246,7 @@ export async function createConnector(input: unknown): Promise<{ ok: true; messa
   const actor = await requirePermission('connectors.manage')
   const parsed = createSchema.safeParse(input)
   if (!parsed.success) return fail(firstError(parsed.error))
-  const { kind, name, description, intervalMinutes } = parsed.data
+  const { kind, name, description } = parsed.data
   const config: ConnectorConfig = { ...parsed.data.config, url: parsed.data.config.url.trim() }
 
   const invalid = checkTarget(kind, config)
@@ -266,7 +264,7 @@ export async function createConnector(input: unknown): Promise<{ ok: true; messa
 
   try {
     await db.transaction(async (tx) => {
-      await tx.insert(connectors).values({ id, organizationId: organization.id, name, description: description || null, kind, status: 'draft', config, secretCiphertext: secret.ciphertext, intervalMinutes, createdByUserId: actor.id })
+      await tx.insert(connectors).values({ id, organizationId: organization.id, name, description: description || null, kind, status: 'draft', config, secretCiphertext: secret.ciphertext, createdByUserId: actor.id })
       await tx.insert(auditEvents).values(audit(actor.id, 'connector.created', id, { name, kind }))
     })
   } catch (error) {
@@ -299,7 +297,7 @@ export async function updateConnector(input: unknown): Promise<{ ok: true; messa
   const secretChanged = secret.changed
   const technicalChanged = sections.length > 0 || secretChanged
   const description = parsed.data.description || null
-  const infoChanged = row.name !== parsed.data.name || (row.description ?? null) !== description || row.intervalMinutes !== parsed.data.intervalMinutes
+  const infoChanged = row.name !== parsed.data.name || (row.description ?? null) !== description
   if (!technicalChanged && !infoChanged) return { ok: true, message: 'Aucune modification à enregistrer.' }
 
   const mustPause = technicalChanged && row.status === 'active'
@@ -312,7 +310,6 @@ export async function updateConnector(input: unknown): Promise<{ ok: true; messa
           description,
           config,
           secretCiphertext: secret.ciphertext,
-          intervalMinutes: parsed.data.intervalMinutes,
           status: mustPause ? 'paused' : row.status,
           version: sql`${connectors.version} + 1`,
           lastCheckVersion: technicalChanged ? row.lastCheckVersion : row.lastCheckVersion === row.version ? row.version + 1 : row.lastCheckVersion,
@@ -471,7 +468,7 @@ export async function duplicateConnector(input: unknown): Promise<{ ok: true; me
 
   const id = randomUUID()
   await db.transaction(async (tx) => {
-    await tx.insert(connectors).values({ id, organizationId: row.organizationId, name: name.slice(0, 80), description: row.description, kind: row.kind, status: 'draft', config: row.config, secretCiphertext: null, intervalMinutes: row.intervalMinutes, createdByUserId: actor.id })
+    await tx.insert(connectors).values({ id, organizationId: row.organizationId, name: name.slice(0, 80), description: row.description, kind: row.kind, status: 'draft', config: row.config, secretCiphertext: null, createdByUserId: actor.id })
     await tx.insert(auditEvents).values(audit(actor.id, 'connector.duplicated', id, { name, source: row.name }))
   })
   revalidateConnectors()

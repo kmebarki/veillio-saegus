@@ -74,17 +74,6 @@ export const AUTH_LABELS: Record<AuthType, { label: string; hint: string }> = {
   api_key_query: { label: 'Clé API dans l’URL', hint: 'Ex. ?api_key=… (moins sûr : visible dans les journaux du fournisseur)' },
 }
 
-export const SCHEDULE_OPTIONS = [
-  { value: 0, label: 'Manuelle uniquement' },
-  { value: 15, label: 'Toutes les 15 minutes' },
-  { value: 30, label: 'Toutes les 30 minutes' },
-  { value: 60, label: 'Toutes les heures' },
-  { value: 180, label: 'Toutes les 3 heures' },
-  { value: 360, label: 'Toutes les 6 heures' },
-  { value: 720, label: 'Toutes les 12 heures' },
-  { value: 1440, label: 'Une fois par jour' },
-] as const
-
 export const DEDUPE_OPTIONS = [
   { value: 'link', label: 'Lien de l’article' },
   { value: 'guid', label: 'Identifiant du flux (guid)' },
@@ -98,6 +87,26 @@ export const FORBIDDEN_HEADERS = ['host', 'content-length', 'connection', 'trans
 export const DEFAULT_USER_AGENT = 'VeillioBot/1.0 (+collecte de veille)'
 
 export type KeyValue = { name: string; value: string }
+
+export type ApiPagination = { type: (typeof PAGINATION_TYPES)[number]; param: string; sizeParam: string; pageSize: number; maxPages: number; cursorPath: string }
+
+export const MAX_API_ENDPOINTS = 50
+
+export type ApiEndpoint = {
+  id: string
+  label: string
+  summary: string
+  url: string
+  method: 'GET' | 'POST'
+  query: KeyValue[]
+  body: string
+  itemsPath: string
+  titlePath: string
+  linkPath: string
+  datePath: string
+  summaryPath: string
+  pagination: ApiPagination
+}
 
 export type ConnectorConfig = {
   url: string
@@ -115,7 +124,9 @@ export type ConnectorConfig = {
     linkPath: string
     datePath: string
     summaryPath: string
-    pagination: { type: (typeof PAGINATION_TYPES)[number]; param: string; sizeParam: string; pageSize: number; maxPages: number; cursorPath: string }
+    pagination: ApiPagination
+    endpoints: ApiEndpoint[]
+    activeEndpointId: string
   }
 }
 
@@ -137,6 +148,8 @@ export function defaultConfig(kind: ConnectorKind): ConnectorConfig {
       datePath: 'published_at',
       summaryPath: 'summary',
       pagination: { type: 'none', param: 'page', sizeParam: 'limit', pageSize: 50, maxPages: 3, cursorPath: 'next_cursor' },
+      endpoints: [],
+      activeEndpointId: '',
     },
   }
 }
@@ -152,6 +165,31 @@ const keyValue = z.object({ name: headerName, value: z.string().max(500, 'Valeur
 
 const selector = z.string().trim().max(200, 'Sélecteur trop long (200 caractères maximum).')
 const path = z.string().trim().max(120, 'Chemin trop long (120 caractères maximum).').regex(/^[A-Za-z0-9_$.\-[\]]*$/, 'Chemin invalide : utilisez la notation a.b[0].c.')
+
+const paginationSchema = z.object({
+  type: z.enum(PAGINATION_TYPES),
+  param: z.string().trim().max(64),
+  sizeParam: z.string().trim().max(64),
+  pageSize: z.number().int().min(1).max(500, '500 éléments par page maximum.'),
+  maxPages: z.number().int().min(1).max(10, '10 pages maximum.'),
+  cursorPath: path,
+})
+
+const endpointSchema = z.object({
+  id: z.string().trim().min(1).max(64),
+  label: z.string().trim().min(1).max(120),
+  summary: z.string().trim().max(300),
+  url: z.string().trim().min(1).max(2000),
+  method: z.enum(['GET', 'POST']),
+  query: z.array(keyValue).max(15, '15 paramètres maximum.'),
+  body: z.string().max(5000),
+  itemsPath: path,
+  titlePath: path,
+  linkPath: path,
+  datePath: path,
+  summaryPath: path,
+  pagination: paginationSchema,
+})
 
 export const configSchema = z.object({
   url: z.string().trim().min(1, 'L’URL est obligatoire.').max(2000, 'URL trop longue (2000 caractères maximum).'),
@@ -188,14 +226,9 @@ export const configSchema = z.object({
     linkPath: path,
     datePath: path,
     summaryPath: path,
-    pagination: z.object({
-      type: z.enum(PAGINATION_TYPES),
-      param: z.string().trim().max(64),
-      sizeParam: z.string().trim().max(64),
-      pageSize: z.number().int().min(1).max(500, '500 éléments par page maximum.'),
-      maxPages: z.number().int().min(1).max(10, '10 pages maximum.'),
-      cursorPath: path,
-    }),
+    pagination: paginationSchema,
+    endpoints: z.array(endpointSchema).max(MAX_API_ENDPOINTS, `${MAX_API_ENDPOINTS} endpoints maximum.`).default([]),
+    activeEndpointId: z.string().trim().max(64).default(''),
   }),
 })
 
@@ -234,8 +267,4 @@ export function needsSecret(type: AuthType) {
 
 export function secretLabel(type: AuthType) {
   return type === 'basic' ? 'Mot de passe' : type === 'bearer' ? 'Jeton' : 'Clé API'
-}
-
-export function intervalLabel(minutes: number) {
-  return SCHEDULE_OPTIONS.find((option) => option.value === minutes)?.label ?? `Toutes les ${minutes} min`
 }

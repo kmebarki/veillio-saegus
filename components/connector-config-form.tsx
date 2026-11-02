@@ -10,7 +10,6 @@ import {
   AUTH_TYPES,
   DEDUPE_OPTIONS,
   PAGINATION_TYPES,
-  SCHEDULE_OPTIONS,
   needsSecret,
   secretLabel,
   type ConnectorConfig,
@@ -23,7 +22,6 @@ import { cn } from '@/lib/utils'
 export type ConnectorDraft = {
   name: string
   description: string
-  intervalMinutes: number
   config: ConnectorConfig
   secret: SecretInput
 }
@@ -171,16 +169,9 @@ export function ConnectorConfigForm({ kind, draft, onChange, disabled, hasStored
   return (
     <fieldset disabled={disabled} className="flex min-w-0 flex-col gap-4">
       <Section title="Identité" description="Comment ce connecteur apparaît dans la galerie et les journaux.">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Nom du connecteur">
-            <input required minLength={2} maxLength={80} value={draft.name} onChange={(event) => set({ name: event.target.value })} className={fieldClass} placeholder={kind === 'rss' ? 'Ex. Le Monde – Technologies' : kind === 'web' ? 'Ex. Blog éditeur – actualités' : 'Ex. API Légifrance – JORF'} />
-          </Field>
-          <Field label="Fréquence de collecte" hint="Utilisée par la collecte planifiée une fois le connecteur actif.">
-            <select value={draft.intervalMinutes} onChange={(event) => set({ intervalMinutes: Number(event.target.value) })} className={fieldClass}>
-              {SCHEDULE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
-          </Field>
-        </div>
+        <Field label="Nom du connecteur">
+          <input required minLength={2} maxLength={80} value={draft.name} onChange={(event) => set({ name: event.target.value })} className={fieldClass} placeholder={kind === 'rss' ? 'Ex. Le Monde – Technologies' : kind === 'web' ? 'Ex. Blog éditeur – actualités' : 'Ex. API Légifrance – JORF'} />
+        </Field>
         <Field label="Description (facultatif)">
           <input maxLength={300} value={draft.description} onChange={(event) => set({ description: event.target.value })} className={fieldClass} placeholder="Ce que ce connecteur alimente, qui en est responsable…" />
         </Field>

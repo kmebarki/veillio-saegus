@@ -10,7 +10,7 @@ import { HealthDot, KindIcon, StatusBadge, formatDuration } from '@/components/c
 import { ConnectorWorkbench } from '@/components/connector-workbench'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
-import { AUTH_LABELS, getKindInfo, intervalLabel, type AuthType } from '@/lib/connector-catalog'
+import { AUTH_LABELS, getKindInfo, type AuthType } from '@/lib/connector-catalog'
 import type { ConnectorDetail, ConnectorRunEntry, ConnectorViewer } from '@/lib/connector-types'
 import { cn } from '@/lib/utils'
 
@@ -138,7 +138,6 @@ export function ConnectorDetailDialog({ connectorId, viewer, initialTab = 'overv
               <div className="flex min-w-0 flex-col gap-5">
                 {connector.description && <p className="text-sm leading-6 text-muted-foreground">{connector.description}</p>}
                 <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  <Fact label="Collecte" value={intervalLabel(connector.intervalMinutes)} />
                   <Fact label="Authentification" value={AUTH_LABELS[connector.authType as AuthType]?.label.split(' (')[0] ?? 'Aucune'} />
                   <Fact label="Secret" value={connector.hasSecret ? 'Chiffré' : '—'} />
                   <Fact label="Latence" value={formatDuration(connector.lastLatencyMs)} />

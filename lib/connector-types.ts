@@ -13,7 +13,6 @@ export type ConnectorSummary = {
   status: ConnectorStatus
   health: ConnectorHealth
   host: string
-  intervalMinutes: number
   version: number
   hasSecret: boolean
   authType: string
