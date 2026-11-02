@@ -219,6 +219,29 @@ export const connections = pgTable('connections', {
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
 
+export type StoredSourceDefinition = {
+  notes?: string
+  path?: string
+}
+
+export const sources = pgTable('sources', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organization_id').notNull(),
+  connectorId: uuid('connector_id').notNull(),
+  connectionId: uuid('connection_id'),
+  name: text('name').notNull(),
+  description: text('description'),
+  imageUrl: text('image_url'),
+  endpoint: text('endpoint').notNull(),
+  scope: text('scope').notNull().default('organization'),
+  ownerUserId: text('owner_user_id'),
+  definition: jsonb('definition').$type<StoredSourceDefinition>().notNull().default({}),
+  version: integer('version').notNull().default(1),
+  createdByUserId: text('created_by_user_id').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
 export const collectionOccurrences = pgTable('collection_occurrences', {
   id: uuid('id').primaryKey().defaultRandom(),
   organizationId: uuid('organization_id').notNull(),
