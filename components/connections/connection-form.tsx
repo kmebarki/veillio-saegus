@@ -1,10 +1,11 @@
 'use client'
 
-import { Check, PlugZap, ShieldCheck, TriangleAlert, User, Users } from 'lucide-react'
+import { ArrowLeft, PlugZap, ShieldCheck, TriangleAlert, User, Users } from 'lucide-react'
 import { useMemo, useState, useTransition } from 'react'
 
 import { createConnection, testConnection, testDraftConnection, updateConnection } from '@/app/actions/connections'
 import { inDaysIso, inputClass, todayIso } from '@/components/connections/helpers'
+import { ConnectorPicker } from '@/components/connections/connector-picker'
 import { RequestPreview } from '@/components/connections/request-preview'
 import { SecretField } from '@/components/connections/secret-field'
 import { TestResult } from '@/components/connections/test-result'
@@ -28,9 +29,11 @@ const EXPIRY_PRESETS = [
 
 export function ConnectionForm({ target, overview, onClose, onDone }: Props) {
   const editing = target.mode === 'edit' ? target.connection : null
-  const initialConnector = editing?.connectorId ?? (target.mode === 'create' ? target.connectorId : undefined) ?? overview.connectors.find((item) => item.requiresAuth)?.id ?? ''
+  const usableConnectors = overview.connectors.filter((item) => item.requiresAuth)
+  const initialConnector = editing?.connectorId ?? (target.mode === 'create' ? target.connectorId : undefined) ?? (usableConnectors.length === 1 ? usableConnectors[0].id : '')
 
   const [connectorId, setConnectorId] = useState(initialConnector)
+  const [picking, setPicking] = useState(!editing && !initialConnector)
   const [name, setName] = useState(editing?.name ?? '')
   const [description, setDescription] = useState(editing?.description ?? '')
   const [scope, setScope] = useState<ConnectionScope>(editing?.scope ?? (overview.viewer.canManage ? 'organization' : 'user'))
@@ -83,43 +86,36 @@ export function ConnectionForm({ target, overview, onClose, onDone }: Props) {
     })
   }
 
+  if (picking) {
+    return (
+      <div className="flex flex-col gap-4">
+        <div>
+          <h3 className="text-sm font-semibold">1. Choisissez le connecteur</h3>
+          <p className="text-xs text-muted-foreground">Le fournisseur de données auquel cette connexion donnera accès.</p>
+        </div>
+        <ConnectorPicker
+          connectors={overview.connectors}
+          value={connectorId}
+          onSelect={(id) => {
+            setConnectorId(id)
+            setDraft(null)
+            setPicking(false)
+          }}
+        />
+        <div className="flex justify-end border-t pt-4"><Button type="button" variant="ghost" onClick={onClose}>Annuler</Button></div>
+      </div>
+    )
+  }
+
   return (
     <form onSubmit={submit} className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_330px]">
       <div className="flex min-w-0 flex-col gap-5">
-        {!editing && (
-          <fieldset className="flex flex-col gap-2">
-            <legend className="mb-1.5 text-sm font-medium">Connecteur</legend>
-            <div role="radiogroup" aria-label="Connecteur" className="grid max-h-60 gap-2 overflow-y-auto sm:grid-cols-2">
-              {overview.connectors.map((item) => {
-                const selected = item.id === connectorId
-                const unavailable = !item.requiresAuth
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    disabled={unavailable}
-                    onClick={() => {
-                      setConnectorId(item.id)
-                      setDraft(null)
-                    }}
-                    className={cn('relative flex items-start gap-3 rounded-xl border p-3 text-left transition-colors', unavailable && 'cursor-not-allowed opacity-60', selected ? 'border-primary bg-primary/5 ring-2 ring-primary/15' : 'bg-card hover:border-foreground/30')}
-                  >
-                    <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><KindIcon kind={item.kind} className="size-4" /></span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold">{item.name}</span>
-                      <span className="block truncate text-xs text-muted-foreground">{item.host || 'URL à renseigner'} · {AUTH_LABELS[item.authType as AuthType]?.label.split(' (')[0] ?? 'Clé API'}</span>
-                      <span className="mt-1 block text-[11px] font-medium text-muted-foreground">
-                        {unavailable ? 'Sans authentification : activez-la dans le connecteur' : item.sharedCount > 0 ? `${item.sharedCount} connexion${item.sharedCount > 1 ? 's' : ''} partagée${item.sharedCount > 1 ? 's' : ''}` : 'Aucune connexion partagée'}
-                      </span>
-                    </span>
-                    {selected && <Check className="size-4 shrink-0 text-primary" aria-hidden />}
-                  </button>
-                )
-              })}
-            </div>
-          </fieldset>
+        {!editing && choice && (
+          <div className="flex items-center gap-3 rounded-xl border bg-muted/40 p-3">
+            <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><KindIcon kind={choice.kind} className="size-4" /></span>
+            <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{choice.name}</p><p className="truncate text-xs text-muted-foreground">{choice.host || 'URL à renseigner'} · {AUTH_LABELS[authType]?.label}</p></div>
+            {usableConnectors.length > 1 && <Button type="button" variant="outline" size="sm" onClick={() => setPicking(true)}><ArrowLeft data-icon="inline-start" />Changer</Button>}
+          </div>
         )}
 
         {editing && (
