@@ -2,7 +2,6 @@
 
 import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
 import { acceptInvitation } from '@/app/actions/admin-access'
@@ -10,7 +9,6 @@ import { Button } from '@/components/ui/button'
 import { authClient } from '@/lib/auth-client'
 
 export function AuthForm({ mode, invitationToken }: { mode: 'sign-in' | 'sign-up'; invitationToken?: string }) {
-  const router = useRouter()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -39,11 +37,10 @@ export function AuthForm({ mode, invitationToken }: { mode: 'sign-in' | 'sign-up
         setError(acceptance.message)
         return
       }
-      router.push(acceptance.destination)
-    } else {
-      router.push('/admission')
+      window.location.replace(acceptance.destination)
+      return
     }
-    router.refresh()
+    window.location.replace('/admission')
   }
 
   return (
