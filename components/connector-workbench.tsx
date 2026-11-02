@@ -10,7 +10,7 @@ import { ConnectorTestResult } from '@/components/connector-test-panel'
 import { Button } from '@/components/ui/button'
 import { fieldClass } from '@/components/ui/modal'
 import type { ConnectionOption } from '@/lib/connection-types'
-import { defaultConfig, needsSecret, type ConnectorConfig, type ConnectorKind } from '@/lib/connector-catalog'
+import { defaultConfig, isHttpKind, needsSecret, type ConnectorConfig, type ConnectorKind } from '@/lib/connector-catalog'
 import type { ConnectorSummary, TestOutcome } from '@/lib/connector-types'
 
 type Props = {
@@ -92,7 +92,8 @@ export function ConnectorWorkbench({ kind, existing, canManage, onSaved, onCance
     })
   }
 
-  const canSave = canManage && draft.name.trim().length >= 2 && draft.config.url.trim().length > 0 && (existing ? dirty : true) && !isSaving
+  const hasTarget = isHttpKind(kind) ? draft.config.url.trim().length > 0 : kind === 'imap' ? draft.config.imap.host.trim().length > 0 : true
+  const canSave = canManage && draft.name.trim().length >= 2 && hasTarget && (existing ? dirty : true) && !isSaving
 
   return (
     <form
@@ -103,7 +104,7 @@ export function ConnectorWorkbench({ kind, existing, canManage, onSaved, onCance
       }}
     >
       <div className="min-w-0">
-        <ConnectorConfigForm kind={kind} draft={draft} onChange={setDraft} disabled={readOnly || isSaving} />
+        <ConnectorConfigForm kind={kind} connectorId={existing?.connector.id} draft={draft} onChange={setDraft} disabled={readOnly || isSaving} />
       </div>
 
       <aside className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-0 lg:max-h-[calc(92dvh-8rem)] lg:self-start lg:overflow-y-auto lg:pr-1" aria-label="Test de connexion">
@@ -133,7 +134,7 @@ export function ConnectorWorkbench({ kind, existing, canManage, onSaved, onCance
             )
           )}
           {canManage ? (
-            <Button type="button" onClick={test} disabled={isTesting || isSaving || !draft.config.url.trim()} variant={outcome && !stale ? 'outline' : 'default'}>
+            <Button type="button" onClick={test} disabled={isTesting || isSaving || !hasTarget} variant={outcome && !stale ? 'outline' : 'default'}>
               {isTesting ? <LoaderCircle className="animate-spin" data-icon="inline-start" /> : <TestTubeDiagonal data-icon="inline-start" />}
               {isTesting ? 'Test en cours…' : outcome ? 'Relancer le test' : 'Tester la connexion'}
             </Button>

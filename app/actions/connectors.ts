@@ -10,7 +10,9 @@ import {
   CONNECTOR_KINDS,
   configSchema,
   defaultConfig,
+  describeTarget,
   isConnectorKind,
+  isHttpKind,
   needsSecret,
   validateKindConfig,
   type ConnectorConfig,
@@ -95,12 +97,8 @@ function healthOf(status: string | null): ConnectorHealth {
   return status === 'success' ? 'ok' : status === 'warning' ? 'warning' : status === 'error' ? 'error' : 'unknown'
 }
 
-function hostOf(url: string) {
-  try {
-    return new URL(url).hostname
-  } catch {
-    return ''
-  }
+function hostOf(kind: ConnectorKind, config: ConnectorConfig) {
+  return describeTarget(kind, config)
 }
 
 function toSummary(row: Row, connectionCount: number): ConnectorSummary {
@@ -114,8 +112,7 @@ function toSummary(row: Row, connectionCount: number): ConnectorSummary {
     kind,
     status: (['draft', 'active', 'paused'].includes(row.status) ? row.status : 'draft') as ConnectorStatus,
     health: healthOf(row.lastCheckStatus),
-    host: hostOf(config.url),
-
+    host: describeTarget(kind, config),
     version: row.version,
     connectionCount,
     authType: config.auth.type,
@@ -143,10 +140,12 @@ async function findDuplicateName(organizationId: string, name: string, excludeId
 }
 
 function checkTarget(kind: ConnectorKind, config: ConnectorConfig): string | null {
-  try {
-    validateTargetUrl(config.url)
-  } catch (error) {
-    return error instanceof SafeFetchError ? error.message : 'L’adresse est invalide.'
+  if (isHttpKind(kind)) {
+    try {
+      validateTargetUrl(config.url)
+    } catch (error) {
+      return error instanceof SafeFetchError ? error.message : 'L’adresse est invalide.'
+    }
   }
   return validateKindConfig(kind, config)
 }
@@ -179,6 +178,9 @@ function describeChanges(before: ConnectorConfig, after: ConnectorConfig) {
   if (differs(before.auth, after.auth)) sections.push('Authentification')
   if (differs(before.http, after.http) || differs(before.retry, after.retry)) sections.push('Requête HTTP')
   if (differs(before.web, after.web) || differs(before.api, after.api) || before.dedupe !== after.dedupe) sections.push('Extraction')
+  if (differs(before.imap, after.imap)) sections.push('Messagerie')
+  if (differs(before.webhook, after.webhook)) sections.push('Webhook')
+  if (differs(before.m365, after.m365)) sections.push('Microsoft 365')
   return sections
 }
 
@@ -397,14 +399,20 @@ async function enforceTestRateLimit(actorId: string) {
 
 const RATE_MESSAGE = `Trop de tests en peu de temps (${TEST_MAX_PER_WINDOW} par 10 minutes). Patientez un instant.`
 
-function missingConnectionOutcome(): TestOutcome {
+const MISSING_CONNECTION_HINT: Partial<Record<ConnectorKind, string>> = {
+  imap: 'Ajoutez une connexion (adresse de la boîte et mot de passe d’application) dans « Connexions », puis choisissez-la pour tester.',
+  webhook: 'Ajoutez une connexion contenant le secret partagé de l’expéditeur dans « Connexions », puis choisissez-la pour tester.',
+  m365: 'Ajoutez une connexion contenant le secret client de l’application Entra ID dans « Connexions », puis choisissez-la pour tester.',
+}
+
+function missingConnectionOutcome(kind: ConnectorKind): TestOutcome {
   return {
     status: 'error',
     message: 'Aucune connexion utilisable pour ce connecteur.',
     httpStatus: null,
     durationMs: 0,
     itemsFound: null,
-    checks: [{ id: 'url', label: 'Identifiants', status: 'error', detail: 'Ajoutez une connexion (clé API, jeton, mot de passe) dans « Connexions », puis choisissez-la pour tester.' }],
+    checks: [{ id: 'url', label: 'Identifiants', status: 'error', detail: MISSING_CONNECTION_HINT[kind] ?? 'Ajoutez une connexion (clé API, jeton, mot de passe) dans « Connexions », puis choisissez-la pour tester.' }],
     sample: [],
   }
 }
@@ -424,8 +432,8 @@ export async function testConnectorDraft(input: unknown): Promise<{ ok: true; ou
   const credential = requiresCredential ? await resolveCredential(actor.id, parsed.data.id, parsed.data.connectionId) : null
 
   const targetId = parsed.data.id ?? 'brouillon'
-  const outcome = requiresCredential && !credential ? missingConnectionOutcome() : await runConnectorTest(kind, config, credential?.secret ?? null, credential?.username ?? '')
-  await db.insert(auditEvents).values(audit(actor.id, 'connector.tested', targetId, { status: outcome.status, draft: true, host: hostOf(config.url) }))
+  const outcome = requiresCredential && !credential ? missingConnectionOutcome(kind) : await runConnectorTest(kind, config, credential?.secret ?? null, credential?.username ?? '', { connectorId: parsed.data.id })
+  await db.insert(auditEvents).values(audit(actor.id, 'connector.tested', targetId, { status: outcome.status, draft: true, host: hostOf(kind, config) }))
   return { ok: true, outcome }
 }
 
@@ -443,7 +451,7 @@ export async function testConnector(input: unknown): Promise<{ ok: true; outcome
   const credential = requiresCredential ? await resolveCredential(actor.id, row.id, parsed.data.connectionId) : null
 
   const outcome: TestOutcome =
-    requiresCredential && !credential ? missingConnectionOutcome() : await runConnectorTest(kind, config, credential?.secret ?? null, credential?.username ?? '')
+    requiresCredential && !credential ? missingConnectionOutcome(kind) : await runConnectorTest(kind, config, credential?.secret ?? null, credential?.username ?? '', { connectorId: row.id })
 
   await db.transaction(async (tx) => {
     await tx.insert(connectorRuns).values({
@@ -467,7 +475,7 @@ export async function testConnector(input: unknown): Promise<{ ok: true; outcome
         lastLatencyMs: outcome.httpStatus ? outcome.durationMs : null,
       })
       .where(and(eq(connectors.id, row.id), eq(connectors.version, row.version)))
-    await tx.insert(auditEvents).values(audit(actor.id, 'connector.tested', row.id, { status: outcome.status, draft: false, host: hostOf(config.url) }))
+    await tx.insert(auditEvents).values(audit(actor.id, 'connector.tested', row.id, { status: outcome.status, draft: false, host: hostOf(kind, config) }))
     await tx.execute(sql`delete from connector_runs where "connectorId" = ${row.id} and id not in (select id from connector_runs where "connectorId" = ${row.id} order by "createdAt" desc limit 100)`)
   })
 

@@ -143,6 +143,22 @@ export type ConnectorRunDetails = {
   bytes?: number
 }
 
+export type WebhookEventPayloadItem = { title: string; link: string; date: string; summary: string; guid?: string }
+
+export const webhookEvents = pgTable('webhook_events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  connectorId: uuid('connectorId').notNull(),
+  organizationId: uuid('organizationId').notNull(),
+  status: text('status').notNull(),
+  httpStatus: integer('httpStatus').notNull().default(200),
+  signatureValid: boolean('signatureValid').notNull().default(false),
+  bytes: integer('bytes').notNull().default(0),
+  sourceIp: text('sourceIp'),
+  message: text('message'),
+  item: jsonb('item').$type<WebhookEventPayloadItem | null>(),
+  receivedAt: timestamp('receivedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
 export const connectors = pgTable('connectors', {
   id: uuid('id').primaryKey().defaultRandom(),
   organizationId: uuid('organizationId').notNull(),

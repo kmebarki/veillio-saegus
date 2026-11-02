@@ -1,10 +1,10 @@
-import { Braces, CircleAlert, CircleCheck, CircleDashed, CirclePause, Globe, Rss, TriangleAlert } from 'lucide-react'
+import { Braces, CircleAlert, CircleCheck, CircleDashed, CirclePause, Cloud, Globe, Mail, Rss, TriangleAlert, Webhook } from 'lucide-react'
 
 import type { ConnectorHealth, ConnectorKind, ConnectorStatus } from '@/lib/connector-catalog'
 import type { ConnectorSummary } from '@/lib/connector-types'
 import { cn } from '@/lib/utils'
 
-export const KIND_ICONS: Record<ConnectorKind, typeof Rss> = { rss: Rss, web: Globe, api: Braces }
+export const KIND_ICONS: Record<ConnectorKind, typeof Rss> = { rss: Rss, web: Globe, api: Braces, imap: Mail, webhook: Webhook, m365: Cloud }
 
 export function KindIcon({ kind, className }: { kind: ConnectorKind; className?: string }) {
   const Icon = KIND_ICONS[kind]
