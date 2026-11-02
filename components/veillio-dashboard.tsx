@@ -205,13 +205,6 @@ export function Sidebar({ open, onClose, activeItem = 'Tableau de bord' }: { ope
             {administrationItems.map((item) => renderMenuItem(item))}
           </section>
         </nav>
-        <div className="border-t p-3">
-          <button className="flex min-h-14 w-full items-center gap-3 rounded-xl px-2 text-left hover:bg-sidebar-accent">
-            <div className="grid size-9 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">KM</div>
-            <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">Kamel Mebarki</p><p className="truncate text-xs text-muted-foreground">Manager</p></div>
-            <ChevronDown className="size-4 text-muted-foreground" />
-          </button>
-        </div>
       </aside>
     </>
   )
