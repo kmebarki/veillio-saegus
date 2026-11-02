@@ -168,13 +168,13 @@ export function UserProfileDialog({ profile, onClose, onSaved }: { profile: User
       <footer className="sticky bottom-0 flex justify-end gap-2 border-t bg-card/95 px-4 py-4 backdrop-blur sm:px-6">
         {editing ? (
           <>
-            <Button type="button" variant="outline" onClick={() => setEditing(false)}>Annuler</Button>
-            <Button type="submit" form="profile-form" disabled={pending}>{pending ? 'Enregistrement…' : 'Enregistrer'}</Button>
+            <Button key="cancel" type="button" variant="outline" onClick={() => setEditing(false)}>Annuler</Button>
+            <Button key="save" type="submit" form="profile-form" disabled={pending}>{pending ? 'Enregistrement…' : 'Enregistrer'}</Button>
           </>
         ) : (
           <>
-            <Button variant="outline" onClick={onClose}>Fermer</Button>
-            {profile.canEdit && <Button onClick={() => setEditing(true)}><Pencil data-icon="inline-start" />Modifier la fiche</Button>}
+            <Button key="close" type="button" variant="outline" onClick={onClose}>Fermer</Button>
+            {profile.canEdit && <Button key="edit" type="button" onClick={() => setEditing(true)}><Pencil data-icon="inline-start" />Modifier la fiche</Button>}
           </>
         )}
       </footer>
