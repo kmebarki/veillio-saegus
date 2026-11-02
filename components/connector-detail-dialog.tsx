@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState, useTransition } from 'react'
 
 import { deleteConnector, duplicateConnector, getConnectorDetail, setConnectorStatus, testConnector } from '@/app/actions/connectors'
 import { ConnectorTestResult } from '@/components/connector-test-panel'
-import { HealthDot, KindIcon, StatusBadge, formatDuration } from '@/components/connector-ui'
+import { ConnectorLogo, HealthDot, StatusBadge, formatDuration } from '@/components/connector-ui'
 import { ConnectorWorkbench } from '@/components/connector-workbench'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
@@ -114,7 +114,7 @@ export function ConnectorDetailDialog({ connectorId, viewer, initialTab = 'overv
       ) : (
         <div className="flex flex-col gap-5">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary"><KindIcon kind={connector.kind} className="size-6" /></span>
+            <ConnectorLogo kind={connector.kind} logoUrl={connector.logoUrl} className="size-12 rounded-2xl" />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2"><h3 className="truncate text-lg font-semibold tracking-[-0.02em]">{connector.name}</h3><StatusBadge status={connector.status} /></div>
               <p className="truncate text-sm text-muted-foreground">{info?.label} · {connector.host || 'adresse non définie'}</p>

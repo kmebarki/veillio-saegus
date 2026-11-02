@@ -9,7 +9,7 @@ import { ConnectorPicker } from '@/components/connections/connector-picker'
 import { RequestPreview } from '@/components/connections/request-preview'
 import { SecretField } from '@/components/connections/secret-field'
 import { TestResult } from '@/components/connections/test-result'
-import { KindIcon } from '@/components/connector-ui'
+import { ConnectorLogo } from '@/components/connector-ui'
 import { Button } from '@/components/ui/button'
 import { analyzeSecret, analyzeUsername } from '@/lib/connection-secret'
 import type { ConnectionScope, ConnectionSummary, ConnectionsOverview } from '@/lib/connection-types'
@@ -112,7 +112,7 @@ export function ConnectionForm({ target, overview, onClose, onDone }: Props) {
       <div className="flex min-w-0 flex-col gap-5">
         {!editing && choice && (
           <div className="flex items-center gap-3 rounded-xl border bg-muted/40 p-3">
-            <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><KindIcon kind={choice.kind} className="size-4" /></span>
+            <ConnectorLogo kind={choice.kind} logoUrl={choice.logoUrl} className="size-9 rounded-lg" />
             <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{choice.name}</p><p className="truncate text-xs text-muted-foreground">{choice.host || 'URL à renseigner'} · {AUTH_LABELS[authType]?.label}</p></div>
             {usableConnectors.length > 1 && <Button type="button" variant="outline" size="sm" onClick={() => setPicking(true)}><ArrowLeft data-icon="inline-start" />Changer</Button>}
           </div>
@@ -120,7 +120,7 @@ export function ConnectionForm({ target, overview, onClose, onDone }: Props) {
 
         {editing && (
           <div className="flex items-center gap-3 rounded-xl border bg-muted/40 p-3">
-            <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><KindIcon kind={editing.connectorKind} className="size-4" /></span>
+            <ConnectorLogo kind={editing.connectorKind} logoUrl={editing.connectorLogoUrl} className="size-9 rounded-lg" />
             <div className="min-w-0"><p className="truncate text-sm font-semibold">{editing.connectorName}</p><p className="truncate text-xs text-muted-foreground">{editing.host} · {AUTH_LABELS[authType]?.label}</p></div>
           </div>
         )}

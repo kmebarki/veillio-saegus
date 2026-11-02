@@ -140,6 +140,7 @@ function toSummary(actor: Actor, row: Row, connectorRow: ConnectorRow, ownerName
     description: row.description ?? '',
     connectorId: connectorRow.id,
     connectorName: connectorRow.name,
+    connectorLogoUrl: connectorRow.logoUrl ?? '',
     connectorKind: kind,
     connectorUrl: config.url,
     host: hostOf(config.url),
@@ -199,6 +200,7 @@ export async function getConnectionsOverview(): Promise<ConnectionsOverview> {
       {
         id: row.id,
         name: row.name,
+        logoUrl: row.logoUrl ?? '',
         kind,
         status: (['draft', 'active', 'paused'].includes(row.status) ? row.status : 'draft') as 'draft' | 'active' | 'paused',
         authType: config.auth.type,

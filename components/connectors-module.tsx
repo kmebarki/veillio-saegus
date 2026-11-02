@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 
 import { ConnectorDetailDialog } from '@/components/connector-detail-dialog'
-import { HealthDot, KindIcon, StatusBadge, formatDuration } from '@/components/connector-ui'
+import { ConnectorLogo, HealthDot, StatusBadge, formatDuration } from '@/components/connector-ui'
 import { ConnectorWorkbench } from '@/components/connector-workbench'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
@@ -38,7 +38,7 @@ function ConnectorCard({ connector, onOpen }: { connector: ConnectorSummary; onO
     <article>
       <button type="button" onClick={onOpen} aria-label={`Ouvrir le connecteur ${connector.name}`} className="group flex h-full w-full flex-col gap-4 rounded-2xl border bg-card p-5 text-left outline-none transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/5 focus-visible:ring-2 focus-visible:ring-ring">
         <div className="flex items-start gap-3">
-          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground"><KindIcon kind={connector.kind} className="size-5" /></span>
+          <ConnectorLogo kind={connector.kind} logoUrl={connector.logoUrl} className="size-11 rounded-xl" />
           <div className="min-w-0 flex-1">
             <h2 className="truncate text-base font-semibold tracking-[-0.02em]">{connector.name}</h2>
             <p className="mt-0.5 truncate text-sm text-muted-foreground">{info?.label}{connector.host ? ` · ${connector.host}` : ''}</p>
@@ -76,7 +76,7 @@ function CreateDialog({ open, onClose, onCreated }: { open: boolean; onClose: ()
           <div className="grid gap-3 md:grid-cols-3">
             {CONNECTOR_CATALOG.map((item) => (
               <button key={item.kind} type="button" onClick={() => setKind(item.kind)} className="group flex flex-col gap-4 rounded-2xl border bg-card p-5 text-left outline-none transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-lg hover:shadow-primary/5 focus-visible:ring-2 focus-visible:ring-ring">
-                <span className="grid size-12 place-items-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground"><KindIcon kind={item.kind} className="size-6" /></span>
+                <ConnectorLogo kind={item.kind} className="size-12 rounded-xl" />
                 <div>
                   <h3 className="text-base font-semibold tracking-[-0.02em]">{item.label}</h3>
                   <p className="mt-0.5 text-sm text-muted-foreground">{item.tagline}</p>

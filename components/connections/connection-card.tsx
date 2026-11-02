@@ -1,7 +1,7 @@
 import { CalendarClock, KeyRound, Pencil, PlugZap, ShieldAlert, Trash2, User, Users } from 'lucide-react'
 
 import { ageLabel, expiryBadge, STALE_SECRET_DAYS, TONE_CLASSES } from '@/components/connections/helpers'
-import { HealthDot, KindIcon } from '@/components/connector-ui'
+import { ConnectorLogo, HealthDot } from '@/components/connector-ui'
 import { Button } from '@/components/ui/button'
 import type { ConnectionSummary } from '@/lib/connection-types'
 import { AUTH_LABELS, type AuthType } from '@/lib/connector-catalog'
@@ -18,7 +18,7 @@ export function ConnectionCard({ connection, busy, onOpen, onEdit, onTest, onDel
   return (
     <article className="group relative flex flex-col gap-4 rounded-2xl border bg-card p-5 transition-shadow hover:shadow-md">
       <div className="flex items-start gap-3">
-        <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><KindIcon kind={connection.connectorKind} className="size-5" /></span>
+        <ConnectorLogo kind={connection.connectorKind} logoUrl={connection.connectorLogoUrl} className="size-11 rounded-xl" />
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-base font-semibold tracking-[-0.02em]">
             <button type="button" onClick={onOpen} className="text-left after:absolute after:inset-0 after:rounded-2xl focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-ring">{connection.name}</button>

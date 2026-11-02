@@ -4,7 +4,7 @@ import { ChevronRight, Lock, Search, SearchX } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
 import { inputClass } from '@/components/connections/helpers'
-import { KindIcon } from '@/components/connector-ui'
+import { ConnectorLogo } from '@/components/connector-ui'
 import type { ConnectorChoice } from '@/lib/connection-types'
 import { AUTH_LABELS, CONNECTOR_CATALOG, type AuthType, type ConnectorKind } from '@/lib/connector-catalog'
 import { cn } from '@/lib/utils'
@@ -62,7 +62,7 @@ export function ConnectorPicker({ connectors, value, onSelect }: Props) {
             return (
               <li key={item.id} role="option" aria-selected={selected}>
                 <button type="button" onClick={() => onSelect(item.id)} className={cn('group flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:outline-none', selected && 'bg-primary/5')}>
-                  <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><KindIcon kind={item.kind} className="size-4" /></span>
+                  <ConnectorLogo kind={item.kind} logoUrl={item.logoUrl} className="size-9 rounded-lg" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold">{item.name}</span>
                     <span className="block truncate text-xs text-muted-foreground">{item.host || 'URL à renseigner'} · {kindLabel(item.kind)} · {authLabel(item.authType)}</span>

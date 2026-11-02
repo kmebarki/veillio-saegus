@@ -148,6 +148,7 @@ export const connectors = pgTable('connectors', {
   organizationId: uuid('organizationId').notNull(),
   name: text('name').notNull(),
   description: text('description'),
+  logoUrl: text('logoUrl'),
   kind: text('kind').notNull(),
   status: text('status').notNull().default('draft'),
   config: jsonb('config').$type<StoredConnectorConfig>().notNull(),

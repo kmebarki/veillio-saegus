@@ -31,6 +31,7 @@ export function ConnectorWorkbench({ kind, existing, canManage, onSaved, onCance
     () => ({
       name: existing?.connector.name ?? '',
       description: existing?.connector.description ?? '',
+      logoUrl: existing?.connector.logoUrl ?? '',
       config: existing?.config ?? defaultConfig(kind),
     }),
     [existing, kind],
@@ -72,7 +73,7 @@ export function ConnectorWorkbench({ kind, existing, canManage, onSaved, onCance
       return
     }
     startSaving(async () => {
-      const base = { name: draft.name, description: draft.description, config: draft.config }
+      const base = { name: draft.name, description: draft.description, logoUrl: draft.logoUrl, config: draft.config }
       if (existing) {
         const updated = await updateConnector({ ...base, id: existing.connector.id, version: existing.connector.version })
         if (!updated.ok) {

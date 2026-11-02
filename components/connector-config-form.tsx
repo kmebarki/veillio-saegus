@@ -3,6 +3,7 @@
 import { KeyRound, Plus, ShieldCheck, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 
+import { ConnectorLogoField } from '@/components/connector-logo-field'
 import { EndpointsSection } from '@/components/openapi-import'
 import { Button } from '@/components/ui/button'
 import { fieldClass } from '@/components/ui/modal'
@@ -22,6 +23,7 @@ import { cn } from '@/lib/utils'
 export type ConnectorDraft = {
   name: string
   description: string
+  logoUrl: string
   config: ConnectorConfig
 }
 
@@ -143,6 +145,7 @@ export function ConnectorConfigForm({ kind, draft, onChange, disabled }: Props) 
         <Field label="Description (facultatif)">
           <input maxLength={300} value={draft.description} onChange={(event) => set({ description: event.target.value })} className={fieldClass} placeholder="Ce que ce connecteur alimente, qui en est responsable…" />
         </Field>
+        <ConnectorLogoField kind={kind} value={draft.logoUrl} sourceUrl={config.url} onChange={(logoUrl) => set({ logoUrl })} disabled={disabled} />
       </Section>
 
       {kind === 'api' && <EndpointsSection config={config} onChange={(next) => onChange({ ...draft, config: next })} disabled={disabled} />}
