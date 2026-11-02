@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { ArrowLeft, ArrowRight, Bell, Building2, Check, CircleHelp, Globe2, ImagePlus, Menu, Settings, ShieldCheck, UserRoundPlus, Users } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Bell, Building2, Check, CircleHelp, Globe2, ImagePlus, Menu, Save, Settings, ShieldCheck, UserRoundPlus, Users } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
@@ -57,12 +57,12 @@ function RequiredMark() {
   return <><span aria-hidden="true" className="text-primary">*</span><span className="sr-only"> (obligatoire)</span></>
 }
 
-function WizardStepper({ currentStep, isEditing, onStepChange }: { currentStep: number; isEditing: boolean; onStepChange: (step: number) => void }) {
+function WizardStepper({ currentStep, isEditing, visibleSteps, onStepChange }: { currentStep: number; isEditing: boolean; visibleSteps: typeof steps; onStepChange: (step: number) => void }) {
   return (
     <nav aria-label={isEditing ? 'Sections de modification' : 'Étapes de création'} className="rounded-lg border bg-card p-3">
-      {isEditing && <p className="mb-3 px-1 text-xs text-muted-foreground"><strong className="font-medium text-foreground">Accès direct :</strong> cliquez sur une section pour la modifier.</p>}
-      <ol className="flex gap-2 overflow-x-auto lg:grid lg:grid-cols-5">
-        {steps.map((step, index) => {
+      {isEditing && <p className="mb-3 px-1 text-xs text-muted-foreground"><strong className="font-medium text-foreground">Modification rapide :</strong> ouvrez une section, ajustez les informations puis enregistrez directement.</p>}
+      <ol className={cn('flex gap-2 overflow-x-auto lg:grid', isEditing ? 'lg:grid-cols-4' : 'lg:grid-cols-5')}>
+        {visibleSteps.map((step, index) => {
           const Icon = step.icon
           const completed = !isEditing && index < currentStep
           const active = index === currentStep
@@ -112,6 +112,7 @@ async function removeOrganizationLogo(pathname: string) {
 export function OrganizationWizard({ organization }: { organization?: OrganizationListItem }) {
   const router = useRouter()
   const isEditing = Boolean(organization)
+  const visibleSteps = isEditing ? steps.slice(0, -1) : steps
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [currentStep, setCurrentStep] = useState(0)
   const [form, setForm] = useState<CreateOrganizationInput>(() => organization ? {
@@ -176,12 +177,12 @@ export function OrganizationWizard({ organization }: { organization?: Organizati
       setError(stepError)
       return
     }
-    setCurrentStep((step) => Math.min(step + 1, steps.length - 1))
+    setCurrentStep((step) => Math.min(step + 1, visibleSteps.length - 1))
   }
 
   function submit() {
-    if (!confirmed) {
-      setError(isEditing ? 'Confirmez l’exactitude des informations avant d’enregistrer les modifications.' : 'Confirmez l’exactitude des informations avant de créer l’organisation.')
+    if (!isEditing && !confirmed) {
+      setError('Confirmez l’exactitude des informations avant de créer l’organisation.')
       return
     }
     setError('')
@@ -206,7 +207,7 @@ export function OrganizationWizard({ organization }: { organization?: Organizati
         }, 900)
       } catch (submissionError) {
         if (uploadedLogoPathname) await removeOrganizationLogo(uploadedLogoPathname)
-        setError(submissionError instanceof Error ? submissionError.message : 'La création de l’organisation a échoué.')
+        setError(submissionError instanceof Error ? submissionError.message : isEditing ? 'La modification de l’organisation a échoué.' : 'La création de l’organisation a échoué.')
       }
     })
   }
@@ -228,9 +229,9 @@ export function OrganizationWizard({ organization }: { organization?: Organizati
             <section><Button render={<Link href="/admin/organizations" />} nativeButton={false} variant="ghost" className="-ml-2 mb-3"><ArrowLeft data-icon="inline-start" />Retour aux organisations</Button><p className="mb-2 text-xs font-medium text-primary">{isEditing ? 'Mise à jour guidée' : 'Création guidée'}</p><h1 className="text-2xl font-semibold tracking-[-0.04em] sm:text-[30px]">{isEditing ? `Modifier ${organization?.name}` : 'Nouvelle organisation'}</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">{isEditing ? 'Mettez à jour les informations, le périmètre et le statut de cette organisation.' : 'Configurez le périmètre, l’administration et l’état initial de la nouvelle organisation.'}</p></section>
 
             <div className="flex flex-col gap-4">
-              <WizardStepper currentStep={currentStep} isEditing={isEditing} onStepChange={(step) => { setCurrentStep(step); setError('') }} />
+              <WizardStepper currentStep={currentStep} isEditing={isEditing} visibleSteps={visibleSteps} onStepChange={(step) => { setCurrentStep(step); setError('') }} />
               <section className="rounded-lg border bg-card shadow-sm">
-                <div className="flex flex-col gap-3 border-b px-5 py-5 sm:flex-row sm:items-end sm:justify-between sm:px-7"><div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">{isEditing ? 'Section' : 'Étape'} {currentStep + 1} sur {steps.length}</p><h2 className="mt-2 text-xl font-semibold tracking-[-0.02em]">{steps[currentStep].title}</h2><p className="mt-1 text-sm text-muted-foreground">{steps[currentStep].description}</p></div><p className="shrink-0 text-xs text-muted-foreground"><RequiredMark /> Champs obligatoires</p></div>
+                <div className="flex flex-col gap-3 border-b px-5 py-5 sm:flex-row sm:items-end sm:justify-between sm:px-7"><div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">{isEditing ? 'Section' : 'Étape'} {currentStep + 1} sur {visibleSteps.length}</p><h2 className="mt-2 text-xl font-semibold tracking-[-0.02em]">{visibleSteps[currentStep].title}</h2><p className="mt-1 text-sm text-muted-foreground">{visibleSteps[currentStep].description}</p></div><p className="shrink-0 text-xs text-muted-foreground"><RequiredMark /> Champs obligatoires</p></div>
                 <div className="px-5 py-6 sm:px-7">
                   {currentStep === 0 && (
                     <FieldGroup>
@@ -280,9 +281,9 @@ export function OrganizationWizard({ organization }: { organization?: Organizati
 
                   {error && <p role="alert" className="mt-5 rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</p>}
                 </div>
-                <div className="flex flex-col-reverse justify-between gap-3 border-t px-5 py-4 sm:flex-row sm:px-7">
+                <div className="sticky bottom-0 z-10 flex flex-col-reverse justify-between gap-3 border-t bg-card/95 px-5 py-4 backdrop-blur-sm sm:flex-row sm:px-7">
                   <Button type="button" variant="outline" disabled={currentStep === 0 || isPending} onClick={() => { setCurrentStep((step) => Math.max(step - 1, 0)); setError('') }}><ArrowLeft data-icon="inline-start" />Précédent</Button>
-                  {currentStep < steps.length - 1 ? <Button type="button" onClick={goNext}>Continuer<ArrowRight data-icon="inline-end" /></Button> : <Button type="button" disabled={isPending || !confirmed} onClick={submit}><UserRoundPlus data-icon="inline-start" />{isPending ? (isEditing ? 'Enregistrement…' : 'Création…') : (isEditing ? 'Enregistrer les modifications' : 'Créer l’organisation')}</Button>}
+                  {isEditing ? <div className="flex flex-col-reverse gap-2 sm:flex-row">{currentStep < visibleSteps.length - 1 && <Button type="button" variant="outline" disabled={isPending} onClick={goNext}>Section suivante<ArrowRight data-icon="inline-end" /></Button>}<Button type="button" disabled={isPending} onClick={submit}><Save data-icon="inline-start" />{isPending ? 'Enregistrement…' : 'Enregistrer les modifications'}</Button></div> : currentStep < visibleSteps.length - 1 ? <Button type="button" onClick={goNext}>Continuer<ArrowRight data-icon="inline-end" /></Button> : <Button type="button" disabled={isPending || !confirmed} onClick={submit}><UserRoundPlus data-icon="inline-start" />{isPending ? 'Création…' : 'Créer l’organisation'}</Button>}
                 </div>
               </section>
             </div>
