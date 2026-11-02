@@ -22,7 +22,7 @@ const organizationSchema = z.object({
   internalReference: z.string().trim().min(2).max(40).regex(/^[a-zA-Z0-9_-]+$/),
   type: z.enum(['client', 'internal', 'partner']),
   primaryDomain: z.string().trim().toLowerCase().min(3).max(253).regex(/^(?!-)(?:[a-z0-9-]+\.)+[a-z]{2,}$/),
-  addressLine1: z.string().trim().min(2).max(160),
+  addressLine1: z.string().trim().max(160),
   addressLine2: z.string().trim().max(160),
   postalCode: z.string().trim().min(2).max(20),
   city: z.string().trim().min(2).max(100),

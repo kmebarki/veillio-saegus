@@ -26,7 +26,7 @@ export function ResponsibleUserPicker({
   return (
     <div className="flex flex-col gap-3">
       {selected && (
-        <div className="flex items-center justify-between gap-3 rounded-xl border bg-muted/30 p-3">
+        <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/30 p-3">
           <div className="flex min-w-0 items-center gap-3">
             <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><UserRound /></span>
             <span className="min-w-0"><strong className="block truncate text-sm font-medium">{selected.name}</strong><span className="block truncate text-xs text-muted-foreground">{selected.email}</span></span>
@@ -38,13 +38,13 @@ export function ResponsibleUserPicker({
       <label className="relative">
         <span className="sr-only">Rechercher un responsable</span>
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input value={query} onChange={(event) => setQuery(event.target.value)} className="h-10 rounded-xl pl-9" placeholder={selected ? 'Rechercher pour changer de responsable' : 'Rechercher par nom ou e-mail'} autoComplete="off" />
+        <Input value={query} onChange={(event) => setQuery(event.target.value)} className="h-10 rounded-lg pl-9" placeholder={selected ? 'Rechercher pour changer de responsable' : 'Rechercher par nom ou e-mail'} autoComplete="off" />
       </label>
 
       {deferredQuery.length < 2 ? (
         <p className="text-xs text-muted-foreground">Saisissez au moins 2 caractères. Seuls les 20 meilleurs résultats sont affichés.</p>
       ) : (
-        <div className="max-h-56 overflow-y-auto rounded-xl border bg-card p-1" role="listbox" aria-label="Résultats de recherche">
+        <div className="max-h-56 overflow-y-auto rounded-lg border bg-card p-1" role="listbox" aria-label="Résultats de recherche">
           {isLoading && <p className="px-3 py-4 text-sm text-muted-foreground">Recherche…</p>}
           {!isLoading && error && <p className="px-3 py-4 text-sm text-destructive">La recherche est momentanément indisponible.</p>}
           {!isLoading && !error && data.length === 0 && <p className="px-3 py-4 text-sm text-muted-foreground">Aucun contact actif trouvé.</p>}
