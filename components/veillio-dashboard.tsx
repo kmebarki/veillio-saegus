@@ -29,21 +29,22 @@ import {
   Workflow,
   X,
 } from 'lucide-react'
+import Link from 'next/link'
 import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 const workspaceItems = [
-  { label: 'Tableau de bord', icon: LayoutDashboard },
-  { label: 'Catalogue des veilles', icon: LibraryBig },
-  { label: 'Mes veilles', icon: Radio },
-  { label: 'Mes abonnements', icon: Bell },
-  { label: 'Publications', icon: Newspaper },
+  { label: 'Tableau de bord', icon: LayoutDashboard, href: '/' },
+  { label: 'Catalogue des veilles', icon: LibraryBig, href: '#' },
+  { label: 'Mes veilles', icon: Radio, href: '#' },
+  { label: 'Mes abonnements', icon: Bell, href: '#' },
+  { label: 'Publications', icon: Newspaper, href: '#' },
 ]
 
 const steeringItems = [
-  { label: 'Sources', icon: Database },
+  { label: 'Sources', icon: Database, href: '#' },
   {
     label: 'Intégrations',
     icon: Plug,
@@ -54,16 +55,16 @@ const steeringItems = [
     icon: BrainCircuit,
     children: ['Fournisseurs et modèles', 'Prompts', 'Traitements IA', 'Règles IA'],
   },
-  { label: 'Templates', icon: LayoutTemplate },
-  { label: 'Édition et publication', icon: FilePenLine },
-  { label: 'Diffusion', icon: Send },
+  { label: 'Templates', icon: LayoutTemplate, href: '#' },
+  { label: 'Édition et publication', icon: FilePenLine, href: '#' },
+  { label: 'Diffusion', icon: Send, href: '#' },
 ]
 
 const administrationItems = [
-  { label: 'Utilisateurs et admissions', icon: UserRoundCheck },
-  { label: 'Équipes', icon: Workflow },
-  { label: 'Groupes et permissions', icon: ShieldCheck },
-  { label: 'Paramètres', icon: Settings },
+  { label: 'Utilisateurs et admissions', icon: UserRoundCheck, href: '/admin/users' },
+  { label: 'Équipes', icon: Workflow, href: '#' },
+  { label: 'Groupes et permissions', icon: ShieldCheck, href: '#' },
+  { label: 'Paramètres', icon: Settings, href: '#' },
 ]
 
 const watches = [
@@ -117,7 +118,7 @@ function Brand() {
   )
 }
 
-function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function Sidebar({ open, onClose, activeItem = 'Tableau de bord' }: { open: boolean; onClose: () => void; activeItem?: string }) {
   const [expandedMenus, setExpandedMenus] = useState(() => new Set(['Intégrations', 'Gestion de l’IA']))
 
   function toggleMenu(label: string) {
@@ -131,28 +132,32 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
 
   function renderMenuItem(
     item: (typeof workspaceItems)[number] | (typeof steeringItems)[number] | (typeof administrationItems)[number],
-    active = false,
   ) {
     const Icon = item.icon
     const children = 'children' in item ? item.children : undefined
     const expanded = expandedMenus.has(item.label)
 
+    const itemClassName = cn(
+      'flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-medium transition-colors',
+      activeItem === item.label
+        ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-sm'
+        : 'text-sidebar-foreground hover:bg-sidebar-accent',
+    )
+
     return (
       <div key={item.label}>
-        <button
-          className={cn(
-            'flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-medium transition-colors',
-            active
-              ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-sm'
-              : 'text-sidebar-foreground hover:bg-sidebar-accent',
-          )}
-          aria-expanded={children ? expanded : undefined}
-          onClick={() => children ? toggleMenu(item.label) : onClose()}
-        >
-          <Icon className="size-[18px] shrink-0" />
-          <span className="flex-1">{item.label}</span>
-          {children && <ChevronDown className={cn('size-4 text-muted-foreground transition-transform', !expanded && '-rotate-90')} />}
-        </button>
+        {children ? (
+          <button className={itemClassName} aria-expanded={expanded} onClick={() => toggleMenu(item.label)}>
+            <Icon className="size-[18px] shrink-0" />
+            <span className="flex-1">{item.label}</span>
+            <ChevronDown className={cn('size-4 text-muted-foreground transition-transform', !expanded && '-rotate-90')} />
+          </button>
+        ) : (
+          <Link href={'href' in item ? item.href : '#'} className={itemClassName} onClick={onClose} aria-current={activeItem === item.label ? 'page' : undefined}>
+            <Icon className="size-[18px] shrink-0" />
+            <span className="flex-1">{item.label}</span>
+          </Link>
+        )}
         {children && expanded && (
           <div className="flex flex-col gap-0.5 py-1 pl-11">
             {children.map((child) => (
@@ -168,8 +173,8 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
 
   return (
     <>
-      <button aria-label="Fermer le menu" className={cn('fixed inset-0 bg-foreground/20 backdrop-blur-[2px] lg:hidden', open ? 'block' : 'hidden')} onClick={onClose} />
-      <aside className={cn('fixed inset-y-0 left-0 flex w-[288px] flex-col border-r bg-sidebar transition-transform duration-300 lg:translate-x-0', open ? 'translate-x-0' : '-translate-x-full')}>
+      <button aria-label="Fermer le menu" className={cn('fixed inset-0 z-20 bg-foreground/20 backdrop-blur-[2px] lg:hidden', open ? 'block' : 'hidden')} onClick={onClose} />
+      <aside className={cn('fixed inset-y-0 left-0 z-30 flex w-[288px] flex-col border-r bg-sidebar transition-transform duration-300 lg:translate-x-0', open ? 'translate-x-0' : '-translate-x-full')}>
         <div className="flex items-center justify-between border-b">
           <Brand />
           <Button variant="ghost" size="icon-lg" className="mr-3 lg:hidden" aria-label="Fermer le menu" onClick={onClose}><X /></Button>
@@ -177,7 +182,7 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
         <nav className="flex flex-1 flex-col overflow-y-auto px-3 py-5" aria-label="Navigation principale">
           <section className="flex flex-col gap-1" aria-labelledby="workspace-navigation">
             <h2 id="workspace-navigation" className="px-3 pb-1 text-[11px] font-semibold text-muted-foreground">Mon espace</h2>
-            {workspaceItems.map((item, index) => renderMenuItem(item, index === 0))}
+            {workspaceItems.map((item) => renderMenuItem(item))}
           </section>
 
           <section className="mt-5 flex flex-col gap-1 border-t pt-5" aria-labelledby="steering-navigation">
