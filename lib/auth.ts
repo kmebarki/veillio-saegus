@@ -52,6 +52,13 @@ export const auth = betterAuth({
         },
       },
     },
+    session: {
+      create: {
+        after: async (session) => {
+          await pool.query('UPDATE "user" SET "lastLoginAt" = now() WHERE "id" = $1', [session.userId])
+        },
+      },
+    },
   },
   trustedOrigins: [
     ...(process.env.NODE_ENV === 'development'
