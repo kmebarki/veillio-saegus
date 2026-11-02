@@ -10,5 +10,5 @@ export const metadata: Metadata = {
 
 export default async function UsersAdmissionsPage() {
   const data = await getAdminAccessData()
-  return <UsersAdmissions initialUsers={data.users} initialAdmissions={data.admissions} />
+  return <UsersAdmissions initialUsers={data.users} initialAdmissions={data.admissions} initialInvitations={data.invitations} />
 }

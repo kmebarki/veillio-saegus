@@ -40,9 +40,26 @@ const requestedRoleToDatabase: Record<string, string> = {
   Reader: 'reader',
 }
 
+const invitationRoleLabels: Record<string, string> = {
+  Administrator: 'Administrateur',
+  Watcher: 'Contributeur',
+  Reader: 'Lecteur',
+}
+
+const invitationIdSchema = z.object({ id: z.string().uuid() })
+const INVITATION_VALIDITY_MS = 7 * 24 * 60 * 60 * 1000
+
+const dateTimeFormatter = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })
+
+function getInvitationStatus(status: string, expiresAt: Date) {
+  if (status === 'Accepted') return 'Acceptée'
+  if (status === 'Cancelled') return 'Annulée'
+  return expiresAt.getTime() <= Date.now() ? 'Expirée' : 'En attente'
+}
+
 export async function getAdminAccessData() {
   await requireAdmin()
-  const [userRows, admissionRows] = await Promise.all([
+  const [userRows, admissionRows, invitationRows] = await Promise.all([
     db.select({
       id: users.id,
       name: users.name,
@@ -53,9 +70,30 @@ export async function getAdminAccessData() {
       createdAt: users.createdAt,
     }).from(users).orderBy(desc(users.createdAt)),
     db.select().from(admissionRequests).where(eq(admissionRequests.status, 'Pending')).orderBy(desc(admissionRequests.createdAt)),
+    db.select({
+      id: invitations.id,
+      name: invitations.name,
+      email: invitations.email,
+      role: invitations.role,
+      status: invitations.status,
+      expiresAt: invitations.expiresAt,
+      createdAt: invitations.createdAt,
+      invitedBy: users.name,
+    }).from(invitations).leftJoin(users, eq(users.id, invitations.createdByUserId)).orderBy(desc(invitations.createdAt)),
   ])
 
   return {
+    invitations: invitationRows.map((invitation) => ({
+      id: invitation.id,
+      name: invitation.name,
+      email: invitation.email,
+      initials: invitation.name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase(),
+      role: invitationRoleLabels[invitation.role] ?? 'Lecteur',
+      status: getInvitationStatus(invitation.status, invitation.expiresAt),
+      sentAt: dateTimeFormatter.format(invitation.createdAt),
+      expiresAt: dateTimeFormatter.format(invitation.expiresAt),
+      invitedBy: invitation.invitedBy ?? 'Utilisateur supprimé',
+    })),
     users: userRows.map((user) => ({
       id: user.id,
       name: user.name,
@@ -107,7 +145,7 @@ export async function createInvitation(input: unknown) {
       email: parsed.data.email,
       name: parsed.data.name,
       token: invitationToken,
-      role: roleLabels[parsed.data.role] ?? 'Lecteur',
+      role: invitationRoleLabels[parsed.data.role] ?? 'Lecteur',
     })
   } catch {
     await db.update(invitations).set({ status: 'Cancelled', updatedAt: new Date() }).where(eq(invitations.id, invitation.id))
@@ -130,6 +168,72 @@ export async function createInvitation(input: unknown) {
   })
   revalidatePath('/admin/users')
   return { ok: true as const, message: 'Invitation envoyée par e-mail.' }
+}
+
+export async function resendInvitation(input: unknown) {
+  const actor = await requireAdmin()
+  const parsed = invitationIdSchema.safeParse(input)
+  if (!parsed.success) return { ok: false as const, message: 'Invitation invalide.' }
+
+  const [invitation] = await db.select().from(invitations).where(eq(invitations.id, parsed.data.id)).limit(1)
+  if (!invitation || invitation.status !== 'Pending') return { ok: false as const, message: 'Cette invitation ne peut plus être renvoyée.' }
+
+  const existingUser = await db.select({ id: users.id }).from(users).where(eq(users.email, invitation.email)).limit(1)
+  if (existingUser.length > 0) return { ok: false as const, message: 'Cet utilisateur possède déjà un compte.' }
+
+  const invitationToken = randomBytes(32).toString('base64url')
+  const tokenHash = createHash('sha256').update(invitationToken).digest('hex')
+
+  try {
+    await sendInvitationEmail({
+      email: invitation.email,
+      name: invitation.name,
+      token: invitationToken,
+      role: invitationRoleLabels[invitation.role] ?? 'Lecteur',
+    })
+  } catch {
+    return { ok: false as const, message: 'L’invitation n’a pas pu être renvoyée. Vérifiez la configuration SMTP Microsoft 365.' }
+  }
+
+  await db.update(invitations).set({
+    tokenHash,
+    expiresAt: new Date(Date.now() + INVITATION_VALIDITY_MS),
+    createdAt: new Date(),
+    createdByUserId: actor.id,
+    updatedAt: new Date(),
+  }).where(eq(invitations.id, invitation.id))
+  await db.insert(auditEvents).values({
+    actorUserId: actor.id,
+    action: 'invitation.resent',
+    targetType: 'invitation',
+    targetId: invitation.id,
+    metadata: { email: invitation.email },
+  })
+  revalidatePath('/admin/users')
+  return { ok: true as const, message: 'Invitation renvoyée par e-mail.' }
+}
+
+export async function cancelInvitation(input: unknown) {
+  const actor = await requireAdmin()
+  const parsed = invitationIdSchema.safeParse(input)
+  if (!parsed.success) return { ok: false as const, message: 'Invitation invalide.' }
+
+  const [cancelled] = await db
+    .update(invitations)
+    .set({ status: 'Cancelled', updatedAt: new Date() })
+    .where(and(eq(invitations.id, parsed.data.id), eq(invitations.status, 'Pending')))
+    .returning({ id: invitations.id, email: invitations.email })
+  if (!cancelled) return { ok: false as const, message: 'Cette invitation ne peut plus être annulée.' }
+
+  await db.insert(auditEvents).values({
+    actorUserId: actor.id,
+    action: 'invitation.cancelled',
+    targetType: 'invitation',
+    targetId: cancelled.id,
+    metadata: { email: cancelled.email },
+  })
+  revalidatePath('/admin/users')
+  return { ok: true as const, message: 'Invitation annulée.' }
 }
 
 export async function acceptInvitation(input: unknown) {
