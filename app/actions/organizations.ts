@@ -9,7 +9,7 @@ import { z } from 'zod'
 
 import { getEffectivePermissions, requirePermission } from '@/lib/authorization'
 import { db } from '@/lib/db'
-import { auditEvents, invitations, organizations, teams, users } from '@/lib/db/schema'
+import { auditEvents, invitations, organizations, users } from '@/lib/db/schema'
 import { sendInvitationEmail } from '@/lib/email'
 import type { CreateOrganizationInput, OrganizationsOverview } from '@/lib/organization-types'
 
@@ -71,8 +71,8 @@ export async function getOrganizationsOverview(): Promise<OrganizationsOverview>
         status: organizations.status,
         miniSiteEnabled: organizations.miniSiteEnabled,
         createdAt: organizations.createdAt,
-        usersCount: sql<number>`(select count(*)::int from "user" where "user"."organizationId" = ${organizations.id})`,
-        teamsCount: sql<number>`(select count(*)::int from ${teams} where ${teams.organizationId} = ${organizations.id})`,
+        usersCount: sql<number>`(select count(*)::int from "user" where "user"."organizationId" = "organizations"."id")`,
+        teamsCount: sql<number>`(select count(*)::int from "teams" where "teams"."organizationId" = "organizations"."id")`,
       })
       .from(organizations)
       .orderBy(desc(organizations.createdAt)),
