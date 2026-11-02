@@ -2,13 +2,14 @@
 
 import { createHash, randomBytes } from 'node:crypto'
 
-import { and, desc, eq } from 'drizzle-orm'
+import { and, desc, eq, gt } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
-import { requireAdmin } from '@/lib/authorization'
+import { getCurrentIdentity, requireAdmin } from '@/lib/authorization'
 import { db } from '@/lib/db'
 import { admissionRequests, auditEvents, invitations, sessions, users } from '@/lib/db/schema'
+import { sendInvitationEmail } from '@/lib/email'
 
 const invitationSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -92,7 +93,8 @@ export async function createInvitation(input: unknown) {
     .limit(1)
   if (existingInvitation.length > 0) return { ok: false as const, message: 'Une invitation est déjà en attente pour cette adresse.' }
 
-  const tokenHash = createHash('sha256').update(randomBytes(32)).digest('hex')
+  const invitationToken = randomBytes(32).toString('base64url')
+  const tokenHash = createHash('sha256').update(invitationToken).digest('hex')
   const [invitation] = await db.insert(invitations).values({
     ...parsed.data,
     tokenHash,
@@ -100,15 +102,66 @@ export async function createInvitation(input: unknown) {
     createdByUserId: actor.id,
   }).returning({ id: invitations.id })
 
+  try {
+    await sendInvitationEmail({
+      email: parsed.data.email,
+      name: parsed.data.name,
+      token: invitationToken,
+      role: roleLabels[parsed.data.role] ?? 'Lecteur',
+    })
+  } catch {
+    await db.update(invitations).set({ status: 'Cancelled', updatedAt: new Date() }).where(eq(invitations.id, invitation.id))
+    await db.insert(auditEvents).values({
+      actorUserId: actor.id,
+      action: 'invitation.delivery_failed',
+      targetType: 'invitation',
+      targetId: invitation.id,
+      metadata: { email: parsed.data.email },
+    })
+    return { ok: false as const, message: 'L’invitation n’a pas pu être envoyée. Vérifiez la configuration SMTP Microsoft 365.' }
+  }
+
   await db.insert(auditEvents).values({
     actorUserId: actor.id,
-    action: 'invitation.created',
+    action: 'invitation.sent',
     targetType: 'invitation',
     targetId: invitation.id,
     metadata: { email: parsed.data.email, role: parsed.data.role },
   })
   revalidatePath('/admin/users')
-  return { ok: true as const, message: 'Invitation enregistrée de façon sécurisée.' }
+  return { ok: true as const, message: 'Invitation envoyée par e-mail.' }
+}
+
+export async function acceptInvitation(input: unknown) {
+  const identity = await getCurrentIdentity()
+  if (!identity) return { ok: false as const, message: 'Authentification requise.' }
+
+  const parsed = z.object({ token: z.string().min(32).max(256) }).safeParse(input)
+  if (!parsed.success) return { ok: false as const, message: 'Invitation invalide.' }
+
+  const tokenHash = createHash('sha256').update(parsed.data.token).digest('hex')
+  const result = await db.transaction(async (tx) => {
+    const [invitation] = await tx
+      .update(invitations)
+      .set({ status: 'Accepted', updatedAt: new Date() })
+      .where(and(eq(invitations.tokenHash, tokenHash), eq(invitations.email, identity.email), eq(invitations.status, 'Pending'), gt(invitations.expiresAt, new Date())))
+      .returning({ id: invitations.id, role: invitations.role })
+
+    if (!invitation) return null
+    const assignedRole = invitation.role === 'Administrator' ? 'admin' : invitation.role === 'Watcher' ? 'contributor' : 'reader'
+    await tx.update(users).set({ role: assignedRole, status: 'active', updatedAt: new Date() }).where(eq(users.id, identity.id))
+    await tx.insert(auditEvents).values({
+      actorUserId: identity.id,
+      action: 'invitation.accepted',
+      targetType: 'invitation',
+      targetId: invitation.id,
+      metadata: { role: invitation.role },
+    })
+    return assignedRole
+  })
+
+  if (!result) return { ok: false as const, message: 'Cette invitation est invalide, expirée ou liée à une autre adresse.' }
+  return { ok: true as const, destination: result === 'admin' ? '/admin/users' : '/admission' }
 }
 
 export async function decideAdmission(input: unknown) {

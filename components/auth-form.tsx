@@ -5,10 +5,11 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
+import { acceptInvitation } from '@/app/actions/admin-access'
 import { Button } from '@/components/ui/button'
 import { authClient } from '@/lib/auth-client'
 
-export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
+export function AuthForm({ mode, invitationToken }: { mode: 'sign-in' | 'sign-up'; invitationToken?: string }) {
   const router = useRouter()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -32,7 +33,16 @@ export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
       setError('Impossible de vous authentifier. Vérifiez vos informations et réessayez.')
       return
     }
-    router.push('/admission')
+    if (isSignUp && invitationToken) {
+      const acceptance = await acceptInvitation({ token: invitationToken })
+      if (!acceptance.ok) {
+        setError(acceptance.message)
+        return
+      }
+      router.push(acceptance.destination)
+    } else {
+      router.push('/admission')
+    }
     router.refresh()
   }
 
