@@ -11,7 +11,7 @@ type ModalProps = {
   title: string
   description?: string
   children: React.ReactNode
-  size?: 'md' | 'xl'
+  size?: 'md' | 'xl' | '2xl'
   bare?: boolean
 }
 
@@ -29,7 +29,7 @@ export function Modal({ open, onClose, title, description, children, size = 'md'
 
   if (!open) return null
 
-  const width = size === 'xl' ? 'max-w-4xl' : 'max-w-lg'
+  const width = size === '2xl' ? 'max-w-6xl' : size === 'xl' ? 'max-w-4xl' : 'max-w-lg'
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/30 p-3 backdrop-blur-sm sm:p-4" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>

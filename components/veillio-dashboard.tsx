@@ -60,6 +60,8 @@ const steeringItems = [
   { label: 'Diffusion', icon: Send, href: '#' },
 ]
 
+const childHrefs: Record<string, string> = { Connecteurs: '/admin/connectors' }
+
 const administrationItems = [
   { label: 'Utilisateurs et admissions', icon: UserRoundCheck, href: '/admin/users' },
   { label: 'Équipes', icon: Workflow, href: '/admin/teams' },
@@ -160,11 +162,18 @@ export function Sidebar({ open, onClose, activeItem = 'Tableau de bord' }: { ope
         )}
         {children && expanded && (
           <div className="flex flex-col gap-0.5 py-1 pl-11">
-            {children.map((child) => (
-              <button key={child} onClick={onClose} className="min-h-10 rounded-lg px-3 text-left text-[13px] text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground">
-                {child}
-              </button>
-            ))}
+            {children.map((child) => {
+              const href = childHrefs[child]
+              const childClassName = cn(
+                'flex min-h-10 items-center rounded-lg px-3 text-left text-[13px] transition-colors',
+                activeItem === child ? 'bg-sidebar-primary font-medium text-sidebar-primary-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground',
+              )
+              return href ? (
+                <Link key={child} href={href} onClick={onClose} className={childClassName} aria-current={activeItem === child ? 'page' : undefined}>{child}</Link>
+              ) : (
+                <button key={child} onClick={onClose} className={childClassName}>{child}</button>
+              )
+            })}
           </div>
         )}
       </div>

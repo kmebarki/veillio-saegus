@@ -30,6 +30,14 @@ export const PERMISSION_MODULES: PermissionModule[] = [
     permissions: [{ key: 'sources.manage', label: 'Gérer les sources', description: 'Ajouter, modifier et désactiver des sources de collecte.' }],
   },
   {
+    id: 'connectors',
+    label: 'Connecteurs',
+    permissions: [
+      { key: 'connectors.view', label: 'Consulter les connecteurs', description: 'Voir les connecteurs, leur configuration technique et leur santé (sans les secrets).' },
+      { key: 'connectors.manage', label: 'Gérer les connecteurs', description: 'Créer, configurer, tester, activer et supprimer des connecteurs ; définir leurs identifiants.', sensitive: true },
+    ],
+  },
+  {
     id: 'users',
     label: 'Utilisateurs et admissions',
     permissions: [
@@ -83,7 +91,7 @@ export function normalizePermissions(values: readonly string[]) {
 export const ROLE_PERMISSIONS: Record<RoleKey, string[]> = {
   super_admin: PERMISSION_KEYS,
   admin: PERMISSION_KEYS,
-  pilot: ['watches.view', 'watches.contribute', 'watches.manage', 'watches.publish', 'sources.manage', 'users.view', 'admissions.review', 'teams.view'],
+  pilot: ['watches.view', 'watches.contribute', 'watches.manage', 'watches.publish', 'sources.manage', 'users.view', 'admissions.review', 'teams.view', 'connectors.view'],
   contributor: ['watches.view', 'watches.contribute'],
   reader: ['watches.view'],
 }

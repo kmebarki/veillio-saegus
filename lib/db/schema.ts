@@ -133,6 +133,51 @@ export const permissionGroupMembers = pgTable(
   (table) => [primaryKey({ columns: [table.groupId, table.userId] })],
 )
 
+export type StoredConnectorConfig = Record<string, unknown>
+
+export type ConnectorRunDetails = {
+  checks?: { id: string; label: string; status: 'ok' | 'warning' | 'error' | 'skipped'; detail: string }[]
+  sample?: { title: string; link: string; date: string; summary: string }[]
+  finalUrl?: string
+  contentType?: string
+  bytes?: number
+}
+
+export const connectors = pgTable('connectors', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organizationId').notNull(),
+  name: text('name').notNull(),
+  description: text('description'),
+  kind: text('kind').notNull(),
+  status: text('status').notNull().default('draft'),
+  config: jsonb('config').$type<StoredConnectorConfig>().notNull(),
+  secretCiphertext: text('secretCiphertext'),
+  intervalMinutes: integer('intervalMinutes').notNull().default(0),
+  version: integer('version').notNull().default(1),
+  lastCheckAt: timestamp('lastCheckAt', { withTimezone: true }),
+  lastCheckStatus: text('lastCheckStatus'),
+  lastCheckMessage: text('lastCheckMessage'),
+  lastCheckVersion: integer('lastCheckVersion'),
+  lastLatencyMs: integer('lastLatencyMs'),
+  createdByUserId: text('createdByUserId'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const connectorRuns = pgTable('connector_runs', {
+  id: bigserial('id', { mode: 'number' }).primaryKey(),
+  connectorId: uuid('connectorId').notNull().references(() => connectors.id, { onDelete: 'cascade' }),
+  trigger: text('trigger').notNull(),
+  status: text('status').notNull(),
+  httpStatus: integer('httpStatus'),
+  itemsFound: integer('itemsFound'),
+  durationMs: integer('durationMs'),
+  message: text('message'),
+  details: jsonb('details').$type<ConnectorRunDetails>().notNull().default({}),
+  actorUserId: text('actorUserId'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
 export const authorizedDomains = pgTable('authorized_domains', {
   id: uuid('id').primaryKey().defaultRandom(),
   organizationId: uuid('organizationId').notNull(),
