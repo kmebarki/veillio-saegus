@@ -2,23 +2,31 @@
 
 import {
   Bell,
-  BookOpen,
-  Bot,
+  BrainCircuit,
   ChevronDown,
   ChevronRight,
   CircleHelp,
+  Database,
+  FilePenLine,
   FileText,
   LayoutDashboard,
+  LayoutTemplate,
+  LibraryBig,
   Menu,
   MoreHorizontal,
   Network,
   Newspaper,
+  Plug,
   Plus,
   Radio,
   Search,
+  Send,
   Settings,
+  ShieldCheck,
   Sparkles,
+  UserRoundCheck,
   Users,
+  Workflow,
   X,
 } from 'lucide-react'
 import { useState } from 'react'
@@ -26,26 +34,36 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-const navGroups = [
+const workspaceItems = [
+  { label: 'Tableau de bord', icon: LayoutDashboard },
+  { label: 'Catalogue des veilles', icon: LibraryBig },
+  { label: 'Mes veilles', icon: Radio },
+  { label: 'Mes abonnements', icon: Bell },
+  { label: 'Publications', icon: Newspaper },
+]
+
+const steeringItems = [
+  { label: 'Sources', icon: Database },
   {
-    label: 'Espace de veille',
-    items: [
-      { label: 'Vue d’ensemble', icon: LayoutDashboard },
-      { label: 'Mes veilles', icon: Radio, count: 8 },
-      { label: 'Catalogue', icon: BookOpen },
-      { label: 'Publications', icon: Newspaper, count: 3 },
-      { label: 'Mes abonnements', icon: Bell },
-    ],
+    label: 'Intégrations',
+    icon: Plug,
+    children: ['Connecteurs', 'Connexions', 'Collectes'],
   },
   {
-    label: 'Administration',
-    items: [
-      { label: 'Connecteurs', icon: Network },
-      { label: 'Gestion de l’IA', icon: Bot },
-      { label: 'Templates', icon: FileText },
-      { label: 'Utilisateurs', icon: Users, count: 6 },
-    ],
+    label: 'Gestion de l’IA',
+    icon: BrainCircuit,
+    children: ['Fournisseurs et modèles', 'Prompts', 'Traitements IA', 'Règles IA'],
   },
+  { label: 'Templates', icon: LayoutTemplate },
+  { label: 'Édition et publication', icon: FilePenLine },
+  { label: 'Diffusion', icon: Send },
+]
+
+const administrationItems = [
+  { label: 'Utilisateurs et admissions', icon: UserRoundCheck },
+  { label: 'Équipes', icon: Workflow },
+  { label: 'Groupes et permissions', icon: ShieldCheck },
+  { label: 'Paramètres', icon: Settings },
 ]
 
 const watches = [
@@ -100,31 +118,77 @@ function Brand() {
 }
 
 function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [expandedMenus, setExpandedMenus] = useState(() => new Set(['Intégrations', 'Gestion de l’IA']))
+
+  function toggleMenu(label: string) {
+    setExpandedMenus((current) => {
+      const next = new Set(current)
+      if (next.has(label)) next.delete(label)
+      else next.add(label)
+      return next
+    })
+  }
+
+  function renderMenuItem(
+    item: (typeof workspaceItems)[number] | (typeof steeringItems)[number] | (typeof administrationItems)[number],
+    active = false,
+  ) {
+    const Icon = item.icon
+    const children = 'children' in item ? item.children : undefined
+    const expanded = expandedMenus.has(item.label)
+
+    return (
+      <div key={item.label}>
+        <button
+          className={cn(
+            'flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-medium transition-colors',
+            active
+              ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-sm'
+              : 'text-sidebar-foreground hover:bg-sidebar-accent',
+          )}
+          aria-expanded={children ? expanded : undefined}
+          onClick={() => children ? toggleMenu(item.label) : onClose()}
+        >
+          <Icon className="size-[18px] shrink-0" />
+          <span className="flex-1">{item.label}</span>
+          {children && <ChevronDown className={cn('size-4 text-muted-foreground transition-transform', !expanded && '-rotate-90')} />}
+        </button>
+        {children && expanded && (
+          <div className="flex flex-col gap-0.5 py-1 pl-11">
+            {children.map((child) => (
+              <button key={child} onClick={onClose} className="min-h-10 rounded-lg px-3 text-left text-[13px] text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground">
+                {child}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <>
       <button aria-label="Fermer le menu" className={cn('fixed inset-0 bg-foreground/20 backdrop-blur-[2px] lg:hidden', open ? 'block' : 'hidden')} onClick={onClose} />
-      <aside className={cn('fixed inset-y-0 left-0 flex w-[268px] flex-col border-r bg-sidebar transition-transform duration-300 lg:translate-x-0', open ? 'translate-x-0' : '-translate-x-full')}>
+      <aside className={cn('fixed inset-y-0 left-0 flex w-[288px] flex-col border-r bg-sidebar transition-transform duration-300 lg:translate-x-0', open ? 'translate-x-0' : '-translate-x-full')}>
         <div className="flex items-center justify-between border-b">
           <Brand />
           <Button variant="ghost" size="icon-lg" className="mr-3 lg:hidden" aria-label="Fermer le menu" onClick={onClose}><X /></Button>
         </div>
-        <nav className="flex flex-1 flex-col gap-7 overflow-y-auto px-3 py-5" aria-label="Navigation principale">
-          {navGroups.map((group, groupIndex) => (
-            <div key={group.label} className="flex flex-col gap-1">
-              <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{group.label}</p>
-              {group.items.map((item, itemIndex) => {
-                const active = groupIndex === 0 && itemIndex === 0
-                const Icon = item.icon
-                return (
-                  <button key={item.label} onClick={onClose} className={cn('flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-medium transition-colors', active ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-sm' : 'text-sidebar-foreground hover:bg-sidebar-accent')}>
-                    <Icon className="size-[18px]" />
-                    <span className="flex-1">{item.label}</span>
-                    {item.count && <span className={cn('min-w-5 rounded-md px-1.5 py-0.5 text-center text-[10px]', active ? 'bg-white/15' : 'bg-muted text-muted-foreground')}>{item.count}</span>}
-                  </button>
-                )
-              })}
-            </div>
-          ))}
+        <nav className="flex flex-1 flex-col overflow-y-auto px-3 py-5" aria-label="Navigation principale">
+          <section className="flex flex-col gap-1" aria-labelledby="workspace-navigation">
+            <h2 id="workspace-navigation" className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Mon espace</h2>
+            {workspaceItems.map((item, index) => renderMenuItem(item, index === 0))}
+          </section>
+
+          <section className="mt-5 flex flex-col gap-1 border-t pt-5" aria-labelledby="steering-navigation">
+            <h2 id="steering-navigation" className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Pilotage</h2>
+            {steeringItems.map((item) => renderMenuItem(item))}
+          </section>
+
+          <section className="mt-5 flex flex-col gap-1 border-t pt-5" aria-labelledby="administration-navigation">
+            <h2 id="administration-navigation" className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Administration</h2>
+            {administrationItems.map((item) => renderMenuItem(item))}
+          </section>
         </nav>
         <div className="border-t p-3">
           <button className="flex min-h-14 w-full items-center gap-3 rounded-xl px-2 text-left hover:bg-sidebar-accent">
@@ -203,7 +267,7 @@ export function VeillioDashboard() {
   return (
     <div className="min-h-dvh bg-background">
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <div className="lg:pl-[268px]">
+      <div className="lg:pl-[288px]">
         <header className="sticky top-0 flex h-16 items-center gap-3 border-b bg-background/90 px-4 backdrop-blur-xl sm:px-6 lg:px-8">
           <Button variant="ghost" size="icon-lg" className="lg:hidden" aria-label="Ouvrir le menu" onClick={() => setSidebarOpen(true)}><Menu /></Button>
           <div className="relative hidden max-w-md flex-1 sm:block">
