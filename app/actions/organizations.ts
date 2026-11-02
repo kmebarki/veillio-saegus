@@ -2,7 +2,8 @@
 
 import { createHash, randomBytes } from 'node:crypto'
 
-import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm'
+import { del } from '@vercel/blob'
+import { and, asc, count, desc, eq, ilike, ne, or, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { revalidatePath } from 'next/cache'
 import { headers } from 'next/headers'
@@ -10,9 +11,23 @@ import { z } from 'zod'
 
 import { getEffectivePermissions, requirePermission } from '@/lib/authorization'
 import { db } from '@/lib/db'
-import { auditEvents, invitations, organizations, users } from '@/lib/db/schema'
+import {
+  auditEvents,
+  authorizedDomains,
+  collectionOccurrences,
+  collectionPolicies,
+  connections,
+  connectors,
+  invitations,
+  organizations,
+  permissionGroups,
+  sources,
+  teams,
+  users,
+  webhookEvents,
+} from '@/lib/db/schema'
 import { sendInvitationEmail } from '@/lib/email'
-import type { CreateOrganizationInput, OrganizationsOverview } from '@/lib/organization-types'
+import type { CreateOrganizationInput, OrganizationListItem, OrganizationsOverview, UpdateOrganizationInput } from '@/lib/organization-types'
 
 const INVITATION_VALIDITY_MS = 7 * 24 * 60 * 60 * 1000
 const responsibleUsers = alias(users, 'responsible_users')
@@ -107,6 +122,13 @@ export async function getOrganizationsOverview(): Promise<OrganizationsOverview>
       createdAt: organization.createdAt.toISOString(),
     })),
   }
+}
+
+export async function getOrganizationForEdit(id: string): Promise<OrganizationListItem | null> {
+  await requirePermission('organizations.manage')
+  if (!z.string().uuid().safeParse(id).success) return null
+  const overview = await getOrganizationsOverview()
+  return overview.organizations.find((organization) => organization.id === id) ?? null
 }
 
 export async function searchOrganizationResponsibles(query: string) {
@@ -213,5 +235,133 @@ export async function createOrganization(input: CreateOrganizationInput) {
     const code = typeof error === 'object' && error && 'code' in error ? String(error.code) : ''
     if (code === '23505') return { ok: false as const, message: 'Cette référence interne ou ce domaine est déjà utilisé.' }
     return { ok: false as const, message: 'La création de l’organisation a échoué.' }
+  }
+}
+
+export async function updateOrganization(id: string, input: UpdateOrganizationInput) {
+  const actor = await requirePermission('organizations.manage')
+  if (!z.string().uuid().safeParse(id).success) return { ok: false as const, message: 'Organisation introuvable.' }
+
+  const parsed = organizationSchema.safeParse({
+    ...input,
+    inviteAdmin: false,
+    adminFirstName: '',
+    adminLastName: '',
+    adminEmail: '',
+  })
+  if (!parsed.success) return { ok: false as const, message: parsed.error.issues[0]?.message ?? 'Les informations saisies sont invalides.' }
+
+  const data = parsed.data
+  try {
+    const result = await db.transaction(async (transaction) => {
+      if (data.responsibleUserId) {
+        const [responsible] = await transaction.select({ id: users.id }).from(users).where(and(eq(users.id, data.responsibleUserId), eq(users.status, 'active'))).limit(1)
+        if (!responsible) throw new Error('RESPONSIBLE_NOT_FOUND')
+      }
+
+      const [duplicate] = await transaction
+        .select({ id: organizations.id })
+        .from(organizations)
+        .where(and(ne(organizations.id, id), or(eq(organizations.internalReference, data.internalReference.toUpperCase()), eq(organizations.primaryDomain, data.primaryDomain))))
+        .limit(1)
+      if (duplicate) throw new Error('ORGANIZATION_DUPLICATE')
+
+      const [organization] = await transaction
+        .update(organizations)
+        .set({
+          name: data.name,
+          internalReference: data.internalReference.toUpperCase(),
+          type: data.type,
+          primaryDomain: data.primaryDomain,
+          addressLine1: data.addressLine1,
+          addressLine2: data.addressLine2 || null,
+          postalCode: data.postalCode,
+          city: data.city,
+          country: data.country,
+          logoPathname: data.logoPathname,
+          defaultLanguage: data.defaultLanguage,
+          timezone: data.timezone,
+          contactEmail: data.contactEmail || null,
+          phone: data.phone || null,
+          responsibleUserId: data.responsibleUserId,
+          administrationScope: data.administrationScope,
+          setupStatus: data.initialStatus === 'to_configure' ? 'to_configure' : 'active',
+          status: data.initialStatus === 'suspended' ? 'suspended' : 'active',
+          offer: data.offer || null,
+          miniSiteEnabled: data.miniSiteEnabled,
+          updatedAt: new Date(),
+        })
+        .where(eq(organizations.id, id))
+        .returning({ id: organizations.id, name: organizations.name })
+      if (!organization) throw new Error('ORGANIZATION_NOT_FOUND')
+
+      await transaction.insert(auditEvents).values({
+        actorUserId: actor.id,
+        action: 'organization.updated',
+        targetType: 'organization',
+        targetId: organization.id,
+        metadata: { name: organization.name, internalReference: data.internalReference.toUpperCase() },
+      })
+      return organization
+    })
+
+    revalidatePath('/admin/organizations')
+    revalidatePath(`/admin/organizations/${id}/edit`)
+    return { ok: true as const, id: result.id, message: 'Organisation modifiée avec succès.' }
+  } catch (error) {
+    if (error instanceof Error && error.message === 'RESPONSIBLE_NOT_FOUND') return { ok: false as const, message: 'Le responsable sélectionné est introuvable.' }
+    if (error instanceof Error && error.message === 'ORGANIZATION_DUPLICATE') return { ok: false as const, message: 'Cette référence interne ou ce domaine est déjà utilisé.' }
+    if (error instanceof Error && error.message === 'ORGANIZATION_NOT_FOUND') return { ok: false as const, message: 'Organisation introuvable.' }
+    return { ok: false as const, message: 'La modification de l’organisation a échoué.' }
+  }
+}
+
+export async function deleteOrganization(id: string) {
+  const actor = await requirePermission('organizations.manage')
+  if (!z.string().uuid().safeParse(id).success) return { ok: false as const, message: 'Organisation introuvable.' }
+
+  const [organization] = await db.select({ id: organizations.id, name: organizations.name, logoPathname: organizations.logoPathname }).from(organizations).where(eq(organizations.id, id)).limit(1)
+  if (!organization) return { ok: false as const, message: 'Organisation introuvable.' }
+
+  const dependencies = await Promise.all([
+    db.select({ total: count() }).from(users).where(eq(users.organizationId, id)),
+    db.select({ total: count() }).from(teams).where(eq(teams.organizationId, id)),
+    db.select({ total: count() }).from(invitations).where(eq(invitations.organizationId, id)),
+    db.select({ total: count() }).from(permissionGroups).where(eq(permissionGroups.organizationId, id)),
+    db.select({ total: count() }).from(connectors).where(eq(connectors.organizationId, id)),
+    db.select({ total: count() }).from(connections).where(eq(connections.organizationId, id)),
+    db.select({ total: count() }).from(sources).where(eq(sources.organizationId, id)),
+    db.select({ total: count() }).from(webhookEvents).where(eq(webhookEvents.organizationId, id)),
+    db.select({ total: count() }).from(collectionOccurrences).where(eq(collectionOccurrences.organizationId, id)),
+    db.select({ total: count() }).from(collectionPolicies).where(eq(collectionPolicies.organizationId, id)),
+    db.select({ total: count() }).from(authorizedDomains).where(eq(authorizedDomains.organizationId, id)),
+  ])
+  const labels = ['utilisateur', 'équipe', 'invitation', 'groupe de permissions', 'connecteur', 'connexion', 'source', 'événement webhook', 'collecte', 'politique de collecte', 'domaine autorisé']
+  const blockers = dependencies
+    .map(([result], index) => ({ label: labels[index], total: result?.total ?? 0 }))
+    .filter((dependency) => dependency.total > 0)
+
+  if (blockers.length > 0) {
+    const summary = blockers.slice(0, 3).map(({ label, total }) => `${total} ${label}${total > 1 ? 's' : ''}`).join(', ')
+    return { ok: false as const, message: `Suppression impossible : cette organisation est encore liée à ${summary}${blockers.length > 3 ? '…' : '.'}` }
+  }
+
+  try {
+    await db.transaction(async (transaction) => {
+      const [deleted] = await transaction.delete(organizations).where(eq(organizations.id, id)).returning({ id: organizations.id })
+      if (!deleted) throw new Error('ORGANIZATION_NOT_FOUND')
+      await transaction.insert(auditEvents).values({
+        actorUserId: actor.id,
+        action: 'organization.deleted',
+        targetType: 'organization',
+        targetId: id,
+        metadata: { name: organization.name },
+      })
+    })
+    if (organization.logoPathname) await del(organization.logoPathname).catch(() => undefined)
+    revalidatePath('/admin/organizations')
+    return { ok: true as const, message: 'Organisation supprimée.' }
+  } catch {
+    return { ok: false as const, message: 'La suppression de l’organisation a échoué.' }
   }
 }

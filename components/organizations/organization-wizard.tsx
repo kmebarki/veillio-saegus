@@ -5,7 +5,7 @@ import { ArrowLeft, ArrowRight, Bell, Building2, Check, CircleHelp, Globe2, Imag
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
-import { createOrganization } from '@/app/actions/organizations'
+import { createOrganization, updateOrganization } from '@/app/actions/organizations'
 import { ResponsibleUserPicker } from '@/components/organizations/responsible-user-picker'
 import { Sidebar } from '@/components/veillio-dashboard'
 import { UserMenu } from '@/components/user-menu'
@@ -14,7 +14,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import type { CreateOrganizationInput, OrganizationUserOption } from '@/lib/organization-types'
+import type { CreateOrganizationInput, OrganizationListItem, OrganizationUserOption } from '@/lib/organization-types'
 import { cn } from '@/lib/utils'
 
 const steps = [
@@ -111,13 +111,38 @@ async function removeOrganizationLogo(pathname: string) {
   await fetch(`/api/organization-logos?pathname=${encodeURIComponent(pathname)}`, { method: 'DELETE' })
 }
 
-export function OrganizationWizard() {
+export function OrganizationWizard({ organization }: { organization?: OrganizationListItem }) {
   const router = useRouter()
+  const isEditing = Boolean(organization)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [currentStep, setCurrentStep] = useState(0)
-  const [form, setForm] = useState(initialForm)
+  const [form, setForm] = useState<CreateOrganizationInput>(() => organization ? {
+    name: organization.name,
+    internalReference: organization.internalReference ?? '',
+    type: organization.type,
+    primaryDomain: organization.primaryDomain ?? '',
+    addressLine1: organization.addressLine1 ?? '',
+    addressLine2: organization.addressLine2 ?? '',
+    postalCode: organization.postalCode ?? '',
+    city: organization.city ?? '',
+    country: organization.country,
+    logoPathname: organization.logoPathname,
+    defaultLanguage: organization.defaultLanguage,
+    timezone: organization.timezone,
+    contactEmail: organization.contactEmail ?? '',
+    phone: organization.phone ?? '',
+    responsibleUserId: organization.responsibleUserId,
+    administrationScope: organization.administrationScope,
+    initialStatus: organization.status === 'suspended' ? 'suspended' : organization.setupStatus,
+    offer: organization.offer ?? '',
+    miniSiteEnabled: organization.miniSiteEnabled,
+    inviteAdmin: false,
+    adminFirstName: '',
+    adminLastName: '',
+    adminEmail: '',
+  } : initialForm)
   const [logoFile, setLogoFile] = useState<File | null>(null)
-  const [selectedResponsible, setSelectedResponsible] = useState<OrganizationUserOption | null>(null)
+  const [selectedResponsible, setSelectedResponsible] = useState<OrganizationUserOption | null>(() => organization?.responsibleUserId ? { id: organization.responsibleUserId, name: organization.responsibleName ?? 'Responsable actuel', email: '' } : null)
   const [confirmed, setConfirmed] = useState(false)
   const [error, setError] = useState('')
   const [toast, setToast] = useState('')
@@ -166,12 +191,16 @@ export function OrganizationWizard() {
       let uploadedLogoPathname: string | null = null
       try {
         if (logoFile) uploadedLogoPathname = await uploadOrganizationLogo(logoFile)
-        const result = await createOrganization({ ...form, logoPathname: uploadedLogoPathname })
+        const logoPathname = uploadedLogoPathname ?? form.logoPathname
+        const result = organization
+          ? await updateOrganization(organization.id, { ...form, logoPathname })
+          : await createOrganization({ ...form, logoPathname })
         if (!result.ok) {
           if (uploadedLogoPathname) await removeOrganizationLogo(uploadedLogoPathname)
           setError(result.message)
           return
         }
+        if (organization?.logoPathname && uploadedLogoPathname && organization.logoPathname !== uploadedLogoPathname) await removeOrganizationLogo(organization.logoPathname)
         setToast(result.message)
         window.setTimeout(() => {
           router.push('/admin/organizations')
@@ -192,13 +221,13 @@ export function OrganizationWizard() {
       <div className="lg:pl-[288px]">
         <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b bg-background/90 px-4 backdrop-blur-xl sm:px-6 lg:px-8">
           <Button variant="ghost" size="icon-lg" className="lg:hidden" aria-label="Ouvrir le menu" onClick={() => setSidebarOpen(true)}><Menu /></Button>
-          <div className="hidden text-sm text-muted-foreground sm:block">Administration <span className="px-2">/</span> Organisations <span className="px-2">/</span> <strong className="font-medium text-foreground">Nouvelle</strong></div>
+          <div className="hidden text-sm text-muted-foreground sm:block">Administration <span className="px-2">/</span> Organisations <span className="px-2">/</span> <strong className="font-medium text-foreground">{isEditing ? 'Modifier' : 'Nouvelle'}</strong></div>
           <div className="ml-auto flex items-center gap-1"><Button variant="ghost" size="icon-lg" aria-label="Aide"><CircleHelp /></Button><Button variant="ghost" size="icon-lg" aria-label="Paramètres"><Settings /></Button><Button variant="ghost" size="icon-lg" aria-label="Notifications"><Bell /></Button><UserMenu /></div>
         </header>
 
         <main className="mx-auto max-w-[1250px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
           <div className="flex flex-col gap-6">
-            <section><Button render={<Link href="/admin/organizations" />} nativeButton={false} variant="ghost" className="-ml-2 mb-3"><ArrowLeft data-icon="inline-start" />Retour aux organisations</Button><p className="mb-2 text-xs font-medium text-primary">Création guidée</p><h1 className="text-2xl font-semibold tracking-[-0.04em] sm:text-[30px]">Nouvelle organisation</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Configurez le périmètre, l’administration et l’état initial de la nouvelle organisation.</p></section>
+            <section><Button render={<Link href="/admin/organizations" />} nativeButton={false} variant="ghost" className="-ml-2 mb-3"><ArrowLeft data-icon="inline-start" />Retour aux organisations</Button><p className="mb-2 text-xs font-medium text-primary">{isEditing ? 'Mise à jour guidée' : 'Création guidée'}</p><h1 className="text-2xl font-semibold tracking-[-0.04em] sm:text-[30px]">{isEditing ? `Modifier ${organization?.name}` : 'Nouvelle organisation'}</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">{isEditing ? 'Mettez à jour les informations, le périmètre et le statut de cette organisation.' : 'Configurez le périmètre, l’administration et l’état initial de la nouvelle organisation.'}</p></section>
 
             <div className="flex flex-col gap-4">
               <WizardStepper currentStep={currentStep} />
@@ -231,8 +260,8 @@ export function OrganizationWizard() {
                     <FieldGroup>
                       <Field><FieldLabel>Responsable de l’organisation</FieldLabel><ResponsibleUserPicker selected={selectedResponsible} onChange={(user) => { setSelectedResponsible(user); update('responsibleUserId', user?.id ?? null) }} /><FieldDescription>Recherche progressive adaptée aux annuaires volumineux.</FieldDescription></Field>
                       <SelectField label="Périmètre d’administration" value={form.administrationScope} onChange={(value) => update('administrationScope', value)} items={[{ value: 'organization', label: 'Organisation uniquement' }, { value: 'global', label: 'Administration globale' }]} required />
-                      <div className="rounded-lg border bg-muted/30 p-4"><Field orientation="horizontal"><Checkbox id="invite-admin" checked={form.inviteAdmin} onCheckedChange={(checked) => update('inviteAdmin', checked === true)} /><FieldContent><FieldLabel htmlFor="invite-admin">Inviter le premier administrateur</FieldLabel><FieldDescription>Une invitation sécurisée valable 7 jours sera envoyée après la création.</FieldDescription></FieldContent></Field></div>
-                      {form.inviteAdmin && <div className="grid gap-5 rounded-lg border p-4 md:grid-cols-3"><Field><FieldLabel htmlFor="admin-first-name">Prénom <RequiredMark /></FieldLabel><Input id="admin-first-name" value={form.adminFirstName} onChange={(event) => update('adminFirstName', event.target.value)} autoComplete="given-name" className="h-10 rounded-md" required /></Field><Field><FieldLabel htmlFor="admin-last-name">Nom <RequiredMark /></FieldLabel><Input id="admin-last-name" value={form.adminLastName} onChange={(event) => update('adminLastName', event.target.value)} autoComplete="family-name" className="h-10 rounded-md" required /></Field><Field><FieldLabel htmlFor="admin-email">E-mail professionnel <RequiredMark /></FieldLabel><Input id="admin-email" type="email" value={form.adminEmail} onChange={(event) => update('adminEmail', event.target.value)} placeholder="admin@entreprise.fr" className="h-10 rounded-md" required /></Field></div>}
+                      {!isEditing && <div className="rounded-lg border bg-muted/30 p-4"><Field orientation="horizontal"><Checkbox id="invite-admin" checked={form.inviteAdmin} onCheckedChange={(checked) => update('inviteAdmin', checked === true)} /><FieldContent><FieldLabel htmlFor="invite-admin">Inviter le premier administrateur</FieldLabel><FieldDescription>Une invitation sécurisée valable 7 jours sera envoyée après la création.</FieldDescription></FieldContent></Field></div>}
+                      {!isEditing && form.inviteAdmin && <div className="grid gap-5 rounded-lg border p-4 md:grid-cols-3"><Field><FieldLabel htmlFor="admin-first-name">Prénom <RequiredMark /></FieldLabel><Input id="admin-first-name" value={form.adminFirstName} onChange={(event) => update('adminFirstName', event.target.value)} autoComplete="given-name" className="h-10 rounded-md" required /></Field><Field><FieldLabel htmlFor="admin-last-name">Nom <RequiredMark /></FieldLabel><Input id="admin-last-name" value={form.adminLastName} onChange={(event) => update('adminLastName', event.target.value)} autoComplete="family-name" className="h-10 rounded-md" required /></Field><Field><FieldLabel htmlFor="admin-email">E-mail professionnel <RequiredMark /></FieldLabel><Input id="admin-email" type="email" value={form.adminEmail} onChange={(event) => update('adminEmail', event.target.value)} placeholder="admin@entreprise.fr" className="h-10 rounded-md" required /></Field></div>}
                     </FieldGroup>
                   )}
 
@@ -246,8 +275,8 @@ export function OrganizationWizard() {
 
                   {currentStep === 4 && (
                     <div className="flex flex-col gap-5">
-                      <div className="rounded-lg border bg-background px-4"><ReviewRow label="Organisation" value={`${form.name} · ${form.internalReference.toUpperCase()}`} /><ReviewRow label="Logo" value={logoFile?.name ?? 'Aucun logo'} /><ReviewRow label="Type et domaine" value={`${form.type === 'client' ? 'Client' : form.type === 'internal' ? 'Interne' : 'Partenaire'} · ${form.primaryDomain}`} /><ReviewRow label="Adresse" value={[form.addressLine1, form.addressLine2, `${form.postalCode} ${form.city}`.trim(), form.country].filter(Boolean).join(' · ')} /><ReviewRow label="Langue et fuseau" value={`${form.defaultLanguage} · ${form.timezone}`} /><ReviewRow label="Responsable" value={responsibleName} /><ReviewRow label="Périmètre" value={form.administrationScope === 'global' ? 'Administration globale' : 'Organisation uniquement'} /><ReviewRow label="Statut initial" value={form.initialStatus === 'active' ? 'Active' : form.initialStatus === 'suspended' ? 'Suspendue' : 'À configurer'} /><ReviewRow label="Offre" value={form.offer || 'Aucune'} /><ReviewRow label="Premier administrateur" value={form.inviteAdmin ? `${form.adminFirstName} ${form.adminLastName} · ${form.adminEmail}` : 'Invitation désactivée'} /><ReviewRow label="Mini-site" value={form.miniSiteEnabled ? 'Activé' : 'Désactivé'} /></div>
-                      <div className="rounded-lg border border-primary/20 bg-primary/5 p-4"><Field orientation="horizontal"><Checkbox id="confirm-organization" checked={confirmed} onCheckedChange={(checked) => { setConfirmed(checked === true); setError('') }} /><FieldContent><FieldLabel htmlFor="confirm-organization">Je confirme l’exactitude de ces informations <RequiredMark /></FieldLabel><FieldDescription>La référence interne et le domaine doivent être uniques sur la plateforme.</FieldDescription></FieldContent></Field></div>
+                      <div className="rounded-lg border bg-background px-4"><ReviewRow label="Organisation" value={`${form.name} · ${form.internalReference.toUpperCase()}`} /><ReviewRow label="Logo" value={logoFile?.name ?? 'Aucun logo'} /><ReviewRow label="Type et domaine" value={`${form.type === 'client' ? 'Client' : form.type === 'internal' ? 'Interne' : 'Partenaire'} · ${form.primaryDomain}`} /><ReviewRow label="Adresse" value={[form.addressLine1, form.addressLine2, `${form.postalCode} ${form.city}`.trim(), form.country].filter(Boolean).join(' · ')} /><ReviewRow label="Langue et fuseau" value={`${form.defaultLanguage} · ${form.timezone}`} /><ReviewRow label="Responsable" value={responsibleName} /><ReviewRow label="Périmètre" value={form.administrationScope === 'global' ? 'Administration globale' : 'Organisation uniquement'} /><ReviewRow label="Statut initial" value={form.initialStatus === 'active' ? 'Active' : form.initialStatus === 'suspended' ? 'Suspendue' : 'À configurer'} /><ReviewRow label="Offre" value={form.offer || 'Aucune'} />{!isEditing && <ReviewRow label="Premier administrateur" value={form.inviteAdmin ? `${form.adminFirstName} ${form.adminLastName} · ${form.adminEmail}` : 'Invitation désactivée'} />}<ReviewRow label="Mini-site" value={form.miniSiteEnabled ? 'Activé' : 'Désactivé'} /></div>
+                      <div className="rounded-lg border border-primary/20 bg-primary/5 p-4"><Field orientation="horizontal"><Checkbox id="confirm-organization" checked={confirmed} onCheckedChange={(checked) => { setConfirmed(checked === true); setError('') }} /><FieldContent><FieldLabel htmlFor="confirm-organization">Je confirme l’exactitude de ces informations <RequiredMark /></FieldLabel><FieldDescription>La référence interne et le domaine doivent rester uniques sur la plateforme.</FieldDescription></FieldContent></Field></div>
                     </div>
                   )}
 
@@ -255,7 +284,7 @@ export function OrganizationWizard() {
                 </div>
                 <div className="flex flex-col-reverse justify-between gap-3 border-t px-5 py-4 sm:flex-row sm:px-7">
                   <Button type="button" variant="outline" disabled={currentStep === 0 || isPending} onClick={() => { setCurrentStep((step) => Math.max(step - 1, 0)); setError('') }}><ArrowLeft data-icon="inline-start" />Précédent</Button>
-                  {currentStep < steps.length - 1 ? <Button type="button" onClick={goNext}>Continuer<ArrowRight data-icon="inline-end" /></Button> : <Button type="button" disabled={isPending || !confirmed} onClick={submit}><UserRoundPlus data-icon="inline-start" />{isPending ? 'Création…' : 'Créer l’organisation'}</Button>}
+                  {currentStep < steps.length - 1 ? <Button type="button" onClick={goNext}>Continuer<ArrowRight data-icon="inline-end" /></Button> : <Button type="button" disabled={isPending || !confirmed} onClick={submit}><UserRoundPlus data-icon="inline-start" />{isPending ? (isEditing ? 'Enregistrement…' : 'Création…') : (isEditing ? 'Enregistrer les modifications' : 'Créer l’organisation')}</Button>}
                 </div>
               </section>
             </div>

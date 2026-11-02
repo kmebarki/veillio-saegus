@@ -1,8 +1,11 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { Bell, Building2, ChevronRight, CircleHelp, Globe2, Menu, Plus, Search, Settings, SlidersHorizontal, Users, Workflow, X } from 'lucide-react'
+import { useMemo, useState, useTransition } from 'react'
+import { Bell, Building2, ChevronLeft, ChevronRight, CircleHelp, Globe2, Menu, Pencil, Plus, Search, Settings, SlidersHorizontal, Trash2, Users, Workflow, X } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+
+import { deleteOrganization } from '@/app/actions/organizations'
 
 import { OrganizationStatusBadge } from '@/components/organizations/organization-status-badge'
 import { Sidebar } from '@/components/veillio-dashboard'
@@ -16,7 +19,7 @@ import type { OrganizationListItem, OrganizationsOverview } from '@/lib/organiza
 
 const typeLabels: Record<string, string> = { client: 'Client', internal: 'Interne', partner: 'Partenaire' }
 
-function OrganizationInspector({ organization, onClose }: { organization: OrganizationListItem; onClose: () => void }) {
+function OrganizationInspector({ organization, canManage, onClose, onDelete }: { organization: OrganizationListItem; canManage: boolean; onClose: () => void; onDelete: () => void }) {
   const details = [
     ['Référence', organization.internalReference ?? 'Non renseignée'],
     ['Domaine', organization.primaryDomain ?? 'Non renseigné'],
@@ -49,6 +52,7 @@ function OrganizationInspector({ organization, onClose }: { organization: Organi
           <Button variant="ghost" size="icon" aria-label="Fermer" onClick={onClose}><X /></Button>
         </div>
         <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-5 py-6">
+          {canManage && <div className="flex gap-2"><Button render={<Link href={`/admin/organizations/${organization.id}/edit`} />} nativeButton={false} className="flex-1"><Pencil data-icon="inline-start" />Modifier</Button><Button variant="outline" className="text-destructive hover:text-destructive" onClick={onDelete}><Trash2 data-icon="inline-start" />Supprimer</Button></div>}
           <OrganizationStatusBadge organization={organization} />
           <section className="grid grid-cols-3 gap-2" aria-label="Volumes de l’organisation">
             {[['Utilisateurs', organization.usersCount], ['Équipes', organization.teamsCount], ['Veilles', organization.watchesCount]].map(([label, value]) => (
@@ -78,12 +82,18 @@ function OrganizationInspector({ organization, onClose }: { organization: Organi
 }
 
 export function OrganizationsModule({ overview }: { overview: OrganizationsOverview }) {
+  const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('all')
   const [type, setType] = useState('all')
   const [country, setCountry] = useState('all')
+  const [page, setPage] = useState(1)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<OrganizationListItem | null>(null)
+  const [feedback, setFeedback] = useState('')
+  const [isPending, startTransition] = useTransition()
+  const pageSize = 10
 
   const countries = useMemo(() => [...new Set(overview.organizations.map((item) => item.country))].sort(), [overview.organizations])
   const visibleOrganizations = useMemo(() => {
@@ -98,7 +108,26 @@ export function OrganizationsModule({ overview }: { overview: OrganizationsOverv
   const activeCount = overview.organizations.filter((item) => item.status === 'active' && item.setupStatus === 'active').length
   const setupCount = overview.organizations.filter((item) => item.status === 'active' && item.setupStatus === 'to_configure').length
   const totalUsers = overview.organizations.reduce((total, item) => total + item.usersCount, 0)
+  const totalPages = Math.max(1, Math.ceil(visibleOrganizations.length / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const paginatedOrganizations = visibleOrganizations.slice((currentPage - 1) * pageSize, currentPage * pageSize)
   const selected = overview.organizations.find((item) => item.id === selectedId) ?? null
+
+  function confirmDelete() {
+    if (!deleteTarget) return
+    setFeedback('')
+    startTransition(async () => {
+      const result = await deleteOrganization(deleteTarget.id)
+      if (!result.ok) {
+        setFeedback(result.message)
+        return
+      }
+      setDeleteTarget(null)
+      setSelectedId(null)
+      setFeedback(result.message)
+      router.refresh()
+    })
+  }
 
   return (
     <div className="min-h-dvh bg-background">
@@ -126,36 +155,39 @@ export function OrganizationsModule({ overview }: { overview: OrganizationsOverv
 
             <section className="rounded-2xl border bg-card">
               <div className="flex flex-col gap-3 border-b p-4 xl:flex-row xl:items-center">
-                <label className="relative flex-1"><span className="sr-only">Rechercher une organisation</span><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input value={query} onChange={(event) => setQuery(event.target.value)} className="h-10 rounded-xl pl-9" placeholder="Rechercher par nom, domaine ou référence" /></label>
+                <label className="relative flex-1"><span className="sr-only">Rechercher une organisation</span><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1) }} className="h-10 rounded-xl pl-9" placeholder="Rechercher par nom, domaine ou référence" /></label>
                 <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><SlidersHorizontal className="size-4" /><span className="hidden sm:inline">Filtres</span></div>
-                <Select items={[{ value: 'all', label: 'Tous les statuts' }, { value: 'active', label: 'Actives' }, { value: 'to_configure', label: 'À configurer' }, { value: 'suspended', label: 'Suspendues' }]} value={status} onValueChange={(value) => setStatus(value ?? 'all')}><SelectTrigger className="h-10 w-full rounded-xl xl:w-44"><SelectValue placeholder="Tous les statuts" /></SelectTrigger><SelectContent><SelectItem value="all">Tous les statuts</SelectItem><SelectItem value="active">Actives</SelectItem><SelectItem value="to_configure">À configurer</SelectItem><SelectItem value="suspended">Suspendues</SelectItem></SelectContent></Select>
-                <Select items={[{ value: 'all', label: 'Tous les types' }, { value: 'client', label: 'Clients' }, { value: 'internal', label: 'Internes' }, { value: 'partner', label: 'Partenaires' }]} value={type} onValueChange={(value) => setType(value ?? 'all')}><SelectTrigger className="h-10 w-full rounded-xl xl:w-40"><SelectValue placeholder="Tous les types" /></SelectTrigger><SelectContent><SelectItem value="all">Tous les types</SelectItem><SelectItem value="client">Clients</SelectItem><SelectItem value="internal">Internes</SelectItem><SelectItem value="partner">Partenaires</SelectItem></SelectContent></Select>
-                <Select items={[{ value: 'all', label: 'Tous les pays' }, ...countries.map((item) => ({ value: item, label: item }))]} value={country} onValueChange={(value) => setCountry(value ?? 'all')}><SelectTrigger className="h-10 w-full rounded-xl xl:w-40"><SelectValue placeholder="Tous les pays" /></SelectTrigger><SelectContent><SelectItem value="all">Tous les pays</SelectItem>{countries.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select>
+                <Select items={[{ value: 'all', label: 'Tous les statuts' }, { value: 'active', label: 'Actives' }, { value: 'to_configure', label: 'À configurer' }, { value: 'suspended', label: 'Suspendues' }]} value={status} onValueChange={(value) => { setStatus(value ?? 'all'); setPage(1) }}><SelectTrigger className="h-10 w-full rounded-xl xl:w-44"><SelectValue placeholder="Tous les statuts" /></SelectTrigger><SelectContent><SelectItem value="all">Tous les statuts</SelectItem><SelectItem value="active">Actives</SelectItem><SelectItem value="to_configure">À configurer</SelectItem><SelectItem value="suspended">Suspendues</SelectItem></SelectContent></Select>
+                <Select items={[{ value: 'all', label: 'Tous les types' }, { value: 'client', label: 'Clients' }, { value: 'internal', label: 'Internes' }, { value: 'partner', label: 'Partenaires' }]} value={type} onValueChange={(value) => { setType(value ?? 'all'); setPage(1) }}><SelectTrigger className="h-10 w-full rounded-xl xl:w-40"><SelectValue placeholder="Tous les types" /></SelectTrigger><SelectContent><SelectItem value="all">Tous les types</SelectItem><SelectItem value="client">Clients</SelectItem><SelectItem value="internal">Internes</SelectItem><SelectItem value="partner">Partenaires</SelectItem></SelectContent></Select>
+                <Select items={[{ value: 'all', label: 'Tous les pays' }, ...countries.map((item) => ({ value: item, label: item }))]} value={country} onValueChange={(value) => { setCountry(value ?? 'all'); setPage(1) }}><SelectTrigger className="h-10 w-full rounded-xl xl:w-40"><SelectValue placeholder="Tous les pays" /></SelectTrigger><SelectContent><SelectItem value="all">Tous les pays</SelectItem>{countries.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select>
               </div>
 
               {visibleOrganizations.length > 0 ? (
                 <Table>
                   <TableHeader><TableRow><TableHead>Organisation</TableHead><TableHead>Statut</TableHead><TableHead>Responsable</TableHead><TableHead className="text-center">Utilisateurs</TableHead><TableHead className="text-center">Équipes</TableHead><TableHead className="text-center">Veilles</TableHead><TableHead><span className="sr-only">Ouvrir</span></TableHead></TableRow></TableHeader>
-                  <TableBody>{visibleOrganizations.map((organization) => (
+                  <TableBody>{paginatedOrganizations.map((organization) => (
                     <TableRow key={organization.id} className="group">
                       <TableCell><button type="button" className="flex items-center gap-3 text-left" onClick={() => setSelectedId(organization.id)}>{organization.logoPathname ? <img src={`/api/organization-logos?pathname=${encodeURIComponent(organization.logoPathname)}`} alt="" className="size-9 shrink-0 rounded-lg border bg-card object-contain p-1" /> : <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><Building2 className="size-4" /></span>}<span><strong className="block font-medium text-foreground group-hover:text-primary">{organization.name}</strong><span className="mt-1 block text-xs text-muted-foreground">{organization.primaryDomain ?? organization.internalReference ?? 'Sans domaine'}</span></span></button></TableCell>
                       <TableCell><OrganizationStatusBadge organization={organization} /></TableCell>
                       <TableCell><span className="text-sm">{organization.responsibleName ?? 'Non attribué'}</span></TableCell>
                       <TableCell className="text-center font-medium">{organization.usersCount}</TableCell><TableCell className="text-center font-medium">{organization.teamsCount}</TableCell><TableCell className="text-center font-medium">{organization.watchesCount}</TableCell>
-                      <TableCell className="text-right"><Button variant="ghost" size="icon" aria-label={`Ouvrir ${organization.name}`} onClick={() => setSelectedId(organization.id)}><ChevronRight /></Button></TableCell>
+                      <TableCell className="text-right"><div className="flex justify-end gap-1">{overview.canManage && <><Button render={<Link href={`/admin/organizations/${organization.id}/edit`} />} nativeButton={false} variant="ghost" size="icon" aria-label={`Modifier ${organization.name}`}><Pencil /></Button><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" aria-label={`Supprimer ${organization.name}`} onClick={() => { setFeedback(''); setDeleteTarget(organization) }}><Trash2 /></Button></>}<Button variant="ghost" size="icon" aria-label={`Ouvrir ${organization.name}`} onClick={() => setSelectedId(organization.id)}><ChevronRight /></Button></div></TableCell>
                     </TableRow>
                   ))}</TableBody>
                 </Table>
               ) : (
                 <Empty className="min-h-72"><EmptyHeader><EmptyMedia variant="icon"><Building2 /></EmptyMedia><EmptyTitle>Aucune organisation trouvée</EmptyTitle><EmptyDescription>{overview.organizations.length === 0 ? 'Créez la première organisation pour commencer à structurer la plateforme.' : 'Ajustez votre recherche ou vos filtres.'}</EmptyDescription></EmptyHeader>{overview.organizations.length === 0 && overview.canManage && <EmptyContent><Button render={<Link href="/admin/organizations/new" />} nativeButton={false}><Plus data-icon="inline-start" />Créer une organisation</Button></EmptyContent>}</Empty>
               )}
+              {visibleOrganizations.length > 0 && <nav aria-label="Pagination des organisations" className="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm text-muted-foreground">{(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, visibleOrganizations.length)} sur {visibleOrganizations.length} organisation{visibleOrganizations.length > 1 ? 's' : ''}</p><div className="flex items-center gap-2"><Button variant="outline" size="sm" disabled={currentPage === 1} onClick={() => setPage((value) => Math.max(1, value - 1))}><ChevronLeft data-icon="inline-start" />Précédent</Button><span className="min-w-20 text-center text-sm font-medium" aria-live="polite">Page {currentPage} / {totalPages}</span><Button variant="outline" size="sm" disabled={currentPage === totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>Suivant<ChevronRight data-icon="inline-end" /></Button></div></nav>}
             </section>
 
             <p className="flex items-center gap-2 text-xs text-muted-foreground"><Users className="size-3.5" /> Les volumes utilisateurs et équipes sont calculés en temps réel. <Workflow className="ml-2 size-3.5" /> Le volume de veilles sera activé avec le catalogue de veilles.</p>
           </div>
         </main>
       </div>
-      {selected && <OrganizationInspector organization={selected} onClose={() => setSelectedId(null)} />}
+      {selected && <OrganizationInspector organization={selected} canManage={overview.canManage} onClose={() => setSelectedId(null)} onDelete={() => setDeleteTarget(selected)} />}
+      {deleteTarget && <div className="fixed inset-0 z-[80] grid place-items-center bg-foreground/30 p-4" role="presentation"><section role="alertdialog" aria-modal="true" aria-labelledby="delete-organization-title" aria-describedby="delete-organization-description" className="w-full max-w-md rounded-2xl border bg-background p-6 shadow-2xl"><div className="grid size-11 place-items-center rounded-xl bg-destructive/10 text-destructive"><Trash2 className="size-5" /></div><h2 id="delete-organization-title" className="mt-4 text-lg font-semibold">Supprimer {deleteTarget.name} ?</h2><p id="delete-organization-description" className="mt-2 text-sm leading-6 text-muted-foreground">Cette action est définitive. La suppression sera bloquée si des utilisateurs, équipes, invitations ou autres données sont encore rattachés à l’organisation.</p>{feedback && <p role="alert" className="mt-4 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{feedback}</p>}<div className="mt-6 flex justify-end gap-2"><Button variant="outline" disabled={isPending} onClick={() => { setDeleteTarget(null); setFeedback('') }}>Annuler</Button><Button variant="destructive" disabled={isPending} onClick={confirmDelete}>{isPending ? 'Suppression…' : 'Supprimer définitivement'}</Button></div></section></div>}
+      {feedback && !deleteTarget && <div role="status" className="fixed bottom-5 left-1/2 z-[70] -translate-x-1/2 rounded-full bg-foreground px-4 py-2.5 text-sm font-medium text-background shadow-xl">{feedback}</div>}
     </div>
   )
 }

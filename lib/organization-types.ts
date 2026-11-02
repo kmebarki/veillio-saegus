@@ -66,3 +66,8 @@ export type CreateOrganizationInput = {
   adminLastName: string
   adminEmail: string
 }
+
+export type UpdateOrganizationInput = Omit<
+  CreateOrganizationInput,
+  'inviteAdmin' | 'adminFirstName' | 'adminLastName' | 'adminEmail'
+>
