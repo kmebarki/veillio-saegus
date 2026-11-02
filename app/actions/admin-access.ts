@@ -4,6 +4,7 @@ import { createHash, randomBytes } from 'node:crypto'
 
 import { and, count, desc, eq, gt, inArray, ne } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
+import { headers } from 'next/headers'
 import { z } from 'zod'
 
 import type { AdminAdmission, AdminInvitation, AdminOrganization, AdminUser, AdminViewer } from '@/lib/admin-types'
@@ -15,6 +16,15 @@ import { isRateLimited } from '@/lib/rate-limit'
 import { ROLE_LABELS, canManageTarget, getAssignableRoles, isAdminRole, isRoleKey, type RoleKey } from '@/lib/roles'
 
 const INVITATION_VALIDITY_MS = 7 * 24 * 60 * 60 * 1000
+
+async function getRequestOrigin() {
+  const requestHeaders = await headers()
+  const origin = requestHeaders.get('origin')
+  if (origin) return origin
+  const host = requestHeaders.get('x-forwarded-host') ?? requestHeaders.get('host')
+  if (!host) return undefined
+  return `${requestHeaders.get('x-forwarded-proto') ?? 'https'}://${host}`
+}
 
 const invitationSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -202,7 +212,7 @@ export async function createInvitation(input: unknown) {
   }).returning({ id: invitations.id })
 
   try {
-    await sendInvitationEmail({ email: parsed.data.email, name: parsed.data.name, token: invitationToken, role: invitationRoleLabels[parsed.data.role] ?? 'Lecteur' })
+    await sendInvitationEmail({ email: parsed.data.email, name: parsed.data.name, token: invitationToken, role: invitationRoleLabels[parsed.data.role] ?? 'Lecteur', origin: await getRequestOrigin() })
   } catch {
     await db.update(invitations).set({ status: 'Cancelled', updatedAt: new Date() }).where(eq(invitations.id, invitation.id))
     await db.insert(auditEvents).values({ actorUserId: actor.id, action: 'invitation.delivery_failed', targetType: 'invitation', targetId: invitation.id, metadata: { email: parsed.data.email } })
@@ -230,7 +240,7 @@ export async function resendInvitation(input: unknown) {
   const tokenHash = createHash('sha256').update(invitationToken).digest('hex')
 
   try {
-    await sendInvitationEmail({ email: invitation.email, name: invitation.name, token: invitationToken, role: invitationRoleLabels[invitation.role] ?? 'Lecteur' })
+    await sendInvitationEmail({ email: invitation.email, name: invitation.name, token: invitationToken, role: invitationRoleLabels[invitation.role] ?? 'Lecteur', origin: await getRequestOrigin() })
   } catch {
     return { ok: false as const, message: 'L’invitation n’a pas pu être renvoyée. Vérifiez la configuration SMTP Microsoft 365.' }
   }

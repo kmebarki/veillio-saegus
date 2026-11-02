@@ -3,6 +3,7 @@
 import { LogOut } from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
 
+import { signOutAction } from '@/app/actions/session'
 import { UserAvatar } from '@/components/user-avatar'
 import { authClient } from '@/lib/auth-client'
 
@@ -37,11 +38,11 @@ export function UserMenu() {
 
   async function logout() {
     setSigningOut(true)
-    try {
-      await authClient.signOut()
-    } finally {
-      window.location.replace('/sign-in')
+    const result = await signOutAction()
+    if (!result.ok) {
+      await authClient.signOut().catch(() => undefined)
     }
+    window.location.assign('/sign-in')
   }
 
   const user = session?.user

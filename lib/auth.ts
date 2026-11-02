@@ -1,5 +1,6 @@
 import { betterAuth } from 'better-auth'
 import { APIError } from 'better-auth/api'
+import { nextCookies } from 'better-auth/next-js'
 
 import { pool } from '@/lib/db'
 import { sendPasswordResetEmail, sendVerificationEmail } from '@/lib/email'
@@ -108,6 +109,7 @@ export const auth = betterAuth({
     expiresIn: 60 * 60 * 24 * 7,
     updateAge: 60 * 60 * 24,
   },
+  plugins: [nextCookies()],
   ...(process.env.NODE_ENV === 'development'
     ? {
         advanced: {

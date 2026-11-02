@@ -20,8 +20,23 @@ const transporter = nodemailer.createTransport({
   tls: { minVersion: 'TLSv1.2' },
 })
 
-function getApplicationUrl() {
+function normalizeOrigin(value: string | undefined) {
+  if (!value) return null
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.origin : null
+  } catch {
+    return null
+  }
+}
+
+// En production, l'URL est fixée par l'environnement (jamais par un en-tête de requête).
+// Ailleurs (aperçu), l'origine réelle de l'administrateur est préférée à V0_RUNTIME_URL, qui pointe vers v0.
+function getApplicationUrl(requestOrigin?: string) {
   if (process.env.BETTER_AUTH_URL) return process.env.BETTER_AUTH_URL
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL && process.env.VERCEL_ENV === 'production') return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+  const origin = normalizeOrigin(requestOrigin)
+  if (origin) return origin
   if (process.env.VERCEL_PROJECT_PRODUCTION_URL) return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`
   if (process.env.V0_RUNTIME_URL) return process.env.V0_RUNTIME_URL
@@ -62,8 +77,8 @@ export async function sendAdmissionDecisionEmail({ email, name, approved, commen
   })
 }
 
-export async function sendInvitationEmail({ email, name, token, role }: { email: string; name: string; token: string; role: string }) {
-  const invitationUrl = new URL('/sign-up', getApplicationUrl())
+export async function sendInvitationEmail({ email, name, token, role, origin }: { email: string; name: string; token: string; role: string; origin?: string }) {
+  const invitationUrl = new URL('/sign-up', getApplicationUrl(origin))
   invitationUrl.searchParams.set('invite', token)
   const safeName = escapeHtml(name)
   const safeRole = escapeHtml(role)
