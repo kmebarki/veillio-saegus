@@ -219,6 +219,68 @@ export const connections = pgTable('connections', {
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
 
+export const collectionOccurrences = pgTable('collection_occurrences', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organization_id').notNull(),
+  watchId: uuid('watch_id'),
+  watchName: text('watch_name').notNull(),
+  sourceId: uuid('source_id'),
+  sourceName: text('source_name').notNull(),
+  connectorId: uuid('connector_id'),
+  connectionId: uuid('connection_id'),
+  state: text('state').notNull(),
+  trigger: text('trigger').notNull().default('schedule'),
+  scheduledFor: timestamp('scheduled_for', { withTimezone: true }).notNull(),
+  startedAt: timestamp('started_at', { withTimezone: true }),
+  finishedAt: timestamp('finished_at', { withTimezone: true }),
+  deferredUntil: timestamp('deferred_until', { withTimezone: true }),
+  itemsRetrieved: integer('items_retrieved').notNull().default(0),
+  newItems: integer('new_items').notNull().default(0),
+  duplicateItems: integer('duplicate_items').notNull().default(0),
+  attemptCount: integer('attempt_count').notNull().default(0),
+  errorCategory: text('error_category'),
+  errorCode: text('error_code'),
+  errorMessage: text('error_message'),
+  cursorBefore: text('cursor_before'),
+  cursorAfter: text('cursor_after'),
+  parentOccurrenceId: uuid('parent_occurrence_id'),
+  requestedByUserId: text('requested_by_user_id'),
+  version: integer('version').notNull().default(1),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const collectionAttempts = pgTable('collection_attempts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  occurrenceId: uuid('occurrence_id').notNull(),
+  attemptNumber: integer('attempt_number').notNull(),
+  state: text('state').notNull(),
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+  finishedAt: timestamp('finished_at', { withTimezone: true }),
+  durationMs: integer('duration_ms'),
+  itemsRetrieved: integer('items_retrieved').notNull().default(0),
+  errorCategory: text('error_category'),
+  errorCode: text('error_code'),
+  errorMessage: text('error_message'),
+  retryable: boolean('retryable').notNull().default(false),
+  workerId: text('worker_id'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const collectionPolicies = pgTable('collection_policies', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organization_id').notNull(),
+  connectorId: uuid('connector_id'),
+  maxParallel: integer('max_parallel').notNull().default(4),
+  maxAttempts: integer('max_attempts').notNull().default(3),
+  baseBackoffSeconds: integer('base_backoff_seconds').notNull().default(30),
+  maxQuotaDeferralMinutes: integer('max_quota_deferral_minutes').notNull().default(1440),
+  retentionDays: integer('retention_days').notNull().default(90),
+  updatedByUserId: text('updated_by_user_id'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
 export const authorizedDomains = pgTable('authorized_domains', {
   id: uuid('id').primaryKey().defaultRandom(),
   organizationId: uuid('organizationId').notNull(),

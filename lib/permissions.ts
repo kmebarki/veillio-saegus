@@ -46,6 +46,15 @@ export const PERMISSION_MODULES: PermissionModule[] = [
     ],
   },
   {
+    id: 'collections',
+    label: 'Collectes',
+    permissions: [
+      { key: 'collections.view', label: 'Superviser les collectes', description: 'Consulter les occurrences, tentatives, métriques et incidents de collecte.' },
+      { key: 'collections.retry', label: 'Relancer les collectes', description: 'Planifier une nouvelle exécution liée à une collecte en échec ou reportée.', sensitive: true },
+      { key: 'collections.configure', label: 'Configurer les collectes', description: 'Modifier les politiques de concurrence, reprise, quota et rétention.', sensitive: true },
+    ],
+  },
+  {
     id: 'users',
     label: 'Utilisateurs et admissions',
     permissions: [
@@ -99,7 +108,7 @@ export function normalizePermissions(values: readonly string[]) {
 export const ROLE_PERMISSIONS: Record<RoleKey, string[]> = {
   super_admin: PERMISSION_KEYS,
   admin: PERMISSION_KEYS,
-  pilot: ['watches.view', 'watches.contribute', 'watches.manage', 'watches.publish', 'sources.manage', 'users.view', 'admissions.review', 'teams.view', 'connectors.view', 'connections.view'],
+  pilot: ['watches.view', 'watches.contribute', 'watches.manage', 'watches.publish', 'sources.manage', 'collections.view', 'collections.retry', 'users.view', 'admissions.review', 'teams.view', 'connectors.view', 'connections.view'],
   contributor: ['watches.view', 'watches.contribute'],
   reader: ['watches.view'],
 }
