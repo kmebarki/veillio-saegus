@@ -1,6 +1,6 @@
 'use client'
 
-import { Archive, Bell, CircleHelp, Clock3, LogOut, Menu, Plus, Search, Settings, ShieldCheck, UserPlus, Users, Workflow } from 'lucide-react'
+import { Archive, Bell, CircleHelp, Clock3, Menu, Plus, Search, Settings, ShieldCheck, UserPlus, Users, Workflow } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useMemo, useState, useTransition } from 'react'
 
@@ -10,7 +10,7 @@ import { Modal, fieldClass } from '@/components/ui/modal'
 import { TeamDetailDialog } from '@/components/team-detail-dialog'
 import { UserAvatar } from '@/components/user-avatar'
 import { Sidebar } from '@/components/veillio-dashboard'
-import { authClient } from '@/lib/auth-client'
+import { UserMenu } from '@/components/user-menu'
 import type { TeamSummary, TeamsOverview } from '@/lib/team-types'
 import { cn } from '@/lib/utils'
 
@@ -114,11 +114,6 @@ export function TeamsModule({ overview }: { overview: TeamsOverview }) {
     })
   }
 
-  async function logout() {
-    await authClient.signOut()
-    window.location.replace('/sign-in')
-  }
-
   return (
     <div className="min-h-dvh bg-background">
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} activeItem="Équipes" />
@@ -126,7 +121,7 @@ export function TeamsModule({ overview }: { overview: TeamsOverview }) {
         <header className="sticky top-0 z-10 flex h-16 items-center gap-3 border-b bg-background/90 px-4 backdrop-blur-xl sm:px-6 lg:px-8">
           <Button variant="ghost" size="icon-lg" className="lg:hidden" aria-label="Ouvrir le menu" onClick={() => setSidebarOpen(true)}><Menu /></Button>
           <div className="hidden text-sm text-muted-foreground sm:block">Administration <span className="px-2">/</span> <strong className="font-medium text-foreground">Équipes</strong></div>
-          <div className="ml-auto flex items-center gap-1"><Button variant="ghost" size="icon-lg" aria-label="Aide"><CircleHelp /></Button><Button variant="ghost" size="icon-lg" aria-label="Paramètres"><Settings /></Button><Button variant="ghost" size="icon-lg" aria-label="Notifications"><Bell /></Button><Button variant="ghost" size="icon-lg" aria-label="Se déconnecter" onClick={logout}><LogOut /></Button></div>
+          <div className="ml-auto flex items-center gap-1"><Button variant="ghost" size="icon-lg" aria-label="Aide"><CircleHelp /></Button><Button variant="ghost" size="icon-lg" aria-label="Paramètres"><Settings /></Button><Button variant="ghost" size="icon-lg" aria-label="Notifications"><Bell /></Button><UserMenu /></div>
         </header>
 
         <main className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8">

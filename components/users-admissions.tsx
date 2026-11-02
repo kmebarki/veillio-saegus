@@ -1,6 +1,6 @@
 'use client'
 
-import { Ban, Bell, Building2, Check, ChevronDown, CircleHelp, Download, Filter, IdCard, LogOut, Mail, Menu, Search, Send, Settings, ShieldCheck, UserCheck, UserPlus, UserRoundX, Users } from 'lucide-react'
+import { Ban, Bell, Building2, Check, ChevronDown, CircleHelp, Download, Filter, IdCard, Mail, Menu, Search, Send, Settings, ShieldCheck, UserCheck, UserPlus, UserRoundX, Users } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useMemo, useState, useTransition } from 'react'
 
@@ -16,7 +16,7 @@ import { UserActionsMenu } from '@/components/user-actions-menu'
 import { UserAvatar } from '@/components/user-avatar'
 import { Sidebar } from '@/components/veillio-dashboard'
 import type { ActionResult, AdminAdmission, AdminInvitation, AdminOrganization, AdminUser, AdminViewer } from '@/lib/admin-types'
-import { authClient } from '@/lib/auth-client'
+import { UserMenu } from '@/components/user-menu'
 import { ROLE_LABELS, type RoleKey } from '@/lib/roles'
 import { cn } from '@/lib/utils'
 
@@ -158,11 +158,6 @@ export function UsersAdmissions({ viewer, users, admissions, invitations, organi
     })
   }
 
-  async function logout() {
-    await authClient.signOut()
-    window.location.replace('/sign-in')
-  }
-
   const tabs: { id: Tab; label: string; count?: number; tone?: string }[] = [
     { id: 'users', label: 'Utilisateurs', count: users.length },
     { id: 'admissions', label: 'Admissions', count: admissions.length, tone: 'bg-secondary text-secondary-foreground' },
@@ -176,7 +171,7 @@ export function UsersAdmissions({ viewer, users, admissions, invitations, organi
         <header className="sticky top-0 z-10 flex h-16 items-center gap-3 border-b bg-background/90 px-4 backdrop-blur-xl sm:px-6 lg:px-8">
           <Button variant="ghost" size="icon-lg" className="lg:hidden" aria-label="Ouvrir le menu" onClick={() => setSidebarOpen(true)}><Menu /></Button>
           <div className="hidden text-sm text-muted-foreground sm:block">Administration <span className="px-2">/</span> <strong className="font-medium text-foreground">Utilisateurs et admissions</strong></div>
-          <div className="ml-auto flex items-center gap-1"><Button variant="ghost" size="icon-lg" aria-label="Aide"><CircleHelp /></Button><Button variant="ghost" size="icon-lg" aria-label="Paramètres"><Settings /></Button><Button variant="ghost" size="icon-lg" aria-label="Notifications"><Bell /></Button><Button variant="ghost" size="icon-lg" aria-label="Se déconnecter" onClick={logout}><LogOut /></Button></div>
+          <div className="ml-auto flex items-center gap-1"><Button variant="ghost" size="icon-lg" aria-label="Aide"><CircleHelp /></Button><Button variant="ghost" size="icon-lg" aria-label="Paramètres"><Settings /></Button><Button variant="ghost" size="icon-lg" aria-label="Notifications"><Bell /></Button><UserMenu /></div>
         </header>
 
         <main className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8">

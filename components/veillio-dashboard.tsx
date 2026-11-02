@@ -33,6 +33,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
+import { UserMenu } from '@/components/user-menu'
 import { cn } from '@/lib/utils'
 
 const workspaceItems = [
@@ -292,6 +293,7 @@ export function VeillioDashboard() {
             <Button variant="ghost" size="icon-lg" aria-label="Aide"><CircleHelp /></Button>
             <Button variant="ghost" size="icon-lg" aria-label="Paramètres"><Settings /></Button>
             <Button variant="ghost" size="icon-lg" aria-label="Notifications" className="relative"><Bell /><span className="absolute right-2 top-2 size-2 rounded-full border-2 border-background bg-[#F5A623]" /></Button>
+            <UserMenu />
           </div>
         </header>
 

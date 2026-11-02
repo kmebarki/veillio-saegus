@@ -1,6 +1,6 @@
 'use client'
 
-import { Bell, CircleHelp, KeyRound, LogOut, Menu, Pencil, PlugZap, Plus, Search, Settings, Trash2, User, Users } from 'lucide-react'
+import { Bell, CircleHelp, KeyRound, Menu, Pencil, PlugZap, Plus, Search, Settings, Trash2, User, Users } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useMemo, useState, useTransition } from 'react'
@@ -10,7 +10,7 @@ import { HealthDot, KindIcon } from '@/components/connector-ui'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
 import { Sidebar } from '@/components/veillio-dashboard'
-import { authClient } from '@/lib/auth-client'
+import { UserMenu } from '@/components/user-menu'
 import { secretLabel, type AuthType } from '@/lib/connector-catalog'
 import type { ConnectionScope, ConnectionSummary, ConnectionsOverview } from '@/lib/connection-types'
 import { cn } from '@/lib/utils'
@@ -177,11 +177,6 @@ export function ConnectionsModule({ overview }: { overview: ConnectionsOverview 
     router.refresh()
   }
 
-  async function logout() {
-    await authClient.signOut()
-    window.location.replace('/sign-in')
-  }
-
   const canCreate = connectors.length > 0
 
   return (
@@ -191,7 +186,7 @@ export function ConnectionsModule({ overview }: { overview: ConnectionsOverview 
         <header className="sticky top-0 z-10 flex h-16 items-center gap-3 border-b bg-background/90 px-4 backdrop-blur-xl sm:px-6 lg:px-8">
           <Button variant="ghost" size="icon-lg" className="lg:hidden" aria-label="Ouvrir le menu" onClick={() => setSidebarOpen(true)}><Menu /></Button>
           <div className="hidden text-sm text-muted-foreground sm:block">Intégrations <span className="px-2">/</span> <strong className="font-medium text-foreground">Connexions</strong></div>
-          <div className="ml-auto flex items-center gap-1"><Button variant="ghost" size="icon-lg" aria-label="Aide"><CircleHelp /></Button><Button variant="ghost" size="icon-lg" aria-label="Paramètres"><Settings /></Button><Button variant="ghost" size="icon-lg" aria-label="Notifications"><Bell /></Button><Button variant="ghost" size="icon-lg" aria-label="Se déconnecter" onClick={logout}><LogOut /></Button></div>
+          <div className="ml-auto flex items-center gap-1"><Button variant="ghost" size="icon-lg" aria-label="Aide"><CircleHelp /></Button><Button variant="ghost" size="icon-lg" aria-label="Paramètres"><Settings /></Button><Button variant="ghost" size="icon-lg" aria-label="Notifications"><Bell /></Button><UserMenu /></div>
         </header>
 
         <main className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
