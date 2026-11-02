@@ -21,13 +21,21 @@ function OrganizationInspector({ organization, onClose }: { organization: Organi
     ['Référence', organization.internalReference ?? 'Non renseignée'],
     ['Domaine', organization.primaryDomain ?? 'Non renseigné'],
     ['Type', typeLabels[organization.type] ?? organization.type],
-    ['Pays', organization.country],
-    ['Langue', organization.defaultLanguage],
-    ['Fuseau horaire', organization.timezone],
     ['Responsable', organization.responsibleName ?? 'Non attribué'],
-    ['Contact', organization.contactEmail ?? 'Non renseigné'],
     ['Offre', organization.offer ?? 'Non renseignée'],
   ]
+  const contactDetails = [
+    ['Adresse — ligne 1', organization.addressLine1 ?? 'Non renseignée'],
+    ['Adresse — ligne 2', organization.addressLine2 ?? 'Non renseignée'],
+    ['Code postal', organization.postalCode ?? 'Non renseigné'],
+    ['Ville', organization.city ?? 'Non renseignée'],
+    ['Pays', organization.country],
+    ['E-mail', organization.contactEmail ?? 'Non renseigné'],
+    ['Téléphone', organization.phone ?? 'Non renseigné'],
+    ['Langue', organization.defaultLanguage],
+    ['Fuseau horaire', organization.timezone],
+  ]
+  const logoUrl = organization.logoPathname ? `/api/organization-logos?pathname=${encodeURIComponent(organization.logoPathname)}` : null
 
   return (
     <>
@@ -35,7 +43,7 @@ function OrganizationInspector({ organization, onClose }: { organization: Organi
       <aside className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l bg-background shadow-2xl" aria-label={`Détails de ${organization.name}`}>
         <div className="flex items-start justify-between gap-4 border-b px-5 py-5">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Building2 className="size-5" /></div>
+            {logoUrl ? <img src={logoUrl} alt={`Logo de ${organization.name}`} className="size-11 shrink-0 rounded-xl border bg-card object-contain p-1" /> : <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Building2 className="size-5" /></div>}
             <div className="min-w-0"><p className="truncate font-semibold">{organization.name}</p><p className="mt-1 truncate text-sm text-muted-foreground">{organization.primaryDomain ?? organization.internalReference}</p></div>
           </div>
           <Button variant="ghost" size="icon" aria-label="Fermer" onClick={onClose}><X /></Button>
@@ -51,6 +59,12 @@ function OrganizationInspector({ organization, onClose }: { organization: Organi
             <h2 className="text-sm font-semibold">Informations générales</h2>
             <dl className="mt-3 divide-y rounded-xl border bg-card px-4">
               {details.map(([label, value]) => <div key={label} className="flex items-start justify-between gap-4 py-3 text-sm"><dt className="text-muted-foreground">{label}</dt><dd className="text-right font-medium">{value}</dd></div>)}
+            </dl>
+          </section>
+          <section>
+            <h2 className="text-sm font-semibold">Coordonnées</h2>
+            <dl className="mt-3 divide-y rounded-xl border bg-card px-4">
+              {contactDetails.map(([label, value]) => <div key={label} className="flex items-start justify-between gap-4 py-3 text-sm"><dt className="text-muted-foreground">{label}</dt><dd className="text-right font-medium">{value}</dd></div>)}
             </dl>
           </section>
           <section className="rounded-xl border bg-muted/35 p-4">
@@ -76,7 +90,7 @@ export function OrganizationsModule({ overview }: { overview: OrganizationsOverv
     const normalizedQuery = query.trim().toLocaleLowerCase('fr')
     return overview.organizations.filter((organization) => {
       const effectiveStatus = organization.status === 'suspended' ? 'suspended' : organization.setupStatus
-      const matchesQuery = !normalizedQuery || [organization.name, organization.internalReference, organization.primaryDomain, organization.country].some((value) => value?.toLocaleLowerCase('fr').includes(normalizedQuery))
+      const matchesQuery = !normalizedQuery || [organization.name, organization.internalReference, organization.primaryDomain, organization.addressLine1, organization.postalCode, organization.city, organization.country].some((value) => value?.toLocaleLowerCase('fr').includes(normalizedQuery))
       return matchesQuery && (status === 'all' || status === effectiveStatus) && (type === 'all' || type === organization.type) && (country === 'all' || country === organization.country)
     })
   }, [country, overview.organizations, query, status, type])
@@ -124,7 +138,7 @@ export function OrganizationsModule({ overview }: { overview: OrganizationsOverv
                   <TableHeader><TableRow><TableHead>Organisation</TableHead><TableHead>Statut</TableHead><TableHead>Responsable</TableHead><TableHead className="text-center">Utilisateurs</TableHead><TableHead className="text-center">Équipes</TableHead><TableHead className="text-center">Veilles</TableHead><TableHead><span className="sr-only">Ouvrir</span></TableHead></TableRow></TableHeader>
                   <TableBody>{visibleOrganizations.map((organization) => (
                     <TableRow key={organization.id} className="group">
-                      <TableCell><button type="button" className="flex items-center gap-3 text-left" onClick={() => setSelectedId(organization.id)}><span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><Building2 className="size-4" /></span><span><strong className="block font-medium text-foreground group-hover:text-primary">{organization.name}</strong><span className="mt-1 block text-xs text-muted-foreground">{organization.primaryDomain ?? organization.internalReference ?? 'Sans domaine'}</span></span></button></TableCell>
+                      <TableCell><button type="button" className="flex items-center gap-3 text-left" onClick={() => setSelectedId(organization.id)}>{organization.logoPathname ? <img src={`/api/organization-logos?pathname=${encodeURIComponent(organization.logoPathname)}`} alt="" className="size-9 shrink-0 rounded-lg border bg-card object-contain p-1" /> : <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><Building2 className="size-4" /></span>}<span><strong className="block font-medium text-foreground group-hover:text-primary">{organization.name}</strong><span className="mt-1 block text-xs text-muted-foreground">{organization.primaryDomain ?? organization.internalReference ?? 'Sans domaine'}</span></span></button></TableCell>
                       <TableCell><OrganizationStatusBadge organization={organization} /></TableCell>
                       <TableCell><span className="text-sm">{organization.responsibleName ?? 'Non attribué'}</span></TableCell>
                       <TableCell className="text-center font-medium">{organization.usersCount}</TableCell><TableCell className="text-center font-medium">{organization.teamsCount}</TableCell><TableCell className="text-center font-medium">{organization.watchesCount}</TableCell>
