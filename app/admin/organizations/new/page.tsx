@@ -1,0 +1,15 @@
+import type { Metadata } from 'next'
+import { redirect } from 'next/navigation'
+
+import { canManageOrganizations } from '@/app/actions/organizations'
+import { OrganizationWizard } from '@/components/organizations/organization-wizard'
+
+export const metadata: Metadata = {
+  title: 'Nouvelle organisation · Veillio',
+  description: 'Assistant de création d’une organisation Veillio.',
+}
+
+export default async function NewOrganizationPage() {
+  if (!(await canManageOrganizations())) redirect('/admin/organizations')
+  return <OrganizationWizard />
+}

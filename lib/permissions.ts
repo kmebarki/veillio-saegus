@@ -15,6 +15,14 @@ export type PermissionModule = {
 
 export const PERMISSION_MODULES: PermissionModule[] = [
   {
+    id: 'organizations',
+    label: 'Organisations',
+    permissions: [
+      { key: 'organizations.view', label: 'Consulter les organisations', description: 'Accéder au catalogue global des organisations.' },
+      { key: 'organizations.manage', label: 'Gérer les organisations', description: 'Créer et configurer des organisations et leur premier administrateur.', sensitive: true },
+    ],
+  },
+  {
     id: 'watches',
     label: 'Veilles',
     permissions: [
