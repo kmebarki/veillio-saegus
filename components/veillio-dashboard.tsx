@@ -32,7 +32,7 @@ import {
   X,
 } from 'lucide-react'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { UserMenu } from '@/components/user-menu'
@@ -74,6 +74,8 @@ const administrationItems: { label: string; icon: typeof Settings; href: string;
   { label: 'Groupes et permissions', icon: ShieldCheck, href: '/admin/groups', access: 'groups' },
   { label: 'Paramètres', icon: Settings, href: '#' },
 ]
+
+const sidebarScrollStorageKey = 'veillio:sidebar-scroll-top'
 
 const watches = [
   {
@@ -125,8 +127,28 @@ function Brand() {
 
 export function Sidebar({ open, onClose, activeItem = 'Tableau de bord' }: { open: boolean; onClose: () => void; activeItem?: string }) {
   const [expandedMenus, setExpandedMenus] = useState(() => new Set(['Intégrations', 'Gestion de l’IA']))
-  const { viewer } = useViewer()
+  const navigationRef = useRef<HTMLElement>(null)
+  const restoredScrollRef = useRef(false)
+  const { viewer, isLoading } = useViewer()
   const visibleAdministrationItems = administrationItems.filter((item) => !item.access || viewer?.access[item.access])
+
+  useLayoutEffect(() => {
+    if (isLoading || restoredScrollRef.current) return
+
+    const storedScrollTop = window.sessionStorage.getItem(sidebarScrollStorageKey)
+    const scrollTop = storedScrollTop === null ? 0 : Number(storedScrollTop)
+    if (navigationRef.current && Number.isFinite(scrollTop)) navigationRef.current.scrollTop = scrollTop
+    restoredScrollRef.current = true
+  }, [isLoading])
+
+  function preserveScrollPosition() {
+    if (navigationRef.current) window.sessionStorage.setItem(sidebarScrollStorageKey, String(navigationRef.current.scrollTop))
+  }
+
+  function closeAfterNavigation() {
+    preserveScrollPosition()
+    onClose()
+  }
 
   function toggleMenu(label: string) {
     setExpandedMenus((current) => {
@@ -160,7 +182,7 @@ export function Sidebar({ open, onClose, activeItem = 'Tableau de bord' }: { ope
             <ChevronDown className={cn('size-4 text-muted-foreground transition-transform', !expanded && '-rotate-90')} />
           </button>
         ) : (
-          <Link href={('href' in item && item.href) ? item.href : '#'} className={itemClassName} onClick={onClose} aria-current={activeItem === item.label ? 'page' : undefined}>
+          <Link href={('href' in item && item.href) ? item.href : '#'} className={itemClassName} onClick={closeAfterNavigation} aria-current={activeItem === item.label ? 'page' : undefined}>
             <Icon className="size-[18px] shrink-0" />
             <span className="flex-1">{item.label}</span>
           </Link>
@@ -176,7 +198,7 @@ export function Sidebar({ open, onClose, activeItem = 'Tableau de bord' }: { ope
                 activeItem === child ? 'bg-sidebar-primary font-medium text-sidebar-primary-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground',
               )
               return href ? (
-                <Link key={child} href={href} onClick={onClose} className={childClassName} aria-current={activeItem === child ? 'page' : undefined}>{child}</Link>
+                <Link key={child} href={href} onClick={closeAfterNavigation} className={childClassName} aria-current={activeItem === child ? 'page' : undefined}>{child}</Link>
               ) : (
                 <button key={child} onClick={onClose} className={childClassName}>{child}</button>
               )
@@ -195,7 +217,7 @@ export function Sidebar({ open, onClose, activeItem = 'Tableau de bord' }: { ope
           <Brand />
           <Button variant="ghost" size="icon-lg" className="mr-3 lg:hidden" aria-label="Fermer le menu" onClick={onClose}><X /></Button>
         </div>
-        <nav className="flex flex-1 flex-col overflow-y-auto px-3 py-5" aria-label="Navigation principale">
+        <nav ref={navigationRef} className="flex flex-1 flex-col overflow-y-auto px-3 py-5" aria-label="Navigation principale">
           <section className="flex flex-col gap-1" aria-labelledby="workspace-navigation">
             <h2 id="workspace-navigation" className="px-3 pb-1 text-[11px] font-semibold text-muted-foreground">Mon espace</h2>
             {workspaceItems.map((item) => renderMenuItem(item))}
