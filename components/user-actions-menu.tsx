@@ -59,6 +59,9 @@ export function UserActionsMenu({ user, viewer, teams, busy, run }: { user: Admi
               {viewer.assignableRoles.map((key) => <option key={key} value={key}>{ROLE_LABELS[key]}</option>)}
             </select>
           </label>
+          {role === 'super_admin' && user.roleKey !== 'super_admin' && (
+            <p role="alert" className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-xs leading-5 text-destructive"><ShieldCheck className="mt-0.5 size-4 shrink-0" />{user.name} obtiendra tous les droits, y compris les permissions sensibles et la gestion des autres super administrateurs.</p>
+          )}
           <p className="flex items-start gap-2 rounded-xl bg-muted/60 p-3 text-xs leading-5 text-muted-foreground"><ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" />Le changement s’applique à la prochaine requête de l’utilisateur et est journalisé.</p>
           <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setDialog(null)}>Annuler</Button><Button type="submit" disabled={busy || role === user.roleKey}>Enregistrer</Button></div>
         </form>
