@@ -6,6 +6,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { signOutAction } from '@/app/actions/session'
 import { UserAvatar } from '@/components/user-avatar'
 import { authClient } from '@/lib/auth-client'
+import { useViewer } from '@/lib/use-viewer'
 
 function initialsOf(name: string, email: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean)
@@ -45,11 +46,13 @@ export function UserMenu() {
     window.location.assign('/sign-in')
   }
 
+  const { viewer, isLoading } = useViewer()
   const user = session?.user
-  const name = user?.name ?? ''
-  const email = user?.email ?? ''
+  const name = viewer?.name ?? user?.name ?? ''
+  const email = viewer?.email ?? user?.email ?? ''
+  const roleLabel = viewer?.roleLabel
 
-  if (isPending) return <span className="ml-1 size-9 animate-pulse rounded-full bg-muted" aria-hidden />
+  if (isPending || (isLoading && !viewer)) return <span className="ml-1 size-9 animate-pulse rounded-full bg-muted" aria-hidden />
 
   return (
     <div ref={containerRef} className="relative ml-1">
@@ -70,6 +73,7 @@ export function UserMenu() {
           <div className="border-b px-4 py-3">
             <p className="truncate text-sm font-semibold">{name || 'Mon compte'}</p>
             {email && <p className="mt-0.5 truncate text-xs text-muted-foreground">{email}</p>}
+            {roleLabel && <p className="mt-2 inline-flex rounded-md bg-secondary px-2 py-0.5 text-[11px] font-semibold text-secondary-foreground">{roleLabel}</p>}
           </div>
           <div className="p-1.5">
             <button

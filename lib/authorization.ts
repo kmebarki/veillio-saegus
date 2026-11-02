@@ -50,6 +50,14 @@ export async function requireManager() {
   return identity
 }
 
+export async function requireTeamsAccess() {
+  const identity = await requireIdentity()
+  if (isAdminRole(identity.role)) return identity
+  const permissions = await getEffectivePermissions(identity.id, identity.role)
+  if (!permissions.includes('teams.view')) redirect('/')
+  return identity
+}
+
 export const getEffectivePermissions = cache(async (userId: string, role: string) => {
   const groupRows = await db
     .select({ permissions: permissionGroups.permissions })

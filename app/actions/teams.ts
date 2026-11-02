@@ -4,7 +4,7 @@ import { and, count, desc, eq, gt, inArray, ne, sql } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
-import { requireAdmin, requireManager, getDefaultOrganization } from '@/lib/authorization'
+import { requireAdmin, requireTeamsAccess, getDefaultOrganization } from '@/lib/authorization'
 import { db } from '@/lib/db'
 import { admissionRequests, auditEvents, invitations, teams, users } from '@/lib/db/schema'
 import { isUniqueViolation } from '@/lib/rate-limit'
@@ -130,7 +130,7 @@ async function buildSummaries(rows: (typeof teams.$inferSelect)[]): Promise<Team
 }
 
 export async function getTeamsOverview(): Promise<TeamsOverview> {
-  const actor = await requireManager()
+  const actor = await requireTeamsAccess()
   const canAdminister = isAdminRole(actor.role)
   const organization = await getDefaultOrganization()
 
@@ -145,7 +145,7 @@ export async function getTeamsOverview(): Promise<TeamsOverview> {
 }
 
 export async function getTeamDetail(input: unknown): Promise<{ ok: true; detail: TeamDetail } | Failure> {
-  const actor = await requireManager()
+  const actor = await requireTeamsAccess()
   const parsed = idSchema.safeParse(input)
   if (!parsed.success) return fail('Équipe invalide.')
 

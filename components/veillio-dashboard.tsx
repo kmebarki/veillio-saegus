@@ -36,6 +36,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { UserMenu } from '@/components/user-menu'
 import { cn } from '@/lib/utils'
+import { useViewer, type ViewerInfo } from '@/lib/use-viewer'
 
 const workspaceItems = [
   { label: 'Tableau de bord', icon: LayoutDashboard, href: '/' },
@@ -64,10 +65,10 @@ const steeringItems = [
 
 const childHrefs: Record<string, string> = { Connecteurs: '/admin/connectors', Connexions: '/admin/connections' }
 
-const administrationItems = [
-  { label: 'Utilisateurs et admissions', icon: UserRoundCheck, href: '/admin/users' },
-  { label: 'Équipes', icon: Workflow, href: '/admin/teams' },
-  { label: 'Groupes et permissions', icon: ShieldCheck, href: '/admin/groups' },
+const administrationItems: { label: string; icon: typeof Settings; href: string; access?: keyof ViewerInfo['access'] }[] = [
+  { label: 'Utilisateurs et admissions', icon: UserRoundCheck, href: '/admin/users', access: 'users' },
+  { label: 'Équipes', icon: Workflow, href: '/admin/teams', access: 'teams' },
+  { label: 'Groupes et permissions', icon: ShieldCheck, href: '/admin/groups', access: 'groups' },
   { label: 'Paramètres', icon: Settings, href: '#' },
 ]
 
@@ -121,6 +122,8 @@ function Brand() {
 
 export function Sidebar({ open, onClose, activeItem = 'Tableau de bord' }: { open: boolean; onClose: () => void; activeItem?: string }) {
   const [expandedMenus, setExpandedMenus] = useState(() => new Set(['Intégrations', 'Gestion de l’IA']))
+  const { viewer } = useViewer()
+  const visibleAdministrationItems = administrationItems.filter((item) => !item.access || viewer?.access[item.access])
 
   function toggleMenu(label: string) {
     setExpandedMenus((current) => {
@@ -198,10 +201,12 @@ export function Sidebar({ open, onClose, activeItem = 'Tableau de bord' }: { ope
             {steeringItems.map((item) => renderMenuItem(item))}
           </section>
 
-          <section className="mt-5 flex flex-col gap-1 border-t pt-5" aria-labelledby="administration-navigation">
-            <h2 id="administration-navigation" className="px-3 pb-1 text-[11px] font-semibold text-muted-foreground">Administration</h2>
-            {administrationItems.map((item) => renderMenuItem(item))}
-          </section>
+          {visibleAdministrationItems.length > 0 && (
+            <section className="mt-5 flex flex-col gap-1 border-t pt-5" aria-labelledby="administration-navigation">
+              <h2 id="administration-navigation" className="px-3 pb-1 text-[11px] font-semibold text-muted-foreground">Administration</h2>
+              {visibleAdministrationItems.map((item) => renderMenuItem(item))}
+            </section>
+          )}
         </nav>
       </aside>
     </>
@@ -267,6 +272,7 @@ function AttentionPanel() {
 }
 
 export function VeillioDashboard() {
+  const { viewer } = useViewer()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [query, setQuery] = useState('')
 
@@ -291,7 +297,7 @@ export function VeillioDashboard() {
         <main className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
           <div className="flex flex-col gap-8">
             <section className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
-              <div><p className="mb-2 text-xs font-medium text-muted-foreground">Mercredi 29 octobre</p><h1 className="text-2xl font-semibold tracking-[-0.04em] sm:text-[30px]">Bonjour Kamel,</h1><p className="mt-2 text-sm text-muted-foreground">Voici l’essentiel de votre activité de veille.</p></div>
+              <div><p className="mb-2 text-xs font-medium text-muted-foreground">Mercredi 29 octobre</p><h1 className="text-2xl font-semibold tracking-[-0.04em] sm:text-[30px]">Bonjour {viewer?.firstName ?? ''},</h1>{viewer && <p className="mt-1 text-xs font-medium text-primary">{viewer.name} · {viewer.roleLabel}</p>}<p className="mt-2 text-sm text-muted-foreground">Voici l’essentiel de votre activité de veille.</p></div>
               <Button size="lg" className="min-h-11 self-start px-4 sm:self-auto"><Plus data-icon="inline-start" />Nouvelle veille</Button>
             </section>
 
