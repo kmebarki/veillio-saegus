@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 
 import { Button, buttonVariants } from '@/components/ui/button'
+import { SaegusLogo } from '@/components/saegus-logo'
 import { authClient } from '@/lib/auth-client'
 
 const fieldClass = 'h-12 w-full rounded-xl border bg-card pl-11 pr-4 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/20'
@@ -55,7 +56,7 @@ export function PasswordResetForm({ mode }: { mode: Mode }) {
   return (
     <main className="flex min-h-dvh items-center justify-center bg-background px-5 py-12">
       <div className="w-full max-w-md rounded-2xl border bg-card p-8 shadow-sm">
-        <p className="text-lg font-semibold text-primary">Veillio</p>
+        <SaegusLogo priority className="h-8" />
         <h1 className="mt-6 text-2xl font-semibold tracking-[-0.03em]">{isRequest ? 'Mot de passe oublié' : 'Nouveau mot de passe'}</h1>
 
         {done ? (

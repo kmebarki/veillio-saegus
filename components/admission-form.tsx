@@ -5,6 +5,7 @@ import { useState, useTransition } from 'react'
 
 import { createAdmissionRequest } from '@/app/actions/admissions'
 import { Button } from '@/components/ui/button'
+import { SaegusLogo } from '@/components/saegus-logo'
 import { fieldClass } from '@/components/ui/modal'
 import { authClient } from '@/lib/auth-client'
 
@@ -28,8 +29,7 @@ function Shell({ children, subtitle }: { children: React.ReactNode; subtitle: st
     <main className="min-h-dvh bg-background px-4 py-10 sm:px-6">
       <div className="mx-auto max-w-2xl">
         <div className="mb-8 flex items-center gap-3">
-          <div className="grid size-10 place-items-center rounded-xl bg-primary font-mono text-sm font-bold text-primary-foreground">V</div>
-          <div className="flex-1"><p className="font-semibold">Veillio</p><p className="text-xs text-muted-foreground">{subtitle}</p></div>
+          <div className="flex flex-1 flex-col gap-1"><SaegusLogo priority className="h-7" /><p className="text-xs text-muted-foreground">Veillio · {subtitle}</p></div>
           <Button variant="ghost" size="sm" onClick={logout}><LogOut data-icon="inline-start" />Se déconnecter</Button>
         </div>
         <section className="rounded-2xl border bg-card p-6 shadow-sm sm:p-8">{children}</section>

@@ -1,5 +1,6 @@
 'use client'
 
+import { SaegusLogo } from '@/components/saegus-logo'
 import {
   Bell,
   BrainCircuit,
@@ -111,12 +112,9 @@ const publications = [
 
 function Brand() {
   return (
-    <div className="flex h-16 items-center gap-3 px-5">
-      <div className="brand-mark" aria-hidden="true"><span /></div>
-      <div>
-        <p className="text-[17px] font-semibold tracking-[-0.03em]">Veillio</p>
-        <p className="text-[10px] font-medium text-muted-foreground">Intelligence de veille</p>
-      </div>
+    <div className="flex h-16 flex-col justify-center gap-1 px-5">
+      <SaegusLogo priority className="h-6" />
+      <p className="text-[10px] font-medium text-muted-foreground">Veillio · Intelligence de veille</p>
     </div>
   )
 }

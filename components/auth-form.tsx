@@ -8,6 +8,7 @@ import { acceptInvitation } from '@/app/actions/admin-access'
 import { saveUserProfile } from '@/app/actions/profile'
 import { ProfileFields } from '@/components/profile-fields'
 import { Button } from '@/components/ui/button'
+import { SaegusLogo } from '@/components/saegus-logo'
 import { authClient } from '@/lib/auth-client'
 import { emptyProfile, type ProfileValues } from '@/lib/profile'
 
@@ -62,13 +63,13 @@ export function AuthForm({ mode, invitationToken }: { mode: 'sign-in' | 'sign-up
   return (
     <main className="grid min-h-dvh bg-background lg:grid-cols-[minmax(0,1fr)_minmax(440px,0.72fr)]">
       <section className="hidden flex-col justify-between bg-primary p-12 text-primary-foreground lg:flex">
-        <div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-xl border border-primary-foreground/20 font-mono text-sm font-bold">V</span><span className="text-lg font-semibold tracking-tight">Veillio</span></div>
+        <div className="flex flex-col gap-2"><SaegusLogo variant="light" priority className="h-10" /><span className="text-sm font-medium text-primary-foreground/70">Veillio · Intelligence de veille</span></div>
         <div className="max-w-xl"><p className="font-mono text-xs uppercase tracking-[0.18em] text-primary-foreground/70">Administration sécurisée</p><h1 className="mt-5 text-4xl font-semibold leading-tight tracking-[-0.05em]">L’accès à la veille commence par une identité vérifiée.</h1><p className="mt-5 max-w-lg text-base leading-7 text-primary-foreground/75">Authentification, admissions et habilitations sont contrôlées côté serveur et tracées dans PostgreSQL.</p></div>
         <p className="text-xs text-primary-foreground/60">Veillio · Saegus</p>
       </section>
       <section className="flex items-center justify-center px-5 py-12 sm:px-8">
         <div className="w-full max-w-md">
-          <div className="mb-9 lg:hidden"><p className="text-lg font-semibold text-primary">Veillio</p></div>
+          <div className="mb-9 flex flex-col gap-1 lg:hidden"><SaegusLogo priority className="h-8" /><p className="text-xs font-medium text-muted-foreground">Veillio · Intelligence de veille</p></div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">{isSignUp ? 'Créer le compte initial' : 'Espace sécurisé'}</p>
           <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em]">{isSignUp ? 'Créer votre compte' : 'Se connecter'}</h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">{isSignUp ? 'Le premier compte créé devient super administrateur.' : 'Accédez à l’administration de votre organisation.'}</p>
