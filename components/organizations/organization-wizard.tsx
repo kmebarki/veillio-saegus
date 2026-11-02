@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { ArrowLeft, ArrowRight, Bell, Building2, Check, CircleHelp, Globe2, Menu, Settings, ShieldCheck, UserRoundPlus, Users } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Bell, Building2, Check, CircleHelp, Globe2, ImagePlus, Menu, Settings, ShieldCheck, UserRoundPlus, Users } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 import { createOrganization } from '@/app/actions/organizations'
+import { ResponsibleUserPicker } from '@/components/organizations/responsible-user-picker'
 import { Sidebar } from '@/components/veillio-dashboard'
 import { UserMenu } from '@/components/user-menu'
 import { Button } from '@/components/ui/button'
@@ -29,7 +30,12 @@ const initialForm: CreateOrganizationInput = {
   internalReference: '',
   type: 'client',
   primaryDomain: '',
+  addressLine1: '',
+  addressLine2: '',
+  postalCode: '',
+  city: '',
   country: 'France',
+  logoPathname: null,
   defaultLanguage: 'Français',
   timezone: 'Europe/Paris',
   contactEmail: '',
@@ -40,7 +46,8 @@ const initialForm: CreateOrganizationInput = {
   offer: '',
   miniSiteEnabled: false,
   inviteAdmin: false,
-  adminName: '',
+  adminFirstName: '',
+  adminLastName: '',
   adminEmail: '',
 }
 
@@ -87,11 +94,26 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
   return <div className="flex flex-col justify-between gap-1 border-b py-3 text-sm last:border-b-0 sm:flex-row sm:items-center"><span className="text-muted-foreground">{label}</span><strong className="font-medium sm:text-right">{value || 'Non renseigné'}</strong></div>
 }
 
-export function OrganizationWizard({ userOptions }: { userOptions: OrganizationUserOption[] }) {
+async function uploadOrganizationLogo(file: File) {
+  const formData = new FormData()
+  formData.append('logo', file)
+  const response = await fetch('/api/organization-logos', { method: 'POST', body: formData })
+  const result = await response.json() as { pathname?: string; error?: string }
+  if (!response.ok || !result.pathname) throw new Error(result.error ?? 'Le téléversement du logo a échoué.')
+  return result.pathname
+}
+
+async function removeOrganizationLogo(pathname: string) {
+  await fetch(`/api/organization-logos?pathname=${encodeURIComponent(pathname)}`, { method: 'DELETE' })
+}
+
+export function OrganizationWizard() {
   const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [currentStep, setCurrentStep] = useState(0)
   const [form, setForm] = useState(initialForm)
+  const [logoFile, setLogoFile] = useState<File | null>(null)
+  const [selectedResponsible, setSelectedResponsible] = useState<OrganizationUserOption | null>(null)
   const [confirmed, setConfirmed] = useState(false)
   const [error, setError] = useState('')
   const [toast, setToast] = useState('')
@@ -109,11 +131,14 @@ export function OrganizationWizard({ userOptions }: { userOptions: OrganizationU
       if (!/^(?!-)(?:[a-z0-9-]+\.)+[a-z]{2,}$/i.test(form.primaryDomain.trim())) return 'Renseignez un domaine principal valide, par exemple entreprise.fr.'
     }
     if (currentStep === 1) {
-      if (!form.country || !form.defaultLanguage || !form.timezone) return 'Le pays, la langue et le fuseau horaire sont requis.'
+      if (form.addressLine1.trim().length < 2) return 'Renseignez la première ligne de l’adresse.'
+      if (form.postalCode.trim().length < 2 || form.city.trim().length < 2 || !form.country) return 'Le code postal, la ville et le pays sont requis.'
+      if (!form.defaultLanguage || !form.timezone) return 'La langue et le fuseau horaire sont requis.'
       if (form.contactEmail && !/^\S+@\S+\.\S+$/.test(form.contactEmail)) return 'L’adresse e-mail de contact est invalide.'
     }
     if (currentStep === 2 && form.inviteAdmin) {
-      if (form.adminName.trim().length < 2) return 'Renseignez le nom du premier administrateur.'
+      if (form.adminFirstName.trim().length < 2) return 'Renseignez le prénom du premier administrateur.'
+      if (form.adminLastName.trim().length < 2) return 'Renseignez le nom du premier administrateur.'
       if (!/^\S+@\S+\.\S+$/.test(form.adminEmail)) return 'Renseignez une adresse e-mail administrateur valide.'
     }
     return ''
@@ -135,21 +160,28 @@ export function OrganizationWizard({ userOptions }: { userOptions: OrganizationU
     }
     setError('')
     startTransition(async () => {
-      const result = await createOrganization(form)
-      if (!result.ok) {
-        setError(result.message)
-        return
+      let uploadedLogoPathname: string | null = null
+      try {
+        if (logoFile) uploadedLogoPathname = await uploadOrganizationLogo(logoFile)
+        const result = await createOrganization({ ...form, logoPathname: uploadedLogoPathname })
+        if (!result.ok) {
+          if (uploadedLogoPathname) await removeOrganizationLogo(uploadedLogoPathname)
+          setError(result.message)
+          return
+        }
+        setToast(result.message)
+        window.setTimeout(() => {
+          router.push('/admin/organizations')
+          router.refresh()
+        }, 900)
+      } catch (submissionError) {
+        if (uploadedLogoPathname) await removeOrganizationLogo(uploadedLogoPathname)
+        setError(submissionError instanceof Error ? submissionError.message : 'La création de l’organisation a échoué.')
       }
-      setToast(result.message)
-      window.setTimeout(() => {
-        router.push('/admin/organizations')
-        router.refresh()
-      }, 900)
     })
   }
 
-  const responsibleItems = [{ value: 'none', label: 'Aucun responsable' }, ...userOptions.map((user) => ({ value: user.id, label: `${user.name} · ${user.email}` }))]
-  const responsibleName = userOptions.find((user) => user.id === form.responsibleUserId)?.name ?? 'Non attribué'
+  const responsibleName = selectedResponsible?.name ?? 'Non attribué'
 
   return (
     <div className="min-h-dvh bg-background">
@@ -178,6 +210,7 @@ export function OrganizationWizard({ userOptions }: { userOptions: OrganizationU
                       </div>
                       <SelectField label="Type d’organisation" value={form.type} onChange={(value) => update('type', value)} items={[{ value: 'client', label: 'Client' }, { value: 'internal', label: 'Interne' }, { value: 'partner', label: 'Partenaire' }]} />
                       <Field><FieldLabel htmlFor="organization-domain">Domaine principal</FieldLabel><Input id="organization-domain" value={form.primaryDomain} onChange={(event) => update('primaryDomain', event.target.value.toLowerCase())} placeholder="entreprise.fr" className="h-10 rounded-xl" /><FieldDescription>Saisi sans protocole ni chemin.</FieldDescription></Field>
+                      <Field><FieldLabel htmlFor="organization-logo">Logo</FieldLabel><label htmlFor="organization-logo" className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed bg-muted/20 p-4 hover:bg-muted/40"><span className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><ImagePlus /></span><span><strong className="block text-sm font-medium">{logoFile?.name ?? 'Choisir un fichier'}</strong><span className="mt-1 block text-xs text-muted-foreground">JPG, PNG ou WebP · 2 Mo maximum</span></span></label><Input id="organization-logo" type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => { const file = event.target.files?.[0] ?? null; if (file && file.size > 2 * 1024 * 1024) { setError('Le logo doit peser moins de 2 Mo.'); event.target.value = ''; return } setLogoFile(file); setError('') }} /></Field>
                     </FieldGroup>
                   )}
 

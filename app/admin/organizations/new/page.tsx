@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 
-import { getOrganizationsOverview } from '@/app/actions/organizations'
+import { canManageOrganizations } from '@/app/actions/organizations'
 import { OrganizationWizard } from '@/components/organizations/organization-wizard'
 
 export const metadata: Metadata = {
@@ -10,7 +10,6 @@ export const metadata: Metadata = {
 }
 
 export default async function NewOrganizationPage() {
-  const overview = await getOrganizationsOverview()
-  if (!overview.canManage) redirect('/admin/organizations')
-  return <OrganizationWizard userOptions={overview.userOptions} />
+  if (!(await canManageOrganizations())) redirect('/admin/organizations')
+  return <OrganizationWizard />
 }

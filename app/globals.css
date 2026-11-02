@@ -13,7 +13,7 @@
 
 :root {
   color-scheme: light;
-  --background: #faf9fb; --foreground: #0e0a19; --card: #ffffff; --card-foreground: #0e0a19;
+  --background: #faf9fb; --foreground: #0e0a19; --card: #ffffff; --card-foreground: #0e0a19; --popover: #ffffff; --popover-foreground: #0e0a19;
   --primary: #5525e4; --primary-foreground: #ffffff; --secondary: #ddd3fd; --secondary-foreground: #2d1574;
   --muted: #f4f3f6; --muted-foreground: #716c7f; --accent: #eee9fe; --accent-foreground: #2d1574;
   --destructive: #c93643; --border: #e1e0e6; --input: #ccc9d4; --ring: #5525e4; --radius: .75rem;

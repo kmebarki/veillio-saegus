@@ -7,7 +7,12 @@ export type OrganizationListItem = {
   internalReference: string | null
   type: string
   primaryDomain: string | null
+  addressLine1: string | null
+  addressLine2: string | null
+  postalCode: string | null
+  city: string | null
   country: string
+  logoPathname: string | null
   defaultLanguage: string
   timezone: string
   contactEmail: string | null
@@ -33,7 +38,6 @@ export type OrganizationUserOption = {
 
 export type OrganizationsOverview = {
   organizations: OrganizationListItem[]
-  userOptions: OrganizationUserOption[]
   canManage: boolean
 }
 
@@ -42,7 +46,12 @@ export type CreateOrganizationInput = {
   internalReference: string
   type: string
   primaryDomain: string
+  addressLine1: string
+  addressLine2: string
+  postalCode: string
+  city: string
   country: string
+  logoPathname: string | null
   defaultLanguage: string
   timezone: string
   contactEmail: string
@@ -53,6 +62,7 @@ export type CreateOrganizationInput = {
   offer: string
   miniSiteEnabled: boolean
   inviteAdmin: boolean
-  adminName: string
+  adminFirstName: string
+  adminLastName: string
   adminEmail: string
 }
