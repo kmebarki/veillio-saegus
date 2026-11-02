@@ -63,7 +63,8 @@ const steeringItems = [
   { label: 'Diffusion', icon: Send, href: '#' },
 ]
 
-const childHrefs: Record<string, string> = { Connecteurs: '/admin/connectors', Connexions: '/admin/connections' }
+const childHrefs: Record<string, string> = { Connecteurs: '/admin/connectors', Connexions: '/admin/connections', Collectes: '/admin/collections' }
+const childAccess: Partial<Record<string, keyof ViewerInfo['access']>> = { Connecteurs: 'connectors', Connexions: 'connections', Collectes: 'collections' }
 
 const administrationItems: { label: string; icon: typeof Settings; href: string; access?: keyof ViewerInfo['access'] }[] = [
   { label: 'Utilisateurs et admissions', icon: UserRoundCheck, href: '/admin/users', access: 'users' },
@@ -166,6 +167,8 @@ export function Sidebar({ open, onClose, activeItem = 'Tableau de bord' }: { ope
           <div className="flex flex-col gap-0.5 py-1 pl-11">
             {children.map((child) => {
               const href = childHrefs[child]
+              const requiredAccess = childAccess[child]
+              if (requiredAccess && viewer && !viewer.access[requiredAccess]) return null
               const childClassName = cn(
                 'flex min-h-10 items-center rounded-lg px-3 text-left text-[13px] transition-colors',
                 activeItem === child ? 'bg-sidebar-primary font-medium text-sidebar-primary-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground',

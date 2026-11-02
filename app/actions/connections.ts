@@ -32,13 +32,23 @@ const usernameField = z.string().max(200, 'L’identifiant est trop long.')
 const secretField = z.string().max(SECRET_MAX * 2, 'Le secret est trop long.')
 const expiryField = z.union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date d’expiration invalide.'), z.literal(''), z.null()]).optional()
 const scopeField = z.enum(['organization', 'user'])
+const logoField = z
+  .string()
+  .trim()
+  .max(150_000, 'Le logo est trop volumineux.')
+  .refine(
+    (value) => value === '' || (value.length <= 500 && /^https:\/\/[^\s"'<>]+$/.test(value)) || /^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(value),
+    'Le logo doit être une image importée ou une adresse https valide.',
+  )
+  .optional()
 
-const createSchema = z.object({ connectorId: z.string().uuid(), name: nameField, description: descriptionField, scope: scopeField, username: usernameField.optional(), secret: secretField, expiresAt: expiryField })
+const createSchema = z.object({ connectorId: z.string().uuid(), name: nameField, description: descriptionField, logoUrl: logoField, scope: scopeField, username: usernameField.optional(), secret: secretField, expiresAt: expiryField })
 const updateSchema = z.object({
   id: z.string().uuid(),
   version: z.number().int().positive(),
   name: nameField,
   description: descriptionField,
+  logoUrl: logoField,
   username: usernameField.optional(),
   secret: z.object({ mode: z.enum(['keep', 'set']), value: secretField }),
   expiresAt: expiryField,
@@ -138,8 +148,10 @@ function toSummary(actor: Actor, row: Row, connectorRow: ConnectorRow, ownerName
     id: row.id,
     name: row.name,
     description: row.description ?? '',
+    logoUrl: row.logoUrl ?? '',
     connectorId: connectorRow.id,
     connectorName: connectorRow.name,
+    connectorLogoUrl: connectorRow.logoUrl ?? '',
     connectorKind: kind,
     connectorUrl: config.url,
     host: hostOf(config.url),
@@ -195,14 +207,15 @@ export async function getConnectionsOverview(): Promise<ConnectionsOverview> {
   const choices = connectorRows.flatMap((row) => {
     const kind = kindOf(row)
     const config = readConfig(kind, row.config)
-    if (!needsSecret(config.auth.type)) return []
     return [
       {
         id: row.id,
         name: row.name,
+        logoUrl: row.logoUrl ?? '',
         kind,
         status: (['draft', 'active', 'paused'].includes(row.status) ? row.status : 'draft') as 'draft' | 'active' | 'paused',
         authType: config.auth.type,
+        requiresAuth: needsSecret(config.auth.type),
         keyName: config.auth.keyName,
         host: hostOf(config.url),
         insecure: config.url.trim().toLowerCase().startsWith('http://'),
@@ -258,6 +271,7 @@ export async function createConnection(input: unknown): Promise<{ ok: true; mess
       connectorId,
       name,
       description: parsed.data.description || null,
+      logoUrl: parsed.data.logoUrl || null,
       scope,
       ownerUserId: scope === 'user' ? actor.id : null,
       username: credentials.username || null,
@@ -315,6 +329,7 @@ export async function updateConnection(input: unknown): Promise<{ ok: true; mess
     .set({
       name,
       description: parsed.data.description || null,
+      logoUrl: parsed.data.logoUrl || null,
       username: username.value || null,
       secretCiphertext: replacing ? encryptSecret(newSecret, row.id) : row.secretCiphertext,
       secretHint: replacing ? secretHintOf(newSecret) : row.secretHint,

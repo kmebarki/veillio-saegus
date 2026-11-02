@@ -1,14 +1,16 @@
 'use client'
 
-import { Check, PlugZap, ShieldCheck, TriangleAlert, User, Users } from 'lucide-react'
+import { ChevronDown, PlugZap, ShieldCheck, TriangleAlert, User, Users } from 'lucide-react'
 import { useMemo, useState, useTransition } from 'react'
 
 import { createConnection, testConnection, testDraftConnection, updateConnection } from '@/app/actions/connections'
 import { inDaysIso, inputClass, todayIso } from '@/components/connections/helpers'
+import { ConnectorPicker } from '@/components/connections/connector-picker'
 import { RequestPreview } from '@/components/connections/request-preview'
 import { SecretField } from '@/components/connections/secret-field'
 import { TestResult } from '@/components/connections/test-result'
-import { KindIcon } from '@/components/connector-ui'
+import { ConnectorLogoField } from '@/components/connector-logo-field'
+import { ConnectorLogo } from '@/components/connector-ui'
 import { Button } from '@/components/ui/button'
 import { analyzeSecret, analyzeUsername } from '@/lib/connection-secret'
 import type { ConnectionScope, ConnectionSummary, ConnectionsOverview } from '@/lib/connection-types'
@@ -28,11 +30,13 @@ const EXPIRY_PRESETS = [
 
 export function ConnectionForm({ target, overview, onClose, onDone }: Props) {
   const editing = target.mode === 'edit' ? target.connection : null
-  const initialConnector = editing?.connectorId ?? (target.mode === 'create' ? target.connectorId : undefined) ?? overview.connectors[0]?.id ?? ''
+  const usableConnectors = overview.connectors.filter((item) => item.requiresAuth)
+  const initialConnector = editing?.connectorId ?? (target.mode === 'create' ? target.connectorId : undefined) ?? (usableConnectors.length === 1 ? usableConnectors[0].id : '')
 
   const [connectorId, setConnectorId] = useState(initialConnector)
   const [name, setName] = useState(editing?.name ?? '')
   const [description, setDescription] = useState(editing?.description ?? '')
+  const [logoUrl, setLogoUrl] = useState(editing?.logoUrl ?? '')
   const [scope, setScope] = useState<ConnectionScope>(editing?.scope ?? (overview.viewer.canManage ? 'organization' : 'user'))
   const [username, setUsername] = useState(editing?.username ?? '')
   const [secret, setSecret] = useState('')
@@ -72,55 +76,51 @@ export function ConnectionForm({ target, overview, onClose, onDone }: Props) {
     setError(null)
     startTransition(async () => {
       if (editing) {
-        const result = await updateConnection({ id: editing.id, version: editing.version, name, description, username, expiresAt, secret: replacing ? { mode: 'set', value: secret } : { mode: 'keep', value: '' } })
+        const result = await updateConnection({ id: editing.id, version: editing.version, name, description, logoUrl, username, expiresAt, secret: replacing ? { mode: 'set', value: secret } : { mode: 'keep', value: '' } })
         if (!result.ok) return setError(result.message)
         return onDone(result.message)
       }
-      const created = await createConnection({ connectorId, name, description, scope, username, secret, expiresAt })
+      const created = await createConnection({ connectorId, name, description, logoUrl, scope, username, secret, expiresAt })
       if (!created.ok) return setError(created.message)
       const tested = await testConnection({ id: created.id })
       onDone(tested.ok ? `Connexion créée · ${tested.outcome.status === 'success' ? 'test réussi' : tested.outcome.status === 'warning' ? 'test réussi avec réserves' : 'test en échec, vérifiez les identifiants'}.` : created.message)
     })
   }
 
+  const connectorField = (
+    <div className="flex flex-col gap-1.5">
+      <div>
+        <h3 className="text-sm font-semibold">Connecteur</h3>
+        <p className="text-xs text-muted-foreground">Le fournisseur de données auquel cette connexion donnera accès.</p>
+      </div>
+      <ConnectorPicker
+        connectors={overview.connectors}
+        value={connectorId}
+        onSelect={(id) => {
+          setConnectorId(id)
+          setDraft(null)
+        }}
+      />
+    </div>
+  )
+
+  if (!editing && !connectorId) {
+    return (
+      <div className="flex flex-col gap-4">
+        {connectorField}
+        <div className="flex justify-end border-t pt-4"><Button type="button" variant="ghost" onClick={onClose}>Annuler</Button></div>
+      </div>
+    )
+  }
+
   return (
     <form onSubmit={submit} className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_330px]">
       <div className="flex min-w-0 flex-col gap-5">
-        {!editing && (
-          <fieldset className="flex flex-col gap-2">
-            <legend className="mb-1.5 text-sm font-medium">Connecteur</legend>
-            <div role="radiogroup" aria-label="Connecteur" className="grid max-h-60 gap-2 overflow-y-auto sm:grid-cols-2">
-              {overview.connectors.map((item) => {
-                const selected = item.id === connectorId
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    onClick={() => {
-                      setConnectorId(item.id)
-                      setDraft(null)
-                    }}
-                    className={cn('relative flex items-start gap-3 rounded-xl border p-3 text-left transition-colors', selected ? 'border-primary bg-primary/5 ring-2 ring-primary/15' : 'bg-card hover:border-foreground/30')}
-                  >
-                    <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><KindIcon kind={item.kind} className="size-4" /></span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold">{item.name}</span>
-                      <span className="block truncate text-xs text-muted-foreground">{item.host || 'URL à renseigner'} · {AUTH_LABELS[item.authType as AuthType]?.label.split(' (')[0] ?? 'Clé API'}</span>
-                      <span className="mt-1 block text-[11px] font-medium text-muted-foreground">{item.sharedCount > 0 ? `${item.sharedCount} connexion${item.sharedCount > 1 ? 's' : ''} partagée${item.sharedCount > 1 ? 's' : ''}` : 'Aucune connexion partagée'}</span>
-                    </span>
-                    {selected && <Check className="size-4 shrink-0 text-primary" aria-hidden />}
-                  </button>
-                )
-              })}
-            </div>
-          </fieldset>
-        )}
+        {!editing && connectorField}
 
         {editing && (
           <div className="flex items-center gap-3 rounded-xl border bg-muted/40 p-3">
-            <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><KindIcon kind={editing.connectorKind} className="size-4" /></span>
+            <ConnectorLogo kind={editing.connectorKind} logoUrl={logoUrl || editing.connectorLogoUrl} className="size-9 rounded-lg" />
             <div className="min-w-0"><p className="truncate text-sm font-semibold">{editing.connectorName}</p><p className="truncate text-xs text-muted-foreground">{editing.host} · {AUTH_LABELS[authType]?.label}</p></div>
           </div>
         )}
@@ -135,6 +135,24 @@ export function ConnectionForm({ target, overview, onClose, onDone }: Props) {
             <input value={description} onChange={(event) => setDescription(event.target.value)} className={inputClass} placeholder="Ex. Quota 10 requêtes/s, compte de Marie" maxLength={240} />
           </label>
         </div>
+
+        <details className="group rounded-xl border bg-card" open={Boolean(logoUrl)}>
+          <summary className="flex cursor-pointer list-none items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 [&::-webkit-details-marker]:hidden">
+            <ConnectorLogo kind={editing?.connectorKind ?? choice?.kind ?? 'api'} logoUrl={logoUrl || editing?.connectorLogoUrl || choice?.logoUrl} className="size-8 rounded-lg" />
+            <span className="flex-1">Logo de la connexion <span className="font-normal text-muted-foreground">· {logoUrl ? 'Personnalisé' : 'Celui du connecteur par défaut'}</span></span>
+            <ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden />
+          </summary>
+          <div className="border-t p-3">
+            <ConnectorLogoField
+              kind={editing?.connectorKind ?? choice?.kind ?? 'api'}
+              value={logoUrl}
+              sourceUrl={endpoint}
+              onChange={setLogoUrl}
+              label="Logo ou image"
+              helper="Importez une image ou récupérez le logo du site du fournisseur. Vide, le logo du connecteur est utilisé."
+            />
+          </div>
+        </details>
 
         {!editing && (
           <fieldset className="flex flex-col gap-2">

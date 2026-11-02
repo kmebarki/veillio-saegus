@@ -1,30 +1,19 @@
 import 'server-only'
 
-import type { ConnectorConfig, ConnectorKind } from '@/lib/connector-catalog'
+import { isHttpKind, type ConnectorConfig, type ConnectorKind, type HttpKind } from '@/lib/connector-catalog'
+import { testImap } from '@/lib/connectors/imap'
+import { testM365 } from '@/lib/connectors/m365'
 import { ParseError, parseApi, parseFeed, parseWeb, resolvePath, type ParsedItem } from '@/lib/connectors/parsers'
 import { safeFetch, SafeFetchError, validateTargetUrl } from '@/lib/connectors/safe-fetch'
+import type { CheckStatus, TestCheck, TestResult, TestSample } from '@/lib/connectors/test-types'
+import { testWebhook } from '@/lib/connectors/webhook'
 
-export type CheckStatus = 'ok' | 'warning' | 'error' | 'skipped'
-export type TestCheck = { id: string; label: string; status: CheckStatus; detail: string }
-export type TestSample = { title: string; link: string; date: string; summary: string }
-
-export type TestResult = {
-  status: 'success' | 'warning' | 'error'
-  message: string
-  httpStatus: number | null
-  durationMs: number
-  itemsFound: number | null
-  checks: TestCheck[]
-  sample: TestSample[]
-  finalUrl?: string
-  contentType?: string
-  bytes?: number
-}
+export type { CheckStatus, TestCheck, TestResult, TestSample }
 
 const MAX_BYTES = 2 * 1024 * 1024
 const MASK = '••••••'
 
-const ACCEPT: Record<ConnectorKind, string> = {
+const ACCEPT: Record<HttpKind, string> = {
   rss: 'application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.5',
   web: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.5',
   api: 'application/json, */*;q=0.5',
@@ -34,7 +23,7 @@ function redact(text: string, secret: string | null) {
   return secret && secret.length >= 3 ? text.split(secret).join(MASK).split(encodeURIComponent(secret)).join(MASK) : text
 }
 
-function buildRequest(kind: ConnectorKind, config: ConnectorConfig, secret: string | null, username: string) {
+function buildRequest(kind: HttpKind, config: ConnectorConfig, secret: string | null, username: string) {
   const url = new URL(config.url.trim())
   const headers: Record<string, string> = {
     'User-Agent': config.http.userAgent,
@@ -76,7 +65,17 @@ function buildRequest(kind: ConnectorKind, config: ConnectorConfig, secret: stri
   return { url: url.toString(), headers, body, sensitive }
 }
 
-export async function runConnectorTest(kind: ConnectorKind, config: ConnectorConfig, secret: string | null, username = ''): Promise<TestResult> {
+export type TestContext = { connectorId?: string }
+
+export async function runConnectorTest(kind: ConnectorKind, config: ConnectorConfig, secret: string | null, username = '', context: TestContext = {}): Promise<TestResult> {
+  if (kind === 'imap') return testImap(config, secret, username)
+  if (kind === 'm365') return testM365(config, secret)
+  if (kind === 'webhook') return testWebhook(config, secret, context.connectorId)
+  if (!isHttpKind(kind)) throw new Error(`Type de connecteur non pris en charge : ${kind}`)
+  return runHttpTest(kind, config, secret, username)
+}
+
+async function runHttpTest(kind: HttpKind, config: ConnectorConfig, secret: string | null, username: string): Promise<TestResult> {
   const startedAt = Date.now()
   const checks: TestCheck[] = []
   const push = (id: string, label: string, status: CheckStatus, detail: string) => checks.push({ id, label, status, detail: redact(detail, secret) })

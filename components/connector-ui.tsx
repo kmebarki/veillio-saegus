@@ -1,14 +1,27 @@
-import { Braces, CircleAlert, CircleCheck, CircleDashed, CirclePause, Globe, Rss, TriangleAlert } from 'lucide-react'
+import { Braces, CircleAlert, CircleCheck, CircleDashed, CirclePause, Cloud, Globe, Mail, Rss, TriangleAlert, Webhook } from 'lucide-react'
 
 import type { ConnectorHealth, ConnectorKind, ConnectorStatus } from '@/lib/connector-catalog'
 import type { ConnectorSummary } from '@/lib/connector-types'
 import { cn } from '@/lib/utils'
 
-export const KIND_ICONS: Record<ConnectorKind, typeof Rss> = { rss: Rss, web: Globe, api: Braces }
+export const KIND_ICONS: Record<ConnectorKind, typeof Rss> = { rss: Rss, web: Globe, api: Braces, imap: Mail, webhook: Webhook, m365: Cloud }
 
 export function KindIcon({ kind, className }: { kind: ConnectorKind; className?: string }) {
   const Icon = KIND_ICONS[kind]
   return <Icon className={className} aria-hidden />
+}
+
+export function ConnectorLogo({ kind, logoUrl, className }: { kind: ConnectorKind; logoUrl?: string; className?: string }) {
+  return (
+    <span className={cn('grid shrink-0 place-items-center overflow-hidden border bg-card', logoUrl ? 'p-1.5' : 'bg-primary/10 text-primary', className)}>
+      {logoUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={logoUrl} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" className="size-full object-contain" />
+      ) : (
+        <KindIcon kind={kind} className="size-1/2" />
+      )}
+    </span>
+  )
 }
 
 const STATUS_STYLES: Record<ConnectorStatus, { label: string; className: string; icon: typeof CircleCheck }> = {

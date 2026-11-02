@@ -14,8 +14,10 @@ export type ConnectionSummary = {
   id: string
   name: string
   description: string
+  logoUrl: string
   connectorId: string
   connectorName: string
+  connectorLogoUrl: string
   connectorKind: ConnectorKind
   connectorUrl: string
   host: string
@@ -44,9 +46,11 @@ export type ConnectionSummary = {
 export type ConnectorChoice = {
   id: string
   name: string
+  logoUrl: string
   kind: ConnectorKind
   status: ConnectorStatus
   authType: string
+  requiresAuth: boolean
   keyName: string
   host: string
   insecure: boolean

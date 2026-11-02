@@ -17,15 +17,15 @@ export function isAdminRole(role: string) {
 }
 
 export function getAssignableRoles(actorRole: string): RoleKey[] {
-  if (actorRole === 'super_admin') return ['admin', 'pilot', 'contributor', 'reader']
+  if (actorRole === 'super_admin') return ['super_admin', 'admin', 'pilot', 'contributor', 'reader']
   if (actorRole === 'admin') return ['pilot', 'contributor', 'reader']
   if (actorRole === 'pilot') return ['contributor', 'reader']
   return []
 }
 
 export function canManageTarget(actorRole: string, targetRole: string) {
-  if (targetRole === 'super_admin') return false
   if (actorRole === 'super_admin') return true
+  if (targetRole === 'super_admin') return false
   if (actorRole === 'admin') return targetRole !== 'admin'
   return false
 }

@@ -3,14 +3,19 @@
 import { KeyRound, Plus, ShieldCheck, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 
+import { Field, NumberField, Section } from '@/components/connector-form-primitives'
+import { ImapSections, M365Sections, WebhookSections } from '@/components/connector-kind-sections'
+import { ConnectorLogoField } from '@/components/connector-logo-field'
 import { EndpointsSection } from '@/components/openapi-import'
 import { Button } from '@/components/ui/button'
 import { fieldClass } from '@/components/ui/modal'
 import {
   AUTH_LABELS,
-  AUTH_TYPES,
   DEDUPE_OPTIONS,
+  KIND_AUTH_TYPES,
   PAGINATION_TYPES,
+  describeTarget,
+  isHttpKind,
   needsSecret,
   secretLabel,
   type ConnectorConfig,
@@ -22,6 +27,7 @@ import { cn } from '@/lib/utils'
 export type ConnectorDraft = {
   name: string
   description: string
+  logoUrl: string
   config: ConnectorConfig
 }
 
@@ -30,6 +36,16 @@ type Props = {
   draft: ConnectorDraft
   onChange: (draft: ConnectorDraft) => void
   disabled?: boolean
+  connectorId?: string
+}
+
+const NAME_PLACEHOLDERS: Record<ConnectorKind, string> = {
+  rss: 'Ex. Le Monde – Technologies',
+  web: 'Ex. Blog éditeur – actualités',
+  api: 'Ex. API Légifrance – JORF',
+  imap: 'Ex. Newsletters sectorielles',
+  webhook: 'Ex. Alertes de l’outil interne',
+  m365: 'Ex. SharePoint – Veille réglementaire',
 }
 
 const PAGINATION_LABELS: Record<(typeof PAGINATION_TYPES)[number], string> = {
@@ -37,49 +53,6 @@ const PAGINATION_LABELS: Record<(typeof PAGINATION_TYPES)[number], string> = {
   page: 'Par numéro de page',
   offset: 'Par décalage (offset)',
   cursor: 'Par curseur',
-}
-
-function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
-  return (
-    <section className="flex flex-col gap-4 rounded-2xl border bg-card p-4 sm:p-5">
-      <header>
-        <h3 className="text-sm font-semibold tracking-[-0.01em]">{title}</h3>
-        {description && <p className="mt-0.5 text-[13px] leading-5 text-muted-foreground">{description}</p>}
-      </header>
-      {children}
-    </section>
-  )
-}
-
-function Field({ label, hint, children, className }: { label: string; hint?: string; children: React.ReactNode; className?: string }) {
-  return (
-    <label className={cn('flex flex-col gap-1.5 text-sm font-medium', className)}>
-      {label}
-      {children}
-      {hint && <span className="text-xs font-normal leading-5 text-muted-foreground">{hint}</span>}
-    </label>
-  )
-}
-
-function NumberField({ label, hint, value, min, max, suffix, disabled, onChange }: { label: string; hint?: string; value: number; min: number; max: number; suffix?: string; disabled?: boolean; onChange: (value: number) => void }) {
-  return (
-    <Field label={label} hint={hint}>
-      <span className="relative block">
-        <input
-          type="number"
-          inputMode="numeric"
-          min={min}
-          max={max}
-          step={1}
-          disabled={disabled}
-          value={Number.isFinite(value) ? value : ''}
-          onChange={(event) => onChange(event.target.value === '' ? Number.NaN : Math.trunc(Number(event.target.value)))}
-          className={cn(fieldClass, suffix && 'pr-12')}
-        />
-        {suffix && <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">{suffix}</span>}
-      </span>
-    </Field>
-  )
 }
 
 function KeyValueEditor({ label, items, max, namePlaceholder, valuePlaceholder, disabled, onChange }: { label: string; items: KeyValue[]; max: number; namePlaceholder: string; valuePlaceholder: string; disabled?: boolean; onChange: (items: KeyValue[]) => void }) {
@@ -113,8 +86,14 @@ function CredentialsNotice({ type }: { type: ConnectorConfig['auth']['type'] }) 
   )
 }
 
-export function ConnectorConfigForm({ kind, draft, onChange, disabled }: Props) {
+export function ConnectorConfigForm({ kind, draft, onChange, disabled, connectorId }: Props) {
   const { config } = draft
+  const http = isHttpKind(kind)
+  const authOptions = KIND_AUTH_TYPES[kind]
+  const logoSourceUrl = http ? config.url : kind === 'm365' ? config.m365.siteUrl : kind === 'imap' && config.imap.host ? `https://${config.imap.host.replace(/^(imap|mail|smtp)\./, '')}` : ''
+  const setImap = (patch: Partial<ConnectorConfig['imap']>) => setConfig({ imap: { ...config.imap, ...patch } })
+  const setWebhook = (patch: Partial<ConnectorConfig['webhook']>) => setConfig({ webhook: { ...config.webhook, ...patch } })
+  const setM365 = (patch: Partial<ConnectorConfig['m365']>) => setConfig({ m365: { ...config.m365, ...patch } })
   const set = (patch: Partial<ConnectorDraft>) => onChange({ ...draft, ...patch })
   const setConfig = (patch: Partial<ConnectorConfig>) => set({ config: { ...config, ...patch } })
   const setAuth = (patch: Partial<ConnectorConfig['auth']>) => setConfig({ auth: { ...config.auth, ...patch } })
@@ -138,16 +117,21 @@ export function ConnectorConfigForm({ kind, draft, onChange, disabled }: Props) 
     <fieldset disabled={disabled} className="flex min-w-0 flex-col gap-4">
       <Section title="Identité" description="Comment ce connecteur apparaît dans la galerie et les journaux.">
         <Field label="Nom du connecteur">
-          <input required minLength={2} maxLength={80} value={draft.name} onChange={(event) => set({ name: event.target.value })} className={fieldClass} placeholder={kind === 'rss' ? 'Ex. Le Monde – Technologies' : kind === 'web' ? 'Ex. Blog éditeur – actualités' : 'Ex. API Légifrance – JORF'} />
+          <input required minLength={2} maxLength={80} value={draft.name} onChange={(event) => set({ name: event.target.value })} className={fieldClass} placeholder={NAME_PLACEHOLDERS[kind]} />
         </Field>
         <Field label="Description (facultatif)">
           <input maxLength={300} value={draft.description} onChange={(event) => set({ description: event.target.value })} className={fieldClass} placeholder="Ce que ce connecteur alimente, qui en est responsable…" />
         </Field>
+        <ConnectorLogoField kind={kind} value={draft.logoUrl} sourceUrl={logoSourceUrl} onChange={(logoUrl) => set({ logoUrl })} disabled={disabled} />
       </Section>
 
       {kind === 'api' && <EndpointsSection config={config} onChange={(next) => onChange({ ...draft, config: next })} disabled={disabled} />}
 
-      <Section title="Source" description={kind === 'rss' ? 'Adresse du flux RSS, Atom ou RDF. Le format est détecté automatiquement.' : kind === 'web' ? 'Adresse de la page de listing à analyser.' : 'Point d’accès de l’API qui renvoie du JSON.'}>
+      {kind === 'imap' && <ImapSections value={config.imap} onChange={setImap} />}
+      {kind === 'm365' && <M365Sections value={config.m365} onChange={setM365} />}
+      {kind === 'webhook' && <WebhookSections value={config.webhook} authType={authType} connectorId={connectorId} onChange={setWebhook} />}
+
+      {http && <Section title="Source" description={kind === 'rss' ? 'Adresse du flux RSS, Atom ou RDF. Le format est détecté automatiquement.' : kind === 'web' ? 'Adresse de la page de listing à analyser.' : 'Point d’accès de l’API qui renvoie du JSON.'}>
         <div className="flex flex-col gap-4">
           <div className={cn('grid gap-4', kind === 'api' && 'sm:grid-cols-[140px_1fr]')}>
             {kind === 'api' && (
@@ -171,12 +155,15 @@ export function ConnectorConfigForm({ kind, draft, onChange, disabled }: Props) 
             </>
           )}
         </div>
-      </Section>
+      </Section>}
 
       <Section title="Authentification" description="Définit seulement comment la requête s’authentifie. Les identifiants eux-mêmes sont gérés dans Connexions.">
         <div className="flex flex-col gap-4">
+          {authOptions.length === 1 ? (
+            <p className="flex items-center gap-1.5 text-[13px] font-semibold"><KeyRound className="size-3.5 text-primary" aria-hidden />{AUTH_LABELS[authOptions[0]].label}<span className="font-normal text-muted-foreground">· {AUTH_LABELS[authOptions[0]].hint}</span></p>
+          ) : (
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3" role="radiogroup" aria-label="Type d’authentification">
-            {AUTH_TYPES.map((type) => {
+            {authOptions.map((type) => {
               const checked = authType === type
               return (
                 <button key={type} type="button" role="radio" aria-checked={checked} onClick={() => changeAuthType(type)} className={cn('flex flex-col items-start gap-0.5 rounded-xl border px-3 py-2.5 text-left transition-colors', checked ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'hover:bg-muted/60')}>
@@ -186,6 +173,7 @@ export function ConnectorConfigForm({ kind, draft, onChange, disabled }: Props) 
               )
             })}
           </div>
+          )}
 
           {isKeyAuth && (
             <Field label={authType === 'api_key_header' ? 'Nom de l’en-tête' : 'Nom du paramètre'}>
@@ -241,9 +229,9 @@ export function ConnectorConfigForm({ kind, draft, onChange, disabled }: Props) 
         </>
       )}
 
-      <details className="group rounded-2xl border bg-card [&_summary::-webkit-details-marker]:hidden">
+      {kind !== 'webhook' && <details className="group rounded-2xl border bg-card [&_summary::-webkit-details-marker]:hidden">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-2xl p-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-5">
-          <span>Réglages avancés <span className="font-normal text-muted-foreground">· délais, en-têtes, tentatives, dédoublonnage</span></span>
+          <span>Réglages avancés <span className="font-normal text-muted-foreground">{http ? '· délais, en-têtes, tentatives, dédoublonnage' : '· délais, volume, tentatives'}</span></span>
           <span className="text-xs font-medium text-primary group-open:hidden">Afficher</span>
           <span className="hidden text-xs font-medium text-primary group-open:inline">Masquer</span>
         </summary>
@@ -251,24 +239,28 @@ export function ConnectorConfigForm({ kind, draft, onChange, disabled }: Props) 
           <div className="grid gap-4 sm:grid-cols-3">
             <NumberField label="Délai maximum" value={config.http.timeoutSec} min={2} max={30} suffix="s" onChange={(timeoutSec) => setHttp({ timeoutSec })} />
             <NumberField label="Éléments maximum" hint="Par collecte." value={config.http.maxItems} min={1} max={500} onChange={(maxItems) => setHttp({ maxItems })} />
-            <Field label="Doublons détectés par">
-              <select value={config.dedupe} onChange={(event) => setConfig({ dedupe: event.target.value as ConnectorConfig['dedupe'] })} className={fieldClass}>
-                {DEDUPE_OPTIONS.filter((option) => kind === 'rss' || option.value !== 'guid').map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </select>
-            </Field>
+            {http && (
+              <Field label="Doublons détectés par">
+                <select value={config.dedupe} onChange={(event) => setConfig({ dedupe: event.target.value as ConnectorConfig['dedupe'] })} className={fieldClass}>
+                  {DEDUPE_OPTIONS.filter((option) => kind === 'rss' || option.value !== 'guid').map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+              </Field>
+            )}
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <NumberField label="Tentatives en cas d’échec" hint="Erreurs réseau, 429 et 5xx uniquement." value={config.retry.maxAttempts} min={1} max={5} onChange={(maxAttempts) => setRetry({ maxAttempts })} />
             <NumberField label="Attente entre tentatives" hint="Doublée à chaque nouvel essai." value={config.retry.backoffSec} min={5} max={3600} suffix="s" onChange={(backoffSec) => setRetry({ backoffSec })} />
           </div>
+          {http && <>
           <Field label="User-Agent" hint="Identifie Veillio auprès du site interrogé."><input spellCheck={false} maxLength={200} value={config.http.userAgent} onChange={(event) => setHttp({ userAgent: event.target.value })} className={cn(fieldClass, 'font-mono text-[13px]')} /></Field>
           <label className="flex items-start gap-3 rounded-xl border px-3 py-2.5 text-sm">
             <input type="checkbox" checked={config.http.followRedirects} onChange={(event) => setHttp({ followRedirects: event.target.checked })} className="mt-0.5 size-4 accent-primary" />
             <span><span className="font-medium">Suivre les redirections</span><span className="block text-xs leading-5 text-muted-foreground">Jusqu’à 5 redirections, chacune revalidée (jamais vers une adresse interne). Les identifiants ne sont pas transmis à un autre domaine.</span></span>
           </label>
           <KeyValueEditor label="En-têtes personnalisés" items={config.http.headers} max={10} namePlaceholder="X-Exemple" valuePlaceholder="valeur" disabled={disabled} onChange={(headers) => setHttp({ headers })} />
+          </>}
         </div>
-      </details>
+      </details>}
     </fieldset>
   )
 }

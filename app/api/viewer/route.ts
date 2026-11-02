@@ -29,6 +29,7 @@ export async function GET() {
           groups: isAdmin || permissions.includes('groups.view'),
           connectors: permissions.includes('connectors.view'),
           connections: permissions.includes('connections.view'),
+          collections: permissions.includes('collections.view'),
         },
       },
     },

@@ -10,7 +10,9 @@ import {
   CONNECTOR_KINDS,
   configSchema,
   defaultConfig,
+  describeTarget,
   isConnectorKind,
+  isHttpKind,
   needsSecret,
   validateKindConfig,
   type ConnectorConfig,
@@ -38,7 +40,18 @@ const nameField = z.string().trim().min(2, 'Le nom doit contenir au moins 2 cara
 const descriptionField = z.string().trim().max(300, 'La description ne peut pas dépasser 300 caractères.')
 const kindField = z.enum(CONNECTOR_KINDS)
 
-const createSchema = z.object({ kind: kindField, name: nameField, description: descriptionField.optional(), config: configSchema })
+const MAX_LOGO_CHARS = 150_000
+const MAX_LOGO_BYTES = 100_000
+const logoField = z
+  .string()
+  .trim()
+  .max(MAX_LOGO_CHARS, 'Le logo est trop volumineux.')
+  .refine(
+    (value) => value === '' || (value.length <= 500 && /^https:\/\/[^\s"'<>]+$/.test(value)) || /^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(value),
+    'Le logo doit être une image importée ou une adresse https valide.',
+  )
+
+const createSchema = z.object({ kind: kindField, name: nameField, description: descriptionField.optional(), logoUrl: logoField.optional(), config: configSchema })
 const updateSchema = createSchema.omit({ kind: true }).extend({ id: z.string().uuid(), version: z.number().int().positive() })
 const draftTestSchema = z.object({ id: z.string().uuid().optional(), kind: kindField, config: configSchema, connectionId: z.string().uuid().optional() })
 const idSchema = z.object({ id: z.string().uuid() })
@@ -84,12 +97,8 @@ function healthOf(status: string | null): ConnectorHealth {
   return status === 'success' ? 'ok' : status === 'warning' ? 'warning' : status === 'error' ? 'error' : 'unknown'
 }
 
-function hostOf(url: string) {
-  try {
-    return new URL(url).hostname
-  } catch {
-    return ''
-  }
+function hostOf(kind: ConnectorKind, config: ConnectorConfig) {
+  return describeTarget(kind, config)
 }
 
 function toSummary(row: Row, connectionCount: number): ConnectorSummary {
@@ -99,11 +108,11 @@ function toSummary(row: Row, connectionCount: number): ConnectorSummary {
     id: row.id,
     name: row.name,
     description: row.description ?? '',
+    logoUrl: row.logoUrl ?? '',
     kind,
     status: (['draft', 'active', 'paused'].includes(row.status) ? row.status : 'draft') as ConnectorStatus,
     health: healthOf(row.lastCheckStatus),
-    host: hostOf(config.url),
-
+    host: describeTarget(kind, config),
     version: row.version,
     connectionCount,
     authType: config.auth.type,
@@ -131,10 +140,12 @@ async function findDuplicateName(organizationId: string, name: string, excludeId
 }
 
 function checkTarget(kind: ConnectorKind, config: ConnectorConfig): string | null {
-  try {
-    validateTargetUrl(config.url)
-  } catch (error) {
-    return error instanceof SafeFetchError ? error.message : 'L’adresse est invalide.'
+  if (isHttpKind(kind)) {
+    try {
+      validateTargetUrl(config.url)
+    } catch (error) {
+      return error instanceof SafeFetchError ? error.message : 'L’adresse est invalide.'
+    }
   }
   return validateKindConfig(kind, config)
 }
@@ -167,6 +178,9 @@ function describeChanges(before: ConnectorConfig, after: ConnectorConfig) {
   if (differs(before.auth, after.auth)) sections.push('Authentification')
   if (differs(before.http, after.http) || differs(before.retry, after.retry)) sections.push('Requête HTTP')
   if (differs(before.web, after.web) || differs(before.api, after.api) || before.dedupe !== after.dedupe) sections.push('Extraction')
+  if (differs(before.imap, after.imap)) sections.push('Messagerie')
+  if (differs(before.webhook, after.webhook)) sections.push('Webhook')
+  if (differs(before.m365, after.m365)) sections.push('Microsoft 365')
   return sections
 }
 
@@ -278,7 +292,7 @@ export async function createConnector(input: unknown): Promise<{ ok: true; messa
   const id = randomUUID()
   try {
     await db.transaction(async (tx) => {
-      await tx.insert(connectors).values({ id, organizationId: organization.id, name, description: description || null, kind, status: 'draft', config, createdByUserId: actor.id })
+      await tx.insert(connectors).values({ id, organizationId: organization.id, name, description: description || null, logoUrl: parsed.data.logoUrl || null, kind, status: 'draft', config, createdByUserId: actor.id })
       await tx.insert(auditEvents).values(audit(actor.id, 'connector.created', id, { name, kind }))
     })
   } catch (error) {
@@ -308,7 +322,8 @@ export async function updateConnector(input: unknown): Promise<{ ok: true; messa
   const sections = describeChanges(previous, config)
   const technicalChanged = sections.length > 0
   const description = parsed.data.description || null
-  const infoChanged = row.name !== parsed.data.name || (row.description ?? null) !== description
+  const logoUrl = parsed.data.logoUrl || null
+  const infoChanged = row.name !== parsed.data.name || (row.description ?? null) !== description || (row.logoUrl ?? null) !== logoUrl
   if (!technicalChanged && !infoChanged) return { ok: true, message: 'Aucune modification à enregistrer.' }
 
   const mustPause = technicalChanged && row.status === 'active'
@@ -319,6 +334,7 @@ export async function updateConnector(input: unknown): Promise<{ ok: true; messa
         .set({
           name: parsed.data.name,
           description,
+          logoUrl,
           config,
           status: mustPause ? 'paused' : row.status,
           version: sql`${connectors.version} + 1`,
@@ -343,20 +359,60 @@ export async function updateConnector(input: unknown): Promise<{ ok: true; messa
   return { ok: true, message: technicalChanged ? 'Configuration enregistrée. Relancez un test pour valider les changements.' : 'Connecteur mis à jour.' }
 }
 
+async function downloadFavicon(host: string): Promise<string | null> {
+  const endpoint = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128`
+  try {
+    const response = await fetch(endpoint, { signal: AbortSignal.timeout(8000), redirect: 'follow' })
+    if (!response.ok) return null
+    const type = (response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase()
+    if (!['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(type)) return null
+    const buffer = Buffer.from(await response.arrayBuffer())
+    if (buffer.length === 0 || buffer.length > MAX_LOGO_BYTES) return null
+    return `data:${type};base64,${buffer.toString('base64')}`
+  } catch {
+    return null
+  }
+}
+
+export async function fetchSiteLogo(input: unknown): Promise<{ ok: true; logoUrl: string; host: string } | Failure> {
+  await requirePermission('connectors.manage')
+  const parsed = z.object({ url: z.string().trim().min(1).max(2000) }).safeParse(input)
+  if (!parsed.success) return fail('Renseignez d’abord l’adresse du connecteur.')
+  let host: string
+  try {
+    host = validateTargetUrl(parsed.data.url).hostname
+  } catch {
+    return fail('Renseignez d’abord une adresse valide dans la section Source.')
+  }
+  const labels = host.split('.')
+  const candidates = labels.length > 2 ? [host, labels.slice(-2).join('.')] : [host]
+  for (const candidate of candidates) {
+    const logoUrl = await downloadFavicon(candidate)
+    if (logoUrl) return { ok: true, logoUrl, host: candidate }
+  }
+  return fail('Aucun logo n’a pu être récupéré pour ce site. Importez une image à la place.')
+}
+
 async function enforceTestRateLimit(actorId: string) {
   return isRateLimited({ actorUserId: actorId, actions: ['connector.tested'], windowMs: TEST_WINDOW_MS, max: TEST_MAX_PER_WINDOW })
 }
 
 const RATE_MESSAGE = `Trop de tests en peu de temps (${TEST_MAX_PER_WINDOW} par 10 minutes). Patientez un instant.`
 
-function missingConnectionOutcome(): TestOutcome {
+const MISSING_CONNECTION_HINT: Partial<Record<ConnectorKind, string>> = {
+  imap: 'Ajoutez une connexion (adresse de la boîte et mot de passe d’application) dans « Connexions », puis choisissez-la pour tester.',
+  webhook: 'Ajoutez une connexion contenant le secret partagé de l’expéditeur dans « Connexions », puis choisissez-la pour tester.',
+  m365: 'Ajoutez une connexion contenant le secret client de l’application Entra ID dans « Connexions », puis choisissez-la pour tester.',
+}
+
+function missingConnectionOutcome(kind: ConnectorKind): TestOutcome {
   return {
     status: 'error',
     message: 'Aucune connexion utilisable pour ce connecteur.',
     httpStatus: null,
     durationMs: 0,
     itemsFound: null,
-    checks: [{ id: 'url', label: 'Identifiants', status: 'error', detail: 'Ajoutez une connexion (clé API, jeton, mot de passe) dans « Connexions », puis choisissez-la pour tester.' }],
+    checks: [{ id: 'url', label: 'Identifiants', status: 'error', detail: MISSING_CONNECTION_HINT[kind] ?? 'Ajoutez une connexion (clé API, jeton, mot de passe) dans « Connexions », puis choisissez-la pour tester.' }],
     sample: [],
   }
 }
@@ -376,8 +432,8 @@ export async function testConnectorDraft(input: unknown): Promise<{ ok: true; ou
   const credential = requiresCredential ? await resolveCredential(actor.id, parsed.data.id, parsed.data.connectionId) : null
 
   const targetId = parsed.data.id ?? 'brouillon'
-  const outcome = requiresCredential && !credential ? missingConnectionOutcome() : await runConnectorTest(kind, config, credential?.secret ?? null, credential?.username ?? '')
-  await db.insert(auditEvents).values(audit(actor.id, 'connector.tested', targetId, { status: outcome.status, draft: true, host: hostOf(config.url) }))
+  const outcome = requiresCredential && !credential ? missingConnectionOutcome(kind) : await runConnectorTest(kind, config, credential?.secret ?? null, credential?.username ?? '', { connectorId: parsed.data.id })
+  await db.insert(auditEvents).values(audit(actor.id, 'connector.tested', targetId, { status: outcome.status, draft: true, host: hostOf(kind, config) }))
   return { ok: true, outcome }
 }
 
@@ -395,7 +451,7 @@ export async function testConnector(input: unknown): Promise<{ ok: true; outcome
   const credential = requiresCredential ? await resolveCredential(actor.id, row.id, parsed.data.connectionId) : null
 
   const outcome: TestOutcome =
-    requiresCredential && !credential ? missingConnectionOutcome() : await runConnectorTest(kind, config, credential?.secret ?? null, credential?.username ?? '')
+    requiresCredential && !credential ? missingConnectionOutcome(kind) : await runConnectorTest(kind, config, credential?.secret ?? null, credential?.username ?? '', { connectorId: row.id })
 
   await db.transaction(async (tx) => {
     await tx.insert(connectorRuns).values({
@@ -419,7 +475,7 @@ export async function testConnector(input: unknown): Promise<{ ok: true; outcome
         lastLatencyMs: outcome.httpStatus ? outcome.durationMs : null,
       })
       .where(and(eq(connectors.id, row.id), eq(connectors.version, row.version)))
-    await tx.insert(auditEvents).values(audit(actor.id, 'connector.tested', row.id, { status: outcome.status, draft: false, host: hostOf(config.url) }))
+    await tx.insert(auditEvents).values(audit(actor.id, 'connector.tested', row.id, { status: outcome.status, draft: false, host: hostOf(kind, config) }))
     await tx.execute(sql`delete from connector_runs where "connectorId" = ${row.id} and id not in (select id from connector_runs where "connectorId" = ${row.id} order by "createdAt" desc limit 100)`)
   })
 
@@ -471,7 +527,7 @@ export async function duplicateConnector(input: unknown): Promise<{ ok: true; me
 
   const id = randomUUID()
   await db.transaction(async (tx) => {
-    await tx.insert(connectors).values({ id, organizationId: row.organizationId, name: name.slice(0, 80), description: row.description, kind: row.kind, status: 'draft', config: row.config, createdByUserId: actor.id })
+    await tx.insert(connectors).values({ id, organizationId: row.organizationId, name: name.slice(0, 80), description: row.description, logoUrl: row.logoUrl, kind: row.kind, status: 'draft', config: row.config, createdByUserId: actor.id })
     await tx.insert(auditEvents).values(audit(actor.id, 'connector.duplicated', id, { name, source: row.name }))
   })
   revalidateConnectors()

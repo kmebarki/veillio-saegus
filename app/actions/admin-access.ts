@@ -42,7 +42,7 @@ const admissionDecisionSchema = z.object({
 })
 
 const statusSchema = z.object({ userId: z.string().min(1).max(255), status: z.enum(['active', 'suspended']) })
-const roleSchema = z.object({ userId: z.string().min(1).max(255), role: z.enum(['admin', 'pilot', 'contributor', 'reader']) })
+const roleSchema = z.object({ userId: z.string().min(1).max(255), role: z.enum(['super_admin', 'admin', 'pilot', 'contributor', 'reader']) })
 const teamAssignmentSchema = z.object({ userId: z.string().min(1).max(255), teamId: z.string().uuid().nullable() })
 const userIdSchema = z.object({ userId: z.string().min(1).max(255) })
 const invitationIdSchema = z.object({ id: z.string().uuid() })
@@ -84,6 +84,15 @@ async function isLastActiveAdmin(target: { id: string; role: string }) {
     .select({ total: count() })
     .from(users)
     .where(and(inArray(users.role, ['super_admin', 'admin']), eq(users.status, 'active'), ne(users.id, target.id)))
+  return (others?.total ?? 0) === 0
+}
+
+async function isLastActiveSuperAdmin(target: { id: string; role: string }) {
+  if (target.role !== 'super_admin') return false
+  const [others] = await db
+    .select({ total: count() })
+    .from(users)
+    .where(and(eq(users.role, 'super_admin'), eq(users.status, 'active'), ne(users.id, target.id)))
   return (others?.total ?? 0) === 0
 }
 
@@ -374,7 +383,7 @@ export async function decideAdmission(input: unknown) {
 
 async function loadManageableTarget(actor: { id: string; role: string }, userId: string) {
   if (userId === actor.id) return { error: 'Vous ne pouvez pas modifier votre propre compte.' as const }
-  const [target] = await db.select({ id: users.id, role: users.role, email: users.email }).from(users).where(eq(users.id, userId)).limit(1)
+  const [target] = await db.select({ id: users.id, role: users.role, email: users.email, status: users.status }).from(users).where(eq(users.id, userId)).limit(1)
   if (!target) return { error: 'Utilisateur introuvable.' as const }
   if (!canManageTarget(actor.role, target.role)) return { error: 'Vous n’avez pas le droit de modifier cet utilisateur.' as const }
   return { target }
@@ -388,6 +397,7 @@ export async function updateUserStatus(input: unknown) {
   if (loaded.error !== undefined) return { ok: false as const, message: loaded.error }
 
   if (parsed.data.status === 'suspended' && (await isLastActiveAdmin(loaded.target))) return { ok: false as const, message: 'Impossible de suspendre le dernier administrateur actif.' }
+  if (parsed.data.status === 'suspended' && (await isLastActiveSuperAdmin(loaded.target))) return { ok: false as const, message: 'Impossible de suspendre le dernier super administrateur actif.' }
 
   await db.update(users).set({ status: parsed.data.status, updatedAt: new Date() }).where(eq(users.id, parsed.data.userId))
   if (parsed.data.status === 'suspended') await db.delete(sessions).where(eq(sessions.userId, parsed.data.userId))
@@ -404,7 +414,9 @@ export async function changeUserRole(input: unknown) {
   const loaded = await loadManageableTarget(actor, parsed.data.userId)
   if (loaded.error !== undefined) return { ok: false as const, message: loaded.error }
 
+  if (parsed.data.role === 'super_admin' && loaded.target.status !== 'active') return { ok: false as const, message: 'Seul un compte actif peut devenir super administrateur.' }
   if (!isAdminRole(parsed.data.role) && (await isLastActiveAdmin(loaded.target))) return { ok: false as const, message: 'Impossible de retirer le rôle du dernier administrateur actif.' }
+  if (parsed.data.role !== 'super_admin' && (await isLastActiveSuperAdmin(loaded.target))) return { ok: false as const, message: 'Impossible de retirer le rôle du dernier super administrateur actif.' }
 
   await db.update(users).set({ role: parsed.data.role, updatedAt: new Date() }).where(eq(users.id, parsed.data.userId))
   await db.insert(auditEvents).values({ actorUserId: actor.id, action: 'user.role_changed', targetType: 'user', targetId: parsed.data.userId, metadata: { from: loaded.target.role, to: parsed.data.role } })

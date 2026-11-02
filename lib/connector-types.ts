@@ -10,6 +10,7 @@ export type ConnectorSummary = {
   id: string
   name: string
   description: string
+  logoUrl: string
   kind: ConnectorKind
   status: ConnectorStatus
   health: ConnectorHealth

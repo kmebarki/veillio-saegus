@@ -1,7 +1,14 @@
 import { z } from 'zod'
 
-export const CONNECTOR_KINDS = ['rss', 'web', 'api'] as const
+export const CONNECTOR_KINDS = ['rss', 'web', 'api', 'imap', 'webhook', 'm365'] as const
 export type ConnectorKind = (typeof CONNECTOR_KINDS)[number]
+
+export const HTTP_KINDS = ['rss', 'web', 'api'] as const
+export type HttpKind = (typeof HTTP_KINDS)[number]
+
+export function isHttpKind(kind: ConnectorKind): kind is HttpKind {
+  return (HTTP_KINDS as readonly string[]).includes(kind)
+}
 
 export const CONNECTOR_STATUSES = ['draft', 'active', 'paused'] as const
 export type ConnectorStatus = (typeof CONNECTOR_STATUSES)[number]
@@ -13,7 +20,7 @@ export type ConnectorKindInfo = {
   label: string
   tagline: string
   description: string
-  accent: 'violet' | 'sky' | 'amber'
+  accent: 'violet' | 'sky' | 'amber' | 'emerald' | 'rose' | 'blue'
   strengths: string[]
   requires: string
 }
@@ -46,14 +53,36 @@ export const CONNECTOR_CATALOG: ConnectorKindInfo[] = [
     strengths: ['Clé API, Bearer, Basic', 'Pagination page, offset, curseur', 'Mapping de champs par chemin'],
     requires: 'URL, chemin des éléments et champs',
   },
+  {
+    kind: 'imap',
+    label: 'Messagerie (IMAP)',
+    tagline: 'Newsletters et alertes e-mail',
+    description: 'Lit une boîte aux lettres en lecture seule (IMAP) et transforme chaque e-mail filtré en contenu de veille.',
+    accent: 'emerald',
+    strengths: ['Connexion chiffrée TLS / STARTTLS', 'Filtres expéditeur, objet, ancienneté', 'Lecture seule : aucun e-mail modifié'],
+    requires: 'Serveur IMAP, dossier et identifiants',
+  },
+  {
+    kind: 'webhook',
+    label: 'Webhook entrant',
+    tagline: 'Réception poussée signée',
+    description: 'Expose une adresse sécurisée qui reçoit des événements poussés par un service tiers, vérifiés par signature.',
+    accent: 'rose',
+    strengths: ['Signature HMAC-SHA256 ou jeton Bearer', 'Anti-rejeu et dédoublonnage', 'Journal des événements reçus'],
+    requires: 'Secret partagé et mapping du payload',
+  },
+  {
+    kind: 'm365',
+    label: 'Microsoft 365',
+    tagline: 'SharePoint et OneDrive',
+    description: 'Lit des listes SharePoint, des bibliothèques de documents ou un OneDrive via Microsoft Graph.',
+    accent: 'blue',
+    strengths: ['Application Entra ID (sans mot de passe utilisateur)', 'Listes, bibliothèques, OneDrive', 'Clouds Global, US Gov, Chine'],
+    requires: 'Tenant, ID d’application, secret client',
+  },
 ]
 
-export const COMING_SOON_KINDS = [
-  { label: 'Messagerie (IMAP)', tagline: 'Newsletters et alertes e-mail' },
-  { label: 'Webhook entrant', tagline: 'Réception poussée signée' },
-  { label: 'Microsoft 365', tagline: 'SharePoint et OneDrive' },
-  { label: 'Slack / Teams', tagline: 'Canaux de partage' },
-]
+export const COMING_SOON_KINDS = [{ label: 'Slack / Teams', tagline: 'Canaux de partage' }]
 
 export function getKindInfo(kind: string) {
   return CONNECTOR_CATALOG.find((item) => item.kind === kind)
@@ -63,7 +92,7 @@ export function isConnectorKind(value: string): value is ConnectorKind {
   return (CONNECTOR_KINDS as readonly string[]).includes(value)
 }
 
-export const AUTH_TYPES = ['none', 'basic', 'bearer', 'api_key_header', 'api_key_query'] as const
+export const AUTH_TYPES = ['none', 'basic', 'bearer', 'api_key_header', 'api_key_query', 'webhook_hmac', 'oauth_client'] as const
 export type AuthType = (typeof AUTH_TYPES)[number]
 
 export const AUTH_LABELS: Record<AuthType, { label: string; hint: string }> = {
@@ -72,6 +101,21 @@ export const AUTH_LABELS: Record<AuthType, { label: string; hint: string }> = {
   bearer: { label: 'Jeton Bearer', hint: 'En-tête Authorization: Bearer …' },
   api_key_header: { label: 'Clé API dans un en-tête', hint: 'Ex. X-API-Key: …' },
   api_key_query: { label: 'Clé API dans l’URL', hint: 'Ex. ?api_key=… (moins sûr : visible dans les journaux du fournisseur)' },
+  webhook_hmac: { label: 'Signature HMAC-SHA256', hint: 'L’expéditeur signe chaque requête avec le secret partagé.' },
+  oauth_client: { label: 'Application Entra ID', hint: 'Secret client OAuth 2.0 (client credentials).' },
+}
+
+export const KIND_AUTH_TYPES: Record<ConnectorKind, readonly AuthType[]> = {
+  rss: ['none', 'basic', 'bearer', 'api_key_header', 'api_key_query'],
+  web: ['none', 'basic', 'bearer', 'api_key_header', 'api_key_query'],
+  api: ['none', 'basic', 'bearer', 'api_key_header', 'api_key_query'],
+  imap: ['basic'],
+  webhook: ['webhook_hmac', 'bearer'],
+  m365: ['oauth_client'],
+}
+
+export function defaultAuthType(kind: ConnectorKind): AuthType {
+  return KIND_AUTH_TYPES[kind][0]
 }
 
 export const DEDUPE_OPTIONS = [
@@ -108,9 +152,71 @@ export type ApiEndpoint = {
   pagination: ApiPagination
 }
 
+export const IMAP_SECURITY = ['tls', 'starttls'] as const
+export const IMAP_PORTS = [143, 993] as const
+export const M365_CLOUDS = ['global', 'usgov', 'china'] as const
+export const M365_SOURCES = ['sharepoint_list', 'sharepoint_library', 'onedrive'] as const
+
+export const M365_CLOUD_INFO: Record<(typeof M365_CLOUDS)[number], { label: string; login: string; graph: string; sharepointSuffix: string }> = {
+  global: { label: 'Microsoft 365 (mondial)', login: 'login.microsoftonline.com', graph: 'graph.microsoft.com', sharepointSuffix: '.sharepoint.com' },
+  usgov: { label: 'Microsoft 365 US Government', login: 'login.microsoftonline.us', graph: 'graph.microsoft.us', sharepointSuffix: '.sharepoint.us' },
+  china: { label: 'Microsoft 365 opéré par 21Vianet', login: 'login.chinacloudapi.cn', graph: 'microsoftgraph.chinacloudapi.cn', sharepointSuffix: '.sharepoint.cn' },
+}
+
+export const M365_SOURCE_LABELS: Record<(typeof M365_SOURCES)[number], { label: string; hint: string }> = {
+  sharepoint_list: { label: 'Liste SharePoint', hint: 'Chaque ligne de la liste devient un contenu.' },
+  sharepoint_library: { label: 'Bibliothèque de documents', hint: 'Chaque fichier d’une bibliothèque devient un contenu.' },
+  onedrive: { label: 'OneDrive d’un utilisateur', hint: 'Chaque fichier d’un dossier OneDrive devient un contenu.' },
+}
+
+export type ImapConfig = {
+  host: string
+  port: number
+  security: (typeof IMAP_SECURITY)[number]
+  folder: string
+  sinceDays: number
+  unreadOnly: boolean
+  fromFilter: string
+  subjectFilter: string
+  linkMode: 'sender' | 'first_link'
+}
+
+export type WebhookConfig = {
+  signatureHeader: string
+  timestampHeader: string
+  toleranceSec: number
+  idHeader: string
+  itemsPath: string
+  titlePath: string
+  linkPath: string
+  datePath: string
+  summaryPath: string
+  maxPayloadKb: number
+  rateLimitPerMin: number
+}
+
+export type M365Config = {
+  cloud: (typeof M365_CLOUDS)[number]
+  tenantId: string
+  clientId: string
+  source: (typeof M365_SOURCES)[number]
+  siteUrl: string
+  listName: string
+  libraryName: string
+  userPrincipal: string
+  folderPath: string
+  fileExtensions: string
+  titleField: string
+  summaryField: string
+  dateField: string
+}
+
 export type ConnectorConfig = {
   url: string
   auth: { type: AuthType; keyName: string }
+  imap: ImapConfig
+  webhook: WebhookConfig
+  m365: M365Config
   http: { timeoutSec: number; userAgent: string; headers: KeyValue[]; followRedirects: boolean; maxItems: number }
   retry: { maxAttempts: number; backoffSec: number }
   dedupe: 'link' | 'guid' | 'title'
@@ -130,13 +236,48 @@ export type ConnectorConfig = {
   }
 }
 
+export const DEFAULT_IMAP: ImapConfig = { host: '', port: 993, security: 'tls', folder: 'INBOX', sinceDays: 14, unreadOnly: false, fromFilter: '', subjectFilter: '', linkMode: 'first_link' }
+
+export const DEFAULT_WEBHOOK: WebhookConfig = {
+  signatureHeader: 'X-Veillio-Signature',
+  timestampHeader: 'X-Veillio-Timestamp',
+  toleranceSec: 300,
+  idHeader: 'X-Event-Id',
+  itemsPath: '',
+  titlePath: 'title',
+  linkPath: 'url',
+  datePath: 'published_at',
+  summaryPath: 'summary',
+  maxPayloadKb: 256,
+  rateLimitPerMin: 120,
+}
+
+export const DEFAULT_M365: M365Config = {
+  cloud: 'global',
+  tenantId: '',
+  clientId: '',
+  source: 'sharepoint_library',
+  siteUrl: '',
+  listName: '',
+  libraryName: 'Documents',
+  userPrincipal: '',
+  folderPath: '',
+  fileExtensions: '',
+  titleField: 'Title',
+  summaryField: '',
+  dateField: '',
+}
+
 export function defaultConfig(kind: ConnectorKind): ConnectorConfig {
   return {
     url: '',
-    auth: { type: 'none', keyName: kind === 'api' ? 'X-API-Key' : '' },
-    http: { timeoutSec: 15, userAgent: DEFAULT_USER_AGENT, headers: [], followRedirects: true, maxItems: 100 },
+    auth: { type: defaultAuthType(kind), keyName: kind === 'api' ? 'X-API-Key' : '' },
+    imap: { ...DEFAULT_IMAP },
+    webhook: { ...DEFAULT_WEBHOOK },
+    m365: { ...DEFAULT_M365 },
+    http: { timeoutSec: kind === 'imap' || kind === 'm365' ? 20 : 15, userAgent: DEFAULT_USER_AGENT, headers: [], followRedirects: true, maxItems: 100 },
     retry: { maxAttempts: 3, backoffSec: 30 },
-    dedupe: kind === 'rss' ? 'guid' : 'link',
+    dedupe: kind === 'rss' || kind === 'imap' || kind === 'webhook' || kind === 'm365' ? 'guid' : 'link',
     web: { itemSelector: 'article', titleSelector: 'h2 a', linkSelector: 'h2 a', dateSelector: 'time', summarySelector: 'p' },
     api: {
       method: 'GET',
@@ -191,12 +332,57 @@ const endpointSchema = z.object({
   pagination: paginationSchema,
 })
 
+const imapSchema = z.object({
+  host: z.string().trim().toLowerCase().max(253, 'Nom de serveur trop long.'),
+  port: z.number().int().refine((port) => (IMAP_PORTS as readonly number[]).includes(port), 'Ports autorisés : 993 (TLS) ou 143 (STARTTLS).'),
+  security: z.enum(IMAP_SECURITY),
+  folder: z.string().trim().min(1, 'Le dossier est obligatoire.').max(200, 'Nom de dossier trop long.'),
+  sinceDays: z.number().int().min(1, 'Au moins 1 jour.').max(365, '365 jours maximum.'),
+  unreadOnly: z.boolean(),
+  fromFilter: z.string().trim().max(200, 'Filtre expéditeur trop long.'),
+  subjectFilter: z.string().trim().max(200, 'Filtre objet trop long.'),
+  linkMode: z.enum(['sender', 'first_link']),
+})
+
+const webhookSchema = z.object({
+  signatureHeader: z.string().trim().max(64),
+  timestampHeader: z.string().trim().max(64),
+  toleranceSec: z.number().int().min(30, 'Tolérance minimale : 30 s.').max(3600, 'Tolérance maximale : 1 h.'),
+  idHeader: z.string().trim().max(64),
+  itemsPath: path,
+  titlePath: path,
+  linkPath: path,
+  datePath: path,
+  summaryPath: path,
+  maxPayloadKb: z.number().int().min(1, '1 Ko minimum.').max(1024, '1024 Ko maximum.'),
+  rateLimitPerMin: z.number().int().min(1, '1 requête par minute minimum.').max(6000, '6000 requêtes par minute maximum.'),
+})
+
+const m365Schema = z.object({
+  cloud: z.enum(M365_CLOUDS),
+  tenantId: z.string().trim().max(253),
+  clientId: z.string().trim().max(64),
+  source: z.enum(M365_SOURCES),
+  siteUrl: z.string().trim().max(500),
+  listName: z.string().trim().max(200),
+  libraryName: z.string().trim().max(200),
+  userPrincipal: z.string().trim().max(254),
+  folderPath: z.string().trim().max(400),
+  fileExtensions: z.string().trim().max(120),
+  titleField: z.string().trim().max(80),
+  summaryField: z.string().trim().max(80),
+  dateField: z.string().trim().max(80),
+})
+
 export const configSchema = z.object({
-  url: z.string().trim().min(1, 'L’URL est obligatoire.').max(2000, 'URL trop longue (2000 caractères maximum).'),
+  url: z.string().trim().max(2000, 'URL trop longue (2000 caractères maximum).').default(''),
   auth: z.object({
     type: z.enum(AUTH_TYPES),
     keyName: z.string().trim().max(64),
   }),
+  imap: imapSchema.default(() => ({ ...DEFAULT_IMAP })),
+  webhook: webhookSchema.default(() => ({ ...DEFAULT_WEBHOOK })),
+  m365: m365Schema.default(() => ({ ...DEFAULT_M365 })),
   http: z.object({
     timeoutSec: z.number().int().min(2, 'Délai minimum : 2 s.').max(30, 'Délai maximum : 30 s.'),
     userAgent: z.string().trim().min(3, 'User-Agent trop court.').max(200, 'User-Agent trop long.').regex(/^[\x20-\x7e]+$/, 'User-Agent : caractères ASCII uniquement.'),
@@ -233,7 +419,65 @@ export const configSchema = z.object({
 
 export type ValidationIssue = string
 
+const HOSTNAME = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/
+const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const HEADER_NAME = /^[A-Za-z0-9-]{1,64}$/
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+function validateImap(config: ConnectorConfig): ValidationIssue | null {
+  const { imap } = config
+  if (!imap.host) return 'Indiquez le serveur IMAP (ex. imap.exemple.fr).'
+  if (!HOSTNAME.test(imap.host)) return 'Le serveur IMAP doit être un nom de domaine complet (ex. imap.exemple.fr), pas une adresse IP ni un nom interne.'
+  if (imap.security === 'tls' && imap.port !== 993) return 'Le mode TLS implicite utilise le port 993.'
+  if (imap.security === 'starttls' && imap.port !== 143) return 'Le mode STARTTLS utilise le port 143.'
+  if (/[\u0000-\u001f]/.test(imap.folder)) return 'Le nom du dossier contient un caractère invalide.'
+  return null
+}
+
+function validateWebhook(config: ConnectorConfig): ValidationIssue | null {
+  const { webhook } = config
+  if (config.auth.type === 'webhook_hmac') {
+    if (!webhook.signatureHeader) return 'Indiquez l’en-tête qui porte la signature.'
+    if (!HEADER_NAME.test(webhook.signatureHeader)) return 'Nom d’en-tête de signature invalide.'
+    if (webhook.timestampHeader && !HEADER_NAME.test(webhook.timestampHeader)) return 'Nom d’en-tête d’horodatage invalide.'
+  }
+  if (webhook.idHeader && !HEADER_NAME.test(webhook.idHeader)) return 'Nom d’en-tête d’identifiant d’événement invalide.'
+  if (!webhook.titlePath) return 'Le chemin du titre est obligatoire.'
+  return null
+}
+
+function validateM365(config: ConnectorConfig): ValidationIssue | null {
+  const { m365 } = config
+  const tenant = m365.tenantId
+  if (!tenant) return 'Indiquez l’identifiant du tenant (GUID ou domaine, ex. contoso.onmicrosoft.com).'
+  if (!GUID.test(tenant) && !HOSTNAME.test(tenant.toLowerCase())) return 'Le tenant doit être un GUID ou un nom de domaine (ex. contoso.onmicrosoft.com).'
+  if (!m365.clientId) return 'Indiquez l’ID d’application (client).'
+  if (!GUID.test(m365.clientId)) return 'L’ID d’application doit être un GUID (ex. 3f2a9c1e-….).'
+  if (m365.source === 'onedrive') {
+    if (!m365.userPrincipal) return 'Indiquez l’adresse (UPN) de l’utilisateur dont le OneDrive est lu.'
+    if (!EMAIL.test(m365.userPrincipal)) return 'L’UPN doit ressembler à prenom.nom@entreprise.com.'
+  } else {
+    if (!m365.siteUrl) return 'Indiquez l’adresse du site SharePoint.'
+    let site: URL
+    try {
+      site = new URL(m365.siteUrl)
+    } catch {
+      return 'L’adresse du site n’est pas une URL valide (ex. https://contoso.sharepoint.com/sites/veille).'
+    }
+    const suffix = M365_CLOUD_INFO[m365.cloud].sharepointSuffix
+    if (site.protocol !== 'https:' || !site.hostname.toLowerCase().endsWith(suffix)) return `L’adresse du site doit être en HTTPS et se terminer par « ${suffix} ».`
+    if (m365.source === 'sharepoint_list' && !m365.listName) return 'Indiquez le nom de la liste SharePoint.'
+  }
+  if (/[\u0000-\u001f<>:"|?*\\]/.test(m365.folderPath)) return 'Le chemin du dossier contient un caractère interdit.'
+  return null
+}
+
 export function validateKindConfig(kind: ConnectorKind, config: ConnectorConfig): ValidationIssue | null {
+  if (!KIND_AUTH_TYPES[kind].includes(config.auth.type)) return `Ce type d’authentification n’est pas disponible pour un connecteur « ${getKindInfo(kind)?.label ?? kind} ».`
+  if (isHttpKind(kind) && !config.url) return 'L’URL est obligatoire.'
+  if (kind === 'imap') return validateImap(config)
+  if (kind === 'webhook') return validateWebhook(config)
+  if (kind === 'm365') return validateM365(config)
   if ((config.auth.type === 'api_key_header' || config.auth.type === 'api_key_query') && !config.auth.keyName) return 'Indiquez le nom de l’en-tête ou du paramètre qui porte la clé.'
   if (kind === 'web') {
     if (!config.web.itemSelector) return 'Le sélecteur des éléments est obligatoire.'
@@ -264,5 +508,28 @@ export function needsSecret(type: AuthType) {
 }
 
 export function secretLabel(type: AuthType) {
-  return type === 'basic' ? 'Mot de passe' : type === 'bearer' ? 'Jeton' : 'Clé API'
+  if (type === 'basic') return 'Mot de passe'
+  if (type === 'bearer') return 'Jeton'
+  if (type === 'webhook_hmac') return 'Secret de signature'
+  if (type === 'oauth_client') return 'Secret client'
+  return 'Clé API'
+}
+
+export function hostOfUrl(url: string) {
+  try {
+    return new URL(url.trim()).hostname
+  } catch {
+    return ''
+  }
+}
+
+/** Cible lisible d’un connecteur : hôte HTTP, serveur IMAP, site SharePoint, etc. */
+export function describeTarget(kind: ConnectorKind, config: ConnectorConfig) {
+  if (kind === 'imap') return config.imap.host
+  if (kind === 'webhook') return 'webhook entrant'
+  if (kind === 'm365') {
+    const info = M365_CLOUD_INFO[config.m365.cloud]
+    return config.m365.source === 'onedrive' ? info.graph : hostOfUrl(config.m365.siteUrl) || info.graph
+  }
+  return hostOfUrl(config.url)
 }

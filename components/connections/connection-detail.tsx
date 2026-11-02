@@ -2,7 +2,7 @@ import { CalendarClock, Pencil, PlugZap, Trash2 } from 'lucide-react'
 
 import { ageLabel, expiryBadge, TONE_CLASSES } from '@/components/connections/helpers'
 import { RequestPreview } from '@/components/connections/request-preview'
-import { HealthDot, KindIcon } from '@/components/connector-ui'
+import { ConnectorLogo, HealthDot } from '@/components/connector-ui'
 import { Button } from '@/components/ui/button'
 import type { ConnectionActivityEntry, ConnectionSummary } from '@/lib/connection-types'
 import { AUTH_LABELS, type AuthType } from '@/lib/connector-catalog'
@@ -34,7 +34,7 @@ export function ConnectionDetail({ connection, activity, busy, onEdit, onTest, o
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className="flex min-w-0 flex-col gap-6">
         <div className="flex items-center gap-3">
-          <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><KindIcon kind={connection.connectorKind} className="size-5" /></span>
+          <ConnectorLogo kind={connection.connectorKind} logoUrl={connection.logoUrl || connection.connectorLogoUrl} className="size-12 rounded-xl" />
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">{connection.connectorName}</p>
             <p className="truncate text-xs text-muted-foreground">{connection.host || connection.connectorUrl}</p>

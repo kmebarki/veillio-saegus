@@ -37,7 +37,7 @@ export function ConnectionsModule({ overview }: { overview: ConnectionsOverview 
   const [toast, setToast] = useState<string | null>(null)
 
   const detail = connections.find((item) => item.id === detailId) ?? null
-  const uncovered = viewer.canManage ? connectors.filter((item) => item.sharedCount === 0) : []
+  const uncovered = viewer.canManage ? connectors.filter((item) => item.requiresAuth && item.sharedCount === 0) : []
 
   const counts = useMemo(() => ({ all: connections.length, organization: stats.shared, user: stats.personal, attention: stats.attention }), [connections.length, stats])
   const visible = useMemo(() => {
@@ -88,7 +88,7 @@ export function ConnectionsModule({ overview }: { overview: ConnectionsOverview 
     { id: 'user', label: 'Personnelles' },
     { id: 'attention', label: 'À surveiller' },
   ]
-  const canCreate = connectors.length > 0
+  const canCreate = connectors.some((item) => item.requiresAuth)
 
   return (
     <div className="min-h-dvh bg-background">
