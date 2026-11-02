@@ -1,6 +1,7 @@
 import { betterAuth } from 'better-auth'
 
 import { pool } from '@/lib/db'
+import { sendVerificationEmail } from '@/lib/email'
 
 export const auth = betterAuth({
   database: pool,
@@ -15,6 +16,20 @@ export const auth = betterAuth({
     enabled: true,
     autoSignIn: true,
     minPasswordLength: 12,
+  },
+  emailVerification: {
+    sendOnSignUp: true,
+    autoSignInAfterVerification: true,
+    sendVerificationEmail: async ({ user, url }) => {
+      const invitation = await pool.query(
+        `SELECT 1 FROM "invitations" WHERE lower("email") = lower($1) AND "status" = 'Pending' AND "expiresAt" > now() LIMIT 1`,
+        [user.email],
+      )
+      if (invitation.rowCount && invitation.rowCount > 0) return
+      void sendVerificationEmail({ email: user.email, name: user.name, url }).catch((error: unknown) => {
+        console.error('Verification email delivery failed', error instanceof Error ? error.message : error)
+      })
+    },
   },
   user: {
     additionalFields: {

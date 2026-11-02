@@ -8,6 +8,8 @@ export const users = pgTable('user', {
   image: text('image'),
   role: text('role').notNull().default('reader'),
   status: text('status').notNull().default('active'),
+  organizationId: uuid('organizationId'),
+  teamId: uuid('teamId'),
   lastLoginAt: timestamp('lastLoginAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
@@ -55,6 +57,7 @@ export const invitations = pgTable('invitations', {
   name: text('name').notNull(),
   role: text('role').notNull(),
   status: text('status').notNull().default('Pending'),
+  teamId: uuid('teamId'),
   tokenHash: text('tokenHash').notNull().unique(),
   expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
   createdByUserId: text('createdByUserId').notNull(),
@@ -70,10 +73,33 @@ export const admissionRequests = pgTable('admission_requests', {
   message: text('message'),
   requestedRole: text('requestedRole').notNull().default('Reader'),
   status: text('status').notNull().default('Pending'),
+  declaredTeamId: uuid('declaredTeamId'),
+  decisionComment: text('decisionComment'),
   reviewedByUserId: text('reviewedByUserId'),
   reviewedAt: timestamp('reviewedAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const organizations = pgTable('organizations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const teams = pgTable('teams', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organizationId').notNull(),
+  name: text('name').notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const authorizedDomains = pgTable('authorized_domains', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organizationId').notNull(),
+  domain: text('domain').notNull().unique(),
+  autoAdmit: boolean('autoAdmit').notNull().default(true),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 })
 
 export const auditEvents = pgTable('audit_events', {

@@ -23,7 +23,7 @@ export function AuthForm({ mode, invitationToken }: { mode: 'sign-in' | 'sign-up
     setError('')
 
     const result = isSignUp
-      ? await authClient.signUp.email({ name: name.trim(), email: email.trim(), password })
+      ? await authClient.signUp.email({ name: name.trim(), email: email.trim(), password, callbackURL: '/admission' })
       : await authClient.signIn.email({ email: email.trim(), password })
 
     setPending(false)
