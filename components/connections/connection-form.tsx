@@ -28,7 +28,7 @@ const EXPIRY_PRESETS = [
 
 export function ConnectionForm({ target, overview, onClose, onDone }: Props) {
   const editing = target.mode === 'edit' ? target.connection : null
-  const initialConnector = editing?.connectorId ?? (target.mode === 'create' ? target.connectorId : undefined) ?? overview.connectors[0]?.id ?? ''
+  const initialConnector = editing?.connectorId ?? (target.mode === 'create' ? target.connectorId : undefined) ?? overview.connectors.find((item) => item.requiresAuth)?.id ?? ''
 
   const [connectorId, setConnectorId] = useState(initialConnector)
   const [name, setName] = useState(editing?.name ?? '')
@@ -92,23 +92,27 @@ export function ConnectionForm({ target, overview, onClose, onDone }: Props) {
             <div role="radiogroup" aria-label="Connecteur" className="grid max-h-60 gap-2 overflow-y-auto sm:grid-cols-2">
               {overview.connectors.map((item) => {
                 const selected = item.id === connectorId
+                const unavailable = !item.requiresAuth
                 return (
                   <button
                     key={item.id}
                     type="button"
                     role="radio"
                     aria-checked={selected}
+                    disabled={unavailable}
                     onClick={() => {
                       setConnectorId(item.id)
                       setDraft(null)
                     }}
-                    className={cn('relative flex items-start gap-3 rounded-xl border p-3 text-left transition-colors', selected ? 'border-primary bg-primary/5 ring-2 ring-primary/15' : 'bg-card hover:border-foreground/30')}
+                    className={cn('relative flex items-start gap-3 rounded-xl border p-3 text-left transition-colors', unavailable && 'cursor-not-allowed opacity-60', selected ? 'border-primary bg-primary/5 ring-2 ring-primary/15' : 'bg-card hover:border-foreground/30')}
                   >
                     <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><KindIcon kind={item.kind} className="size-4" /></span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold">{item.name}</span>
                       <span className="block truncate text-xs text-muted-foreground">{item.host || 'URL à renseigner'} · {AUTH_LABELS[item.authType as AuthType]?.label.split(' (')[0] ?? 'Clé API'}</span>
-                      <span className="mt-1 block text-[11px] font-medium text-muted-foreground">{item.sharedCount > 0 ? `${item.sharedCount} connexion${item.sharedCount > 1 ? 's' : ''} partagée${item.sharedCount > 1 ? 's' : ''}` : 'Aucune connexion partagée'}</span>
+                      <span className="mt-1 block text-[11px] font-medium text-muted-foreground">
+                        {unavailable ? 'Sans authentification : activez-la dans le connecteur' : item.sharedCount > 0 ? `${item.sharedCount} connexion${item.sharedCount > 1 ? 's' : ''} partagée${item.sharedCount > 1 ? 's' : ''}` : 'Aucune connexion partagée'}
+                      </span>
                     </span>
                     {selected && <Check className="size-4 shrink-0 text-primary" aria-hidden />}
                   </button>

@@ -47,6 +47,7 @@ export type ConnectorChoice = {
   kind: ConnectorKind
   status: ConnectorStatus
   authType: string
+  requiresAuth: boolean
   keyName: string
   host: string
   insecure: boolean

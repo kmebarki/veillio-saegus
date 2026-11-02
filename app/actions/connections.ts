@@ -195,7 +195,6 @@ export async function getConnectionsOverview(): Promise<ConnectionsOverview> {
   const choices = connectorRows.flatMap((row) => {
     const kind = kindOf(row)
     const config = readConfig(kind, row.config)
-    if (!needsSecret(config.auth.type)) return []
     return [
       {
         id: row.id,
@@ -203,6 +202,7 @@ export async function getConnectionsOverview(): Promise<ConnectionsOverview> {
         kind,
         status: (['draft', 'active', 'paused'].includes(row.status) ? row.status : 'draft') as 'draft' | 'active' | 'paused',
         authType: config.auth.type,
+        requiresAuth: needsSecret(config.auth.type),
         keyName: config.auth.keyName,
         host: hostOf(config.url),
         insecure: config.url.trim().toLowerCase().startsWith('http://'),
