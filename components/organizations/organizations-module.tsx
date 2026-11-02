@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
-import { Bell, Building2, ChevronLeft, ChevronRight, CircleHelp, Globe2, Menu, Pencil, Plus, Search, Settings, SlidersHorizontal, Trash2, Users, Workflow, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, Bell, Building2, ChevronLeft, ChevronRight, CircleHelp, Globe2, Menu, Pencil, Plus, Search, Settings, SlidersHorizontal, Trash2, Users, Workflow, X } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
@@ -18,6 +18,24 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import type { OrganizationListItem, OrganizationsOverview } from '@/lib/organization-types'
 
 const typeLabels: Record<string, string> = { client: 'Client', internal: 'Interne', partner: 'Partenaire' }
+const statusSortOrder = { active: 0, to_configure: 1, suspended: 2 } as const
+
+type OrganizationSortKey = 'name' | 'status' | 'responsible'
+type SortDirection = 'asc' | 'desc'
+
+function SortableTableHead({ label, sortKey, activeSortKey, direction, onSort }: { label: string; sortKey: OrganizationSortKey; activeSortKey: OrganizationSortKey; direction: SortDirection; onSort: (key: OrganizationSortKey) => void }) {
+  const isActive = sortKey === activeSortKey
+  const SortIcon = isActive ? (direction === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown
+
+  return (
+    <TableHead aria-sort={isActive ? (direction === 'asc' ? 'ascending' : 'descending') : 'none'}>
+      <button type="button" className="group/sort inline-flex items-center gap-1.5 font-medium text-muted-foreground transition-colors hover:text-foreground" onClick={() => onSort(sortKey)}>
+        {label}
+        <SortIcon className="size-3.5 opacity-60 transition-opacity group-hover/sort:opacity-100" aria-hidden="true" />
+      </button>
+    </TableHead>
+  )
+}
 
 function OrganizationInspector({ organization, canManage, onClose, onDelete }: { organization: OrganizationListItem; canManage: boolean; onClose: () => void; onDelete: () => void }) {
   const details = [
@@ -88,6 +106,7 @@ export function OrganizationsModule({ overview }: { overview: OrganizationsOverv
   const [status, setStatus] = useState('all')
   const [type, setType] = useState('all')
   const [country, setCountry] = useState('all')
+  const [sort, setSort] = useState<{ key: OrganizationSortKey; direction: SortDirection }>({ key: 'name', direction: 'asc' })
   const [page, setPage] = useState(1)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<OrganizationListItem | null>(null)
@@ -98,12 +117,27 @@ export function OrganizationsModule({ overview }: { overview: OrganizationsOverv
   const countries = useMemo(() => [...new Set(overview.organizations.map((item) => item.country))].sort(), [overview.organizations])
   const visibleOrganizations = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase('fr')
-    return overview.organizations.filter((organization) => {
-      const effectiveStatus = organization.status === 'suspended' ? 'suspended' : organization.setupStatus
-      const matchesQuery = !normalizedQuery || [organization.name, organization.internalReference, organization.primaryDomain, organization.addressLine1, organization.postalCode, organization.city, organization.country].some((value) => value?.toLocaleLowerCase('fr').includes(normalizedQuery))
+    const getEffectiveStatus = (organization: OrganizationListItem): keyof typeof statusSortOrder => organization.status === 'suspended' ? 'suspended' : organization.setupStatus
+    const filteredOrganizations = overview.organizations.filter((organization) => {
+      const effectiveStatus = getEffectiveStatus(organization)
+      const matchesQuery = !normalizedQuery || [organization.name, organization.internalReference, organization.primaryDomain, organization.responsibleName, organization.addressLine1, organization.postalCode, organization.city, organization.country].some((value) => value?.toLocaleLowerCase('fr').includes(normalizedQuery))
       return matchesQuery && (status === 'all' || status === effectiveStatus) && (type === 'all' || type === organization.type) && (country === 'all' || country === organization.country)
     })
-  }, [country, overview.organizations, query, status, type])
+
+    return [...filteredOrganizations].sort((first, second) => {
+      if (sort.key === 'responsible') {
+        if (!first.responsibleName && !second.responsibleName) return 0
+        if (!first.responsibleName) return 1
+        if (!second.responsibleName) return -1
+      }
+
+      const comparison = sort.key === 'status'
+        ? statusSortOrder[getEffectiveStatus(first)] - statusSortOrder[getEffectiveStatus(second)]
+        : (sort.key === 'responsible' ? first.responsibleName ?? '' : first.name).localeCompare(sort.key === 'responsible' ? second.responsibleName ?? '' : second.name, 'fr', { sensitivity: 'base' })
+
+      return sort.direction === 'asc' ? comparison : -comparison
+    })
+  }, [country, overview.organizations, query, sort, status, type])
 
   const activeCount = overview.organizations.filter((item) => item.status === 'active' && item.setupStatus === 'active').length
   const setupCount = overview.organizations.filter((item) => item.status === 'active' && item.setupStatus === 'to_configure').length
@@ -112,6 +146,11 @@ export function OrganizationsModule({ overview }: { overview: OrganizationsOverv
   const currentPage = Math.min(page, totalPages)
   const paginatedOrganizations = visibleOrganizations.slice((currentPage - 1) * pageSize, currentPage * pageSize)
   const selected = overview.organizations.find((item) => item.id === selectedId) ?? null
+
+  function handleSort(key: OrganizationSortKey) {
+    setSort((current) => current.key === key ? { key, direction: current.direction === 'asc' ? 'desc' : 'asc' } : { key, direction: 'asc' })
+    setPage(1)
+  }
 
   function confirmDelete() {
     if (!deleteTarget) return
@@ -155,7 +194,7 @@ export function OrganizationsModule({ overview }: { overview: OrganizationsOverv
 
             <section className="rounded-2xl border bg-card">
               <div className="flex flex-col gap-3 border-b p-4 xl:flex-row xl:items-center">
-                <label className="relative flex-1"><span className="sr-only">Rechercher une organisation</span><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1) }} className="h-10 rounded-xl pl-9" placeholder="Rechercher par nom, domaine ou référence" /></label>
+                <label className="relative flex-1"><span className="sr-only">Rechercher une organisation</span><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1) }} className="h-10 rounded-xl pl-9" placeholder="Rechercher par nom, domaine, référence ou responsable" /></label>
                 <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><SlidersHorizontal className="size-4" /><span className="hidden sm:inline">Filtres</span></div>
                 <Select items={[{ value: 'all', label: 'Tous les statuts' }, { value: 'active', label: 'Actives' }, { value: 'to_configure', label: 'À configurer' }, { value: 'suspended', label: 'Suspendues' }]} value={status} onValueChange={(value) => { setStatus(value ?? 'all'); setPage(1) }}><SelectTrigger className="h-10 w-full rounded-xl xl:w-44"><SelectValue placeholder="Tous les statuts" /></SelectTrigger><SelectContent><SelectItem value="all">Tous les statuts</SelectItem><SelectItem value="active">Actives</SelectItem><SelectItem value="to_configure">À configurer</SelectItem><SelectItem value="suspended">Suspendues</SelectItem></SelectContent></Select>
                 <Select items={[{ value: 'all', label: 'Tous les types' }, { value: 'client', label: 'Clients' }, { value: 'internal', label: 'Internes' }, { value: 'partner', label: 'Partenaires' }]} value={type} onValueChange={(value) => { setType(value ?? 'all'); setPage(1) }}><SelectTrigger className="h-10 w-full rounded-xl xl:w-40"><SelectValue placeholder="Tous les types" /></SelectTrigger><SelectContent><SelectItem value="all">Tous les types</SelectItem><SelectItem value="client">Clients</SelectItem><SelectItem value="internal">Internes</SelectItem><SelectItem value="partner">Partenaires</SelectItem></SelectContent></Select>
@@ -164,7 +203,7 @@ export function OrganizationsModule({ overview }: { overview: OrganizationsOverv
 
               {visibleOrganizations.length > 0 ? (
                 <Table>
-                  <TableHeader><TableRow><TableHead>Organisation</TableHead><TableHead>Statut</TableHead><TableHead>Responsable</TableHead><TableHead className="text-center">Utilisateurs</TableHead><TableHead className="text-center">Équipes</TableHead><TableHead className="text-center">Veilles</TableHead><TableHead><span className="sr-only">Ouvrir</span></TableHead></TableRow></TableHeader>
+                  <TableHeader><TableRow><SortableTableHead label="Organisation" sortKey="name" activeSortKey={sort.key} direction={sort.direction} onSort={handleSort} /><SortableTableHead label="Statut" sortKey="status" activeSortKey={sort.key} direction={sort.direction} onSort={handleSort} /><SortableTableHead label="Responsable" sortKey="responsible" activeSortKey={sort.key} direction={sort.direction} onSort={handleSort} /><TableHead className="text-center">Utilisateurs</TableHead><TableHead className="text-center">Équipes</TableHead><TableHead className="text-center">Veilles</TableHead><TableHead><span className="sr-only">Ouvrir</span></TableHead></TableRow></TableHeader>
                   <TableBody>{paginatedOrganizations.map((organization) => (
                     <TableRow key={organization.id} className="group">
                       <TableCell><button type="button" className="flex items-center gap-3 text-left" onClick={() => setSelectedId(organization.id)}>{organization.logoPathname ? <img src={`/api/organization-logos?pathname=${encodeURIComponent(organization.logoPathname)}`} alt="" className="size-9 shrink-0 rounded-lg border bg-card object-contain p-1" /> : <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><Building2 className="size-4" /></span>}<span><strong className="block font-medium text-foreground group-hover:text-primary">{organization.name}</strong><span className="mt-1 block text-xs text-muted-foreground">{organization.primaryDomain ?? organization.internalReference ?? 'Sans domaine'}</span></span></button></TableCell>
