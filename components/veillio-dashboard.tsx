@@ -153,7 +153,7 @@ export function Sidebar({ open, onClose, activeItem = 'Tableau de bord' }: { ope
             <ChevronDown className={cn('size-4 text-muted-foreground transition-transform', !expanded && '-rotate-90')} />
           </button>
         ) : (
-          <Link href={'href' in item ? item.href : '#'} className={itemClassName} onClick={onClose} aria-current={activeItem === item.label ? 'page' : undefined}>
+          <Link href={('href' in item && item.href) ? item.href : '#'} className={itemClassName} onClick={onClose} aria-current={activeItem === item.label ? 'page' : undefined}>
             <Icon className="size-[18px] shrink-0" />
             <span className="flex-1">{item.label}</span>
           </Link>
