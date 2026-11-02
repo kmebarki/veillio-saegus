@@ -1,7 +1,8 @@
 import { betterAuth } from 'better-auth'
+import { APIError } from 'better-auth/api'
 
 import { pool } from '@/lib/db'
-import { sendVerificationEmail } from '@/lib/email'
+import { sendPasswordResetEmail, sendVerificationEmail } from '@/lib/email'
 
 export const auth = betterAuth({
   database: pool,
@@ -16,6 +17,26 @@ export const auth = betterAuth({
     enabled: true,
     autoSignIn: true,
     minPasswordLength: 12,
+    resetPasswordTokenExpiresIn: 60 * 60,
+    revokeSessionsOnPasswordReset: true,
+    sendResetPassword: async ({ user, url }) => {
+      void sendPasswordResetEmail({ email: user.email, name: user.name, url }).catch((error: unknown) => {
+        console.error('Password reset email delivery failed', error instanceof Error ? error.message : error)
+      })
+    },
+  },
+  rateLimit: {
+    enabled: true,
+    storage: 'database',
+    window: 60,
+    max: 60,
+    customRules: {
+      '/sign-in/email': { window: 60, max: 5 },
+      '/sign-up/email': { window: 3600, max: 10 },
+      '/request-password-reset': { window: 3600, max: 5 },
+      '/reset-password': { window: 600, max: 10 },
+      '/send-verification-email': { window: 3600, max: 5 },
+    },
   },
   emailVerification: {
     sendOnSignUp: true,
@@ -54,6 +75,12 @@ export const auth = betterAuth({
     },
     session: {
       create: {
+        before: async (session) => {
+          const result = await pool.query('SELECT "status" FROM "user" WHERE "id" = $1', [session.userId])
+          if (result.rows[0]?.status === 'suspended') {
+            throw new APIError('FORBIDDEN', { message: 'ACCOUNT_SUSPENDED' })
+          }
+        },
         after: async (session) => {
           await pool.query('UPDATE "user" SET "lastLoginAt" = now() WHERE "id" = $1', [session.userId])
         },

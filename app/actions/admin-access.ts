@@ -2,7 +2,7 @@
 
 import { createHash, randomBytes } from 'node:crypto'
 
-import { and, count, desc, eq, gt, inArray } from 'drizzle-orm'
+import { and, count, desc, eq, gt, inArray, ne } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
@@ -11,6 +11,7 @@ import { getCurrentIdentity, getDefaultOrganization, requireAdmin, requireManage
 import { db } from '@/lib/db'
 import { admissionRequests, auditEvents, authorizedDomains, invitations, organizations, sessions, teams, users } from '@/lib/db/schema'
 import { sendAdmissionDecisionEmail, sendInvitationEmail } from '@/lib/email'
+import { isRateLimited } from '@/lib/rate-limit'
 import { ROLE_LABELS, canManageTarget, getAssignableRoles, isAdminRole, isRoleKey, type RoleKey } from '@/lib/roles'
 
 const INVITATION_VALIDITY_MS = 7 * 24 * 60 * 60 * 1000
@@ -62,6 +63,18 @@ function getInvitationStatus(status: string, expiresAt: Date) {
   if (status === 'Accepted') return 'Acceptée'
   if (status === 'Cancelled') return 'Annulée'
   return expiresAt.getTime() <= Date.now() ? 'Expirée' : 'En attente'
+}
+
+const INVITATION_RATE_LIMIT = { actions: ['invitation.sent', 'invitation.resent'], windowMs: 60 * 60 * 1000, max: 30 }
+const RATE_LIMIT_MESSAGE = 'Trop d’invitations envoyées récemment. Réessayez dans une heure.'
+
+async function isLastActiveAdmin(target: { id: string; role: string }) {
+  if (!isAdminRole(target.role)) return false
+  const [others] = await db
+    .select({ total: count() })
+    .from(users)
+    .where(and(inArray(users.role, ['super_admin', 'admin']), eq(users.status, 'active'), ne(users.id, target.id)))
+  return (others?.total ?? 0) === 0
 }
 
 async function teamExists(teamId: string) {
@@ -164,6 +177,7 @@ export async function createInvitation(input: unknown) {
     return { ok: false as const, message: 'Vous ne pouvez pas inviter avec ce rôle.' }
   }
   if (parsed.data.teamId && !(await teamExists(parsed.data.teamId))) return { ok: false as const, message: 'Équipe introuvable.' }
+  if (await isRateLimited({ actorUserId: actor.id, ...INVITATION_RATE_LIMIT })) return { ok: false as const, message: RATE_LIMIT_MESSAGE }
 
   const existingUser = await db.select({ id: users.id }).from(users).where(eq(users.email, parsed.data.email)).limit(1)
   if (existingUser.length > 0) return { ok: false as const, message: 'Cet utilisateur possède déjà un compte.' }
@@ -204,6 +218,7 @@ export async function resendInvitation(input: unknown) {
   const actor = await requireAdmin()
   const parsed = invitationIdSchema.safeParse(input)
   if (!parsed.success) return { ok: false as const, message: 'Invitation invalide.' }
+  if (await isRateLimited({ actorUserId: actor.id, ...INVITATION_RATE_LIMIT })) return { ok: false as const, message: RATE_LIMIT_MESSAGE }
 
   const [invitation] = await db.select().from(invitations).where(eq(invitations.id, parsed.data.id)).limit(1)
   if (!invitation || invitation.status !== 'Pending') return { ok: false as const, message: 'Cette invitation ne peut plus être renvoyée.' }
@@ -289,6 +304,8 @@ export async function decideAdmission(input: unknown) {
   const [admission] = await db.select().from(admissionRequests).where(and(eq(admissionRequests.id, parsed.data.id), eq(admissionRequests.status, 'Pending'))).limit(1)
   if (!admission) return { ok: false as const, message: 'Cette demande a déjà été traitée.' }
 
+  if (admission.email.toLowerCase() === actor.email.toLowerCase()) return { ok: false as const, message: 'Vous ne pouvez pas traiter votre propre demande.' }
+
   const canAdminister = isAdminRole(actor.role)
   if (!canAdminister && (!actor.teamId || admission.declaredTeamId !== actor.teamId)) return { ok: false as const, message: 'Cette demande ne relève pas de votre équipe.' }
 
@@ -311,13 +328,14 @@ export async function decideAdmission(input: unknown) {
     if (!updated) return false
 
     if (decision === 'Approved') {
-      await tx.update(users).set({
+      const [approvedUser] = await tx.update(users).set({
         role: finalRole,
         status: 'active',
         organizationId: actor.organizationId ?? defaultOrganization?.id ?? null,
         teamId: finalTeamId ?? null,
         updatedAt: new Date(),
-      }).where(eq(users.email, admission.email))
+      }).where(and(eq(users.email, admission.email), ne(users.role, 'super_admin'), ne(users.role, 'admin'))).returning({ id: users.id })
+      if (!approvedUser) return false
     }
 
     await tx.insert(auditEvents).values({
@@ -359,6 +377,8 @@ export async function updateUserStatus(input: unknown) {
   const loaded = await loadManageableTarget(actor, parsed.data.userId)
   if (loaded.error !== undefined) return { ok: false as const, message: loaded.error }
 
+  if (parsed.data.status === 'suspended' && (await isLastActiveAdmin(loaded.target))) return { ok: false as const, message: 'Impossible de suspendre le dernier administrateur actif.' }
+
   await db.update(users).set({ status: parsed.data.status, updatedAt: new Date() }).where(eq(users.id, parsed.data.userId))
   if (parsed.data.status === 'suspended') await db.delete(sessions).where(eq(sessions.userId, parsed.data.userId))
   await db.insert(auditEvents).values({ actorUserId: actor.id, action: `user.${parsed.data.status}`, targetType: 'user', targetId: parsed.data.userId })
@@ -373,6 +393,8 @@ export async function changeUserRole(input: unknown) {
   if (!getAssignableRoles(actor.role).includes(parsed.data.role)) return { ok: false as const, message: 'Vous ne pouvez pas attribuer ce rôle.' }
   const loaded = await loadManageableTarget(actor, parsed.data.userId)
   if (loaded.error !== undefined) return { ok: false as const, message: loaded.error }
+
+  if (!isAdminRole(parsed.data.role) && (await isLastActiveAdmin(loaded.target))) return { ok: false as const, message: 'Impossible de retirer le rôle du dernier administrateur actif.' }
 
   await db.update(users).set({ role: parsed.data.role, updatedAt: new Date() }).where(eq(users.id, parsed.data.userId))
   await db.insert(auditEvents).values({ actorUserId: actor.id, action: 'user.role_changed', targetType: 'user', targetId: parsed.data.userId, metadata: { from: loaded.target.role, to: parsed.data.role } })

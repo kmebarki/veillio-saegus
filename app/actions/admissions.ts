@@ -1,12 +1,14 @@
 'use server'
 
-import { and, desc, eq } from 'drizzle-orm'
+import { and, desc, eq, inArray, or } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 
 import { getCurrentIdentity, getDefaultOrganization } from '@/lib/authorization'
 import { db } from '@/lib/db'
-import { admissionRequests, auditEvents, teams } from '@/lib/db/schema'
+import { admissionRequests, auditEvents, teams, users } from '@/lib/db/schema'
+import { sendAdmissionRequestNotification } from '@/lib/email'
+import { isRateLimited, isUniqueViolation } from '@/lib/rate-limit'
 
 const admissionSchema = z.object({
   teamId: z.string().uuid(),
@@ -43,7 +45,7 @@ export async function createAdmissionRequest(input: unknown) {
   const parsed = admissionSchema.safeParse(input)
   if (!parsed.success) return { ok: false as const, message: 'Choisissez une équipe et vérifiez les informations saisies.' }
 
-  const [team] = await db.select({ id: teams.id }).from(teams).where(eq(teams.id, parsed.data.teamId)).limit(1)
+  const [team] = await db.select({ id: teams.id, name: teams.name }).from(teams).where(eq(teams.id, parsed.data.teamId)).limit(1)
   if (!team) return { ok: false as const, message: 'Équipe introuvable.' }
 
   const existing = await db
@@ -53,16 +55,45 @@ export async function createAdmissionRequest(input: unknown) {
     .limit(1)
   if (existing.length > 0) return { ok: false as const, message: 'Votre demande est déjà en cours de traitement.' }
 
+  if (await isRateLimited({ actorUserId: identity.id, actions: ['admission.requested'], windowMs: 24 * 60 * 60 * 1000, max: 5 })) {
+    return { ok: false as const, message: 'Trop de demandes envoyées aujourd’hui. Réessayez demain.' }
+  }
+
   const organization = await getDefaultOrganization()
-  const [request] = await db.insert(admissionRequests).values({
-    email: identity.email,
-    name: identity.name,
-    organization: organization?.name ?? null,
-    declaredTeamId: parsed.data.teamId,
-    requestedRole: parsed.data.requestedRole,
-    message: parsed.data.message,
-  }).returning({ id: admissionRequests.id })
+  let request: { id: string }
+  try {
+    ;[request] = await db.insert(admissionRequests).values({
+      email: identity.email,
+      name: identity.name,
+      organization: organization?.name ?? null,
+      declaredTeamId: parsed.data.teamId,
+      requestedRole: parsed.data.requestedRole,
+      message: parsed.data.message,
+    }).returning({ id: admissionRequests.id })
+  } catch (error) {
+    if (isUniqueViolation(error)) return { ok: false as const, message: 'Votre demande est déjà en cours de traitement.' }
+    throw error
+  }
 
   await db.insert(auditEvents).values({ actorUserId: identity.id, action: 'admission.requested', targetType: 'admission_request', targetId: request.id, metadata: { teamId: parsed.data.teamId } })
+
+  try {
+    const recipients = await db
+      .select({ email: users.email, name: users.name })
+      .from(users)
+      .where(and(eq(users.status, 'active'), or(inArray(users.role, ['super_admin', 'admin']), and(eq(users.role, 'pilot'), eq(users.teamId, parsed.data.teamId)))))
+    if (recipients.length > 0) {
+      await sendAdmissionRequestNotification({
+        recipients,
+        applicantName: identity.name,
+        applicantEmail: identity.email,
+        teamName: team.name,
+        message: parsed.data.message,
+      })
+    }
+  } catch (error) {
+    console.error('Admission notification failed', error)
+  }
+
   return { ok: true as const, message: 'Votre demande a été transmise au responsable de l’équipe et aux administrateurs.' }
 }
