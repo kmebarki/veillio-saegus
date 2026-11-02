@@ -1,19 +1,18 @@
 'use client'
 
-import { Check, Globe, Pencil, Plus, Trash2, Users, X } from 'lucide-react'
+import { ArrowRight, Globe, Plus, Trash2, Users } from 'lucide-react'
+import Link from 'next/link'
 import { useState } from 'react'
 
 import { renameOrganization } from '@/app/actions/admin-access'
-import { addAuthorizedDomain, createTeam, deleteTeam, removeAuthorizedDomain, renameTeam, setDomainAutoAdmit } from '@/app/actions/organization'
-import { Button } from '@/components/ui/button'
+import { addAuthorizedDomain, removeAuthorizedDomain, setDomainAutoAdmit } from '@/app/actions/organization'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { fieldClass } from '@/components/ui/modal'
 import type { ActionResult, AdminOrganization } from '@/lib/admin-types'
+import { cn } from '@/lib/utils'
 
 export function OrganizationPanel({ organization, busy, run }: { organization: AdminOrganization; busy: boolean; run: (action: () => Promise<ActionResult>) => void }) {
   const [orgName, setOrgName] = useState(organization.name)
-  const [teamName, setTeamName] = useState('')
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editingName, setEditingName] = useState('')
   const [domain, setDomain] = useState('')
   const [autoAdmit, setAutoAdmit] = useState(true)
 
@@ -27,29 +26,11 @@ export function OrganizationPanel({ organization, busy, run }: { organization: A
       </section>
 
       <section className="flex flex-col gap-4">
-        <div><h2 className="flex items-center gap-2 text-base font-semibold"><Users className="size-4 text-primary" />Équipes</h2><p className="mt-1 text-sm text-muted-foreground">Les utilisateurs choisissent leur équipe lors d’une demande d’admission.</p></div>
-        <form className="flex gap-2" onSubmit={(event) => { event.preventDefault(); run(() => createTeam({ name: teamName })); setTeamName('') }}>
-          <label className="flex-1"><span className="sr-only">Nom de la nouvelle équipe</span><input required minLength={2} maxLength={80} value={teamName} onChange={(event) => setTeamName(event.target.value)} placeholder="Nouvelle équipe" className={fieldClass} /></label>
-          <Button type="submit" disabled={busy}><Plus data-icon="inline-start" />Ajouter</Button>
-        </form>
-        <ul className="divide-y rounded-xl border">
-          {organization.teams.length === 0 && <li className="px-4 py-8 text-center text-sm text-muted-foreground">Aucune équipe. Créez-en une pour accepter des demandes d’admission.</li>}
-          {organization.teams.map((team) => (
-            <li key={team.id} className="flex items-center gap-3 px-4 py-3">
-              {editingId === team.id ? (
-                <form className="flex flex-1 gap-2" onSubmit={(event) => { event.preventDefault(); run(() => renameTeam({ id: team.id, name: editingName })); setEditingId(null) }}>
-                  <input required minLength={2} maxLength={80} autoFocus aria-label="Nom de l’équipe" value={editingName} onChange={(event) => setEditingName(event.target.value)} className="h-9 flex-1 rounded-lg border bg-background px-3 text-sm outline-none focus:border-ring" />
-                  <Button type="submit" size="icon" aria-label="Valider"><Check /></Button>
-                  <Button type="button" size="icon" variant="ghost" aria-label="Annuler" onClick={() => setEditingId(null)}><X /></Button>
-                </form>
-              ) : <>
-                <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{team.name}</p><p className="text-xs text-muted-foreground">{team.memberCount} membre{team.memberCount > 1 ? 's' : ''}</p></div>
-                <Button variant="ghost" size="icon" aria-label={`Renommer ${team.name}`} onClick={() => { setEditingId(team.id); setEditingName(team.name) }}><Pencil /></Button>
-                <Button variant="ghost" size="icon" aria-label={`Supprimer ${team.name}`} disabled={busy} onClick={() => run(() => deleteTeam({ id: team.id }))}><Trash2 /></Button>
-              </>}
-            </li>
-          ))}
-        </ul>
+        <div><h2 className="flex items-center gap-2 text-base font-semibold"><Users className="size-4 text-primary" />Équipes</h2><p className="mt-1 text-sm text-muted-foreground">Les utilisateurs choisissent leur équipe lors d’une demande d’admission. La gestion complète des équipes (membres, responsables, archivage) se fait dans le module dédié.</p></div>
+        <div className="rounded-xl border p-4">
+          <p className="text-sm"><strong className="text-2xl font-semibold tracking-[-0.03em]">{organization.teams.length}</strong> <span className="text-muted-foreground">équipe{organization.teams.length > 1 ? 's' : ''} active{organization.teams.length > 1 ? 's' : ''}</span></p>
+          <Link href="/admin/teams" className={cn(buttonVariants({ variant: 'outline' }), 'mt-4')}>Gérer les équipes<ArrowRight data-icon="inline-end" /></Link>
+        </div>
       </section>
 
       <section className="flex flex-col gap-4">

@@ -78,7 +78,7 @@ async function isLastActiveAdmin(target: { id: string; role: string }) {
 }
 
 async function teamExists(teamId: string) {
-  const [team] = await db.select({ id: teams.id }).from(teams).where(eq(teams.id, teamId)).limit(1)
+  const [team] = await db.select({ id: teams.id }).from(teams).where(and(eq(teams.id, teamId), eq(teams.status, 'active'))).limit(1)
   return Boolean(team)
 }
 
@@ -161,7 +161,7 @@ export async function getAdminAccessData() {
     ? {
         id: organization.id,
         name: organization.name,
-        teams: teamRows.map((team) => ({ id: team.id, name: team.name, memberCount: counts.get(team.id) ?? 0 })),
+        teams: teamRows.filter((team) => team.status === 'active').map((team) => ({ id: team.id, name: team.name, memberCount: counts.get(team.id) ?? 0 })),
         domains: domainRows.map((domain) => ({ id: domain.id, domain: domain.domain, autoAdmit: domain.autoAdmit })),
       }
     : null
@@ -410,8 +410,12 @@ export async function changeUserTeam(input: unknown) {
   const loaded = await loadManageableTarget(actor, parsed.data.userId)
   if (loaded.error !== undefined) return { ok: false as const, message: loaded.error }
 
-  await db.update(users).set({ teamId: parsed.data.teamId, updatedAt: new Date() }).where(eq(users.id, parsed.data.userId))
-  await db.insert(auditEvents).values({ actorUserId: actor.id, action: 'user.team_changed', targetType: 'user', targetId: parsed.data.userId, metadata: { teamId: parsed.data.teamId } })
+  await db.transaction(async (tx) => {
+    await tx.update(users).set({ teamId: parsed.data.teamId, updatedAt: new Date() }).where(eq(users.id, parsed.data.userId))
+    await tx.update(teams).set({ leadUserId: null, updatedAt: new Date() }).where(and(eq(teams.leadUserId, parsed.data.userId), parsed.data.teamId ? ne(teams.id, parsed.data.teamId) : undefined))
+    await tx.insert(auditEvents).values({ actorUserId: actor.id, action: 'user.team_changed', targetType: 'user', targetId: parsed.data.userId, metadata: { teamId: parsed.data.teamId } })
+  })
+  revalidatePath('/admin/teams')
   revalidatePath('/admin/users')
   return { ok: true as const, message: 'Équipe mise à jour.' }
 }

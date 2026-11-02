@@ -102,7 +102,12 @@ export const teams = pgTable('teams', {
   id: uuid('id').primaryKey().defaultRandom(),
   organizationId: uuid('organizationId').notNull(),
   name: text('name').notNull(),
+  description: text('description'),
+  status: text('status').notNull().default('active'),
+  leadUserId: text('leadUserId'),
+  archivedAt: timestamp('archivedAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
 
 export const authorizedDomains = pgTable('authorized_domains', {

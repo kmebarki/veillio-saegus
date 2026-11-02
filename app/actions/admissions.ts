@@ -19,7 +19,7 @@ const admissionSchema = z.object({
 export async function getAdmissionContext(email: string) {
   const [organization, teamRows, [latest]] = await Promise.all([
     getDefaultOrganization(),
-    db.select({ id: teams.id, name: teams.name }).from(teams).orderBy(teams.name),
+    db.select({ id: teams.id, name: teams.name }).from(teams).where(eq(teams.status, 'active')).orderBy(teams.name),
     db
       .select({ status: admissionRequests.status, decisionComment: admissionRequests.decisionComment })
       .from(admissionRequests)
@@ -45,7 +45,7 @@ export async function createAdmissionRequest(input: unknown) {
   const parsed = admissionSchema.safeParse(input)
   if (!parsed.success) return { ok: false as const, message: 'Choisissez une équipe et vérifiez les informations saisies.' }
 
-  const [team] = await db.select({ id: teams.id, name: teams.name }).from(teams).where(eq(teams.id, parsed.data.teamId)).limit(1)
+  const [team] = await db.select({ id: teams.id, name: teams.name }).from(teams).where(and(eq(teams.id, parsed.data.teamId), eq(teams.status, 'active'))).limit(1)
   if (!team) return { ok: false as const, message: 'Équipe introuvable.' }
 
   const existing = await db
