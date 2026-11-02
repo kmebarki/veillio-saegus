@@ -1,5 +1,6 @@
 'use client'
 
+import { SaegusLogo } from '@/components/saegus-logo'
 import {
   Bell,
   BrainCircuit,
@@ -33,7 +34,9 @@ import Link from 'next/link'
 import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
+import { UserMenu } from '@/components/user-menu'
 import { cn } from '@/lib/utils'
+import { useViewer, type ViewerInfo } from '@/lib/use-viewer'
 
 const workspaceItems = [
   { label: 'Tableau de bord', icon: LayoutDashboard, href: '/' },
@@ -60,10 +63,12 @@ const steeringItems = [
   { label: 'Diffusion', icon: Send, href: '#' },
 ]
 
-const administrationItems = [
-  { label: 'Utilisateurs et admissions', icon: UserRoundCheck, href: '/admin/users' },
-  { label: 'Équipes', icon: Workflow, href: '#' },
-  { label: 'Groupes et permissions', icon: ShieldCheck, href: '#' },
+const childHrefs: Record<string, string> = { Connecteurs: '/admin/connectors', Connexions: '/admin/connections' }
+
+const administrationItems: { label: string; icon: typeof Settings; href: string; access?: keyof ViewerInfo['access'] }[] = [
+  { label: 'Utilisateurs et admissions', icon: UserRoundCheck, href: '/admin/users', access: 'users' },
+  { label: 'Équipes', icon: Workflow, href: '/admin/teams', access: 'teams' },
+  { label: 'Groupes et permissions', icon: ShieldCheck, href: '/admin/groups', access: 'groups' },
   { label: 'Paramètres', icon: Settings, href: '#' },
 ]
 
@@ -108,18 +113,17 @@ const publications = [
 
 function Brand() {
   return (
-    <div className="flex h-16 items-center gap-3 px-5">
-      <div className="brand-mark" aria-hidden="true"><span /></div>
-      <div>
-        <p className="text-[17px] font-semibold tracking-[-0.03em]">Veillio</p>
-        <p className="text-[10px] font-medium text-muted-foreground">Intelligence de veille</p>
-      </div>
+    <div className="flex h-16 flex-col justify-center gap-1 px-5">
+      <SaegusLogo priority className="h-6" />
+      <p className="text-[10px] font-medium text-muted-foreground">Veillio · Intelligence de veille</p>
     </div>
   )
 }
 
 export function Sidebar({ open, onClose, activeItem = 'Tableau de bord' }: { open: boolean; onClose: () => void; activeItem?: string }) {
   const [expandedMenus, setExpandedMenus] = useState(() => new Set(['Intégrations', 'Gestion de l’IA']))
+  const { viewer } = useViewer()
+  const visibleAdministrationItems = administrationItems.filter((item) => !item.access || viewer?.access[item.access])
 
   function toggleMenu(label: string) {
     setExpandedMenus((current) => {
@@ -153,18 +157,25 @@ export function Sidebar({ open, onClose, activeItem = 'Tableau de bord' }: { ope
             <ChevronDown className={cn('size-4 text-muted-foreground transition-transform', !expanded && '-rotate-90')} />
           </button>
         ) : (
-          <Link href={'href' in item ? item.href : '#'} className={itemClassName} onClick={onClose} aria-current={activeItem === item.label ? 'page' : undefined}>
+          <Link href={('href' in item && item.href) ? item.href : '#'} className={itemClassName} onClick={onClose} aria-current={activeItem === item.label ? 'page' : undefined}>
             <Icon className="size-[18px] shrink-0" />
             <span className="flex-1">{item.label}</span>
           </Link>
         )}
         {children && expanded && (
           <div className="flex flex-col gap-0.5 py-1 pl-11">
-            {children.map((child) => (
-              <button key={child} onClick={onClose} className="min-h-10 rounded-lg px-3 text-left text-[13px] text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground">
-                {child}
-              </button>
-            ))}
+            {children.map((child) => {
+              const href = childHrefs[child]
+              const childClassName = cn(
+                'flex min-h-10 items-center rounded-lg px-3 text-left text-[13px] transition-colors',
+                activeItem === child ? 'bg-sidebar-primary font-medium text-sidebar-primary-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground',
+              )
+              return href ? (
+                <Link key={child} href={href} onClick={onClose} className={childClassName} aria-current={activeItem === child ? 'page' : undefined}>{child}</Link>
+              ) : (
+                <button key={child} onClick={onClose} className={childClassName}>{child}</button>
+              )
+            })}
           </div>
         )}
       </div>
@@ -190,18 +201,13 @@ export function Sidebar({ open, onClose, activeItem = 'Tableau de bord' }: { ope
             {steeringItems.map((item) => renderMenuItem(item))}
           </section>
 
-          <section className="mt-5 flex flex-col gap-1 border-t pt-5" aria-labelledby="administration-navigation">
-            <h2 id="administration-navigation" className="px-3 pb-1 text-[11px] font-semibold text-muted-foreground">Administration</h2>
-            {administrationItems.map((item) => renderMenuItem(item))}
-          </section>
+          {visibleAdministrationItems.length > 0 && (
+            <section className="mt-5 flex flex-col gap-1 border-t pt-5" aria-labelledby="administration-navigation">
+              <h2 id="administration-navigation" className="px-3 pb-1 text-[11px] font-semibold text-muted-foreground">Administration</h2>
+              {visibleAdministrationItems.map((item) => renderMenuItem(item))}
+            </section>
+          )}
         </nav>
-        <div className="border-t p-3">
-          <button className="flex min-h-14 w-full items-center gap-3 rounded-xl px-2 text-left hover:bg-sidebar-accent">
-            <div className="grid size-9 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">KM</div>
-            <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">Kamel Mebarki</p><p className="truncate text-xs text-muted-foreground">Manager</p></div>
-            <ChevronDown className="size-4 text-muted-foreground" />
-          </button>
-        </div>
       </aside>
     </>
   )
@@ -259,13 +265,14 @@ function AttentionPanel() {
       <p className="mt-2 text-sm leading-5 text-white/60">Des éléments nécessitent votre validation avant diffusion.</p>
       <div className="mt-5 flex flex-col gap-2">
         <button className="flex min-h-14 items-center gap-3 rounded-xl bg-white/8 px-3 text-left hover:bg-white/12"><div className="grid size-8 place-items-center rounded-lg bg-[#F5A623] text-[#0E0A19]"><FileText className="size-4" /></div><div className="flex-1"><p className="text-xs font-semibold">2 publications à valider</p><p className="mt-0.5 text-[11px] text-white/50">Avant demain, 09:00</p></div><ChevronRight className="size-4 text-white/40" /></button>
-        <button className="flex min-h-14 items-center gap-3 rounded-xl bg-white/8 px-3 text-left hover:bg-white/12"><div className="grid size-8 place-items-center rounded-lg bg-[#DDD3FD] text-[#2D1574]"><Users className="size-4" /></div><div className="flex-1"><p className="text-xs font-semibold">1 demande d’admission</p><p className="mt-0.5 text-[11px] text-white/50">Reçue il y a 3 h</p></div><ChevronRight className="size-4 text-white/40" /></button>
+        <button className="flex min-h-14 items-center gap-3 rounded-xl bg-white/8 px-3 text-left hover:bg-white/12"><div className="grid size-8 place-items-center rounded-lg bg-[#DDD3FD] text-[#2D1574]"><Users className="size-4" /></div><div className="flex-1"><p className="text-xs font-semibold">1 demande d’admission</p><p className="mt-0.5 text-[11px] text-white/50">Re��ue il y a 3 h</p></div><ChevronRight className="size-4 text-white/40" /></button>
       </div>
     </aside>
   )
 }
 
 export function VeillioDashboard() {
+  const { viewer } = useViewer()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [query, setQuery] = useState('')
 
@@ -283,13 +290,14 @@ export function VeillioDashboard() {
             <Button variant="ghost" size="icon-lg" aria-label="Aide"><CircleHelp /></Button>
             <Button variant="ghost" size="icon-lg" aria-label="Paramètres"><Settings /></Button>
             <Button variant="ghost" size="icon-lg" aria-label="Notifications" className="relative"><Bell /><span className="absolute right-2 top-2 size-2 rounded-full border-2 border-background bg-[#F5A623]" /></Button>
+            <UserMenu />
           </div>
         </header>
 
         <main className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
           <div className="flex flex-col gap-8">
             <section className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
-              <div><p className="mb-2 text-xs font-medium text-muted-foreground">Mercredi 29 octobre</p><h1 className="text-2xl font-semibold tracking-[-0.04em] sm:text-[30px]">Bonjour Kamel,</h1><p className="mt-2 text-sm text-muted-foreground">Voici l’essentiel de votre activité de veille.</p></div>
+              <div><p className="mb-2 text-xs font-medium text-muted-foreground">Mercredi 29 octobre</p><h1 className="text-2xl font-semibold tracking-[-0.04em] sm:text-[30px]">Bonjour {viewer?.firstName ?? ''},</h1>{viewer && <p className="mt-1 text-xs font-medium text-primary">{viewer.name} · {viewer.roleLabel}</p>}<p className="mt-2 text-sm text-muted-foreground">Voici l’essentiel de votre activité de veille.</p></div>
               <Button size="lg" className="min-h-11 self-start px-4 sm:self-auto"><Plus data-icon="inline-start" />Nouvelle veille</Button>
             </section>
 
