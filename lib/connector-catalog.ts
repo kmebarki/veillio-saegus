@@ -110,7 +110,7 @@ export type ApiEndpoint = {
 
 export type ConnectorConfig = {
   url: string
-  auth: { type: AuthType; keyName: string; username: string }
+  auth: { type: AuthType; keyName: string }
   http: { timeoutSec: number; userAgent: string; headers: KeyValue[]; followRedirects: boolean; maxItems: number }
   retry: { maxAttempts: number; backoffSec: number }
   dedupe: 'link' | 'guid' | 'title'
@@ -133,7 +133,7 @@ export type ConnectorConfig = {
 export function defaultConfig(kind: ConnectorKind): ConnectorConfig {
   return {
     url: '',
-    auth: { type: 'none', keyName: kind === 'api' ? 'X-API-Key' : '', username: '' },
+    auth: { type: 'none', keyName: kind === 'api' ? 'X-API-Key' : '' },
     http: { timeoutSec: 15, userAgent: DEFAULT_USER_AGENT, headers: [], followRedirects: true, maxItems: 100 },
     retry: { maxAttempts: 3, backoffSec: 30 },
     dedupe: kind === 'rss' ? 'guid' : 'link',
@@ -196,7 +196,6 @@ export const configSchema = z.object({
   auth: z.object({
     type: z.enum(AUTH_TYPES),
     keyName: z.string().trim().max(64),
-    username: z.string().trim().max(200),
   }),
   http: z.object({
     timeoutSec: z.number().int().min(2, 'Délai minimum : 2 s.').max(30, 'Délai maximum : 30 s.'),
@@ -235,7 +234,6 @@ export const configSchema = z.object({
 export type ValidationIssue = string
 
 export function validateKindConfig(kind: ConnectorKind, config: ConnectorConfig): ValidationIssue | null {
-  if (config.auth.type === 'basic' && !config.auth.username) return 'L’identifiant est obligatoire pour l’authentification Basic.'
   if ((config.auth.type === 'api_key_header' || config.auth.type === 'api_key_query') && !config.auth.keyName) return 'Indiquez le nom de l’en-tête ou du paramètre qui porte la clé.'
   if (kind === 'web') {
     if (!config.web.itemSelector) return 'Le sélecteur des éléments est obligatoire.'

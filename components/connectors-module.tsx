@@ -52,7 +52,7 @@ function ConnectorCard({ connector, onOpen }: { connector: ConnectorSummary; onO
           <div className="flex items-center justify-between gap-3"><HealthDot connector={connector} /><ChevronRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden /></div>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
             {connector.lastLatencyMs !== null && <span className="flex items-center gap-1.5"><Timer className="size-3.5" aria-hidden />{formatDuration(connector.lastLatencyMs)}</span>}
-            {connector.hasSecret && <span className="flex items-center gap-1.5"><Lock className="size-3.5" aria-hidden />Secret chiffré</span>}
+            {connector.authType !== 'none' && <span className="flex items-center gap-1.5"><Lock className="size-3.5" aria-hidden />{connector.connectionCount > 0 ? `${connector.connectionCount} connexion${connector.connectionCount > 1 ? 's' : ''}` : 'Aucune connexion'}</span>}
           </div>
         </div>
       </button>

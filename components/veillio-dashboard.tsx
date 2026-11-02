@@ -60,7 +60,7 @@ const steeringItems = [
   { label: 'Diffusion', icon: Send, href: '#' },
 ]
 
-const childHrefs: Record<string, string> = { Connecteurs: '/admin/connectors' }
+const childHrefs: Record<string, string> = { Connecteurs: '/admin/connectors', Connexions: '/admin/connections' }
 
 const administrationItems = [
   { label: 'Utilisateurs et admissions', icon: UserRoundCheck, href: '/admin/users' },
@@ -268,7 +268,7 @@ function AttentionPanel() {
       <p className="mt-2 text-sm leading-5 text-white/60">Des éléments nécessitent votre validation avant diffusion.</p>
       <div className="mt-5 flex flex-col gap-2">
         <button className="flex min-h-14 items-center gap-3 rounded-xl bg-white/8 px-3 text-left hover:bg-white/12"><div className="grid size-8 place-items-center rounded-lg bg-[#F5A623] text-[#0E0A19]"><FileText className="size-4" /></div><div className="flex-1"><p className="text-xs font-semibold">2 publications à valider</p><p className="mt-0.5 text-[11px] text-white/50">Avant demain, 09:00</p></div><ChevronRight className="size-4 text-white/40" /></button>
-        <button className="flex min-h-14 items-center gap-3 rounded-xl bg-white/8 px-3 text-left hover:bg-white/12"><div className="grid size-8 place-items-center rounded-lg bg-[#DDD3FD] text-[#2D1574]"><Users className="size-4" /></div><div className="flex-1"><p className="text-xs font-semibold">1 demande d’admission</p><p className="mt-0.5 text-[11px] text-white/50">Reçue il y a 3 h</p></div><ChevronRight className="size-4 text-white/40" /></button>
+        <button className="flex min-h-14 items-center gap-3 rounded-xl bg-white/8 px-3 text-left hover:bg-white/12"><div className="grid size-8 place-items-center rounded-lg bg-[#DDD3FD] text-[#2D1574]"><Users className="size-4" /></div><div className="flex-1"><p className="text-xs font-semibold">1 demande d’admission</p><p className="mt-0.5 text-[11px] text-white/50">Re��ue il y a 3 h</p></div><ChevronRight className="size-4 text-white/40" /></button>
       </div>
     </aside>
   )

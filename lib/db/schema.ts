@@ -178,6 +178,25 @@ export const connectorRuns = pgTable('connector_runs', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 })
 
+export const connections = pgTable('connections', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organizationId').notNull(),
+  connectorId: uuid('connectorId').notNull().references(() => connectors.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  scope: text('scope').notNull().default('organization'),
+  ownerUserId: text('ownerUserId'),
+  username: text('username'),
+  secretCiphertext: text('secretCiphertext'),
+  version: integer('version').notNull().default(1),
+  lastCheckAt: timestamp('lastCheckAt', { withTimezone: true }),
+  lastCheckStatus: text('lastCheckStatus'),
+  lastCheckMessage: text('lastCheckMessage'),
+  lastCheckVersion: integer('lastCheckVersion'),
+  createdByUserId: text('createdByUserId'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
 export const authorizedDomains = pgTable('authorized_domains', {
   id: uuid('id').primaryKey().defaultRandom(),
   organizationId: uuid('organizationId').notNull(),

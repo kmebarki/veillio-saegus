@@ -1,8 +1,9 @@
 'use client'
 
-import { Eye, EyeOff, KeyRound, Lock, Plus, RotateCcw, ShieldCheck, Trash2 } from 'lucide-react'
-import { useId, useState } from 'react'
+import { KeyRound, Plus, ShieldCheck, Trash2 } from 'lucide-react'
+import Link from 'next/link'
 
+import { EndpointsSection } from '@/components/openapi-import'
 import { Button } from '@/components/ui/button'
 import { fieldClass } from '@/components/ui/modal'
 import {
@@ -16,14 +17,12 @@ import {
   type ConnectorKind,
   type KeyValue,
 } from '@/lib/connector-catalog'
-import type { SecretInput } from '@/lib/connector-types'
 import { cn } from '@/lib/utils'
 
 export type ConnectorDraft = {
   name: string
   description: string
   config: ConnectorConfig
-  secret: SecretInput
 }
 
 type Props = {
@@ -31,7 +30,6 @@ type Props = {
   draft: ConnectorDraft
   onChange: (draft: ConnectorDraft) => void
   disabled?: boolean
-  hasStoredSecret: boolean
 }
 
 const PAGINATION_LABELS: Record<(typeof PAGINATION_TYPES)[number], string> = {
@@ -103,45 +101,19 @@ function KeyValueEditor({ label, items, max, namePlaceholder, valuePlaceholder, 
   )
 }
 
-function SecretField({ type, secret, hasStored, disabled, onChange }: { type: ConnectorConfig['auth']['type']; secret: SecretInput; hasStored: boolean; disabled?: boolean; onChange: (secret: SecretInput) => void }) {
-  const [visible, setVisible] = useState(false)
-  const inputId = useId()
-  const label = secretLabel(type)
-
-  if (secret.mode === 'keep' && hasStored) {
-    return (
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-muted/40 px-3 py-2.5">
-        <p className="flex items-center gap-2 text-sm"><Lock className="size-4 text-primary" aria-hidden /><span className="font-medium">{label} enregistré</span><span className="font-mono tracking-widest text-muted-foreground" aria-hidden>••••••••</span></p>
-        <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={() => onChange({ mode: 'set', value: '' })}><RotateCcw data-icon="inline-start" />Remplacer</Button>
-      </div>
-    )
-  }
-
+function CredentialsNotice({ type }: { type: ConnectorConfig['auth']['type'] }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={inputId} className="text-sm font-medium">{label}</label>
-      <div className="relative">
-        <input
-          id={inputId}
-          type={visible ? 'text' : 'password'}
-          autoComplete="new-password"
-          spellCheck={false}
-          disabled={disabled}
-          maxLength={2000}
-          value={secret.value}
-          onChange={(event) => onChange({ mode: 'set', value: event.target.value })}
-          placeholder={hasStored ? 'Nouveau secret' : 'Collez le secret ici'}
-          className={cn(fieldClass, 'pr-12 font-mono text-[13px]')}
-        />
-        <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2" aria-label={visible ? 'Masquer le secret' : 'Afficher le secret'} onClick={() => setVisible((value) => !value)}>{visible ? <EyeOff /> : <Eye />}</Button>
-      </div>
-      <p className="flex items-start gap-1.5 text-xs leading-5 text-muted-foreground"><ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />Chiffré (AES-256-GCM) avant stockage. Il ne sera plus jamais affiché ni renvoyé au navigateur.</p>
-      {hasStored && <div><Button type="button" variant="ghost" size="sm" onClick={() => onChange({ mode: 'keep', value: '' })}>Conserver le secret actuel</Button></div>}
+    <div className="flex items-start gap-2.5 rounded-xl border bg-muted/40 px-3 py-2.5 text-[13px] leading-5 text-muted-foreground">
+      <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+      <p>
+        Le {secretLabel(type).toLowerCase()} {type === 'basic' ? 'et l’identifiant ne se saisissent' : 'ne se saisit'} pas ici : ils se configurent dans{' '}
+        <Link href="/admin/connections" className="font-medium text-primary underline-offset-4 hover:underline">Connexions</Link>, pour l’organisation ou pour un utilisateur.
+      </p>
     </div>
   )
 }
 
-export function ConnectorConfigForm({ kind, draft, onChange, disabled, hasStoredSecret }: Props) {
+export function ConnectorConfigForm({ kind, draft, onChange, disabled }: Props) {
   const { config } = draft
   const set = (patch: Partial<ConnectorDraft>) => onChange({ ...draft, ...patch })
   const setConfig = (patch: Partial<ConnectorConfig>) => set({ config: { ...config, ...patch } })
@@ -159,11 +131,7 @@ export function ConnectorConfigForm({ kind, draft, onChange, disabled, hasStored
   function changeAuthType(type: ConnectorConfig['auth']['type']) {
     const defaultKey = type === 'api_key_query' ? 'api_key' : 'X-API-Key'
     const keyName = type === 'api_key_header' || type === 'api_key_query' ? (config.auth.keyName && config.auth.type === type ? config.auth.keyName : defaultKey) : ''
-    onChange({
-      ...draft,
-      config: { ...config, auth: { type, keyName, username: type === 'basic' ? config.auth.username : '' } },
-      secret: needsSecret(type) ? (hasStoredSecret ? (draft.secret.mode === 'set' ? draft.secret : { mode: 'keep', value: '' }) : { mode: 'set', value: draft.secret.value }) : { mode: 'keep', value: '' },
-    })
+    onChange({ ...draft, config: { ...config, auth: { type, keyName } } })
   }
 
   return (
@@ -176,6 +144,8 @@ export function ConnectorConfigForm({ kind, draft, onChange, disabled, hasStored
           <input maxLength={300} value={draft.description} onChange={(event) => set({ description: event.target.value })} className={fieldClass} placeholder="Ce que ce connecteur alimente, qui en est responsable…" />
         </Field>
       </Section>
+
+      {kind === 'api' && <EndpointsSection config={config} onChange={(next) => onChange({ ...draft, config: next })} disabled={disabled} />}
 
       <Section title="Source" description={kind === 'rss' ? 'Adresse du flux RSS, Atom ou RDF. Le format est détecté automatiquement.' : kind === 'web' ? 'Adresse de la page de listing à analyser.' : 'Point d’accès de l’API qui renvoie du JSON.'}>
         <div className="flex flex-col gap-4">
@@ -203,7 +173,7 @@ export function ConnectorConfigForm({ kind, draft, onChange, disabled, hasStored
         </div>
       </Section>
 
-      <Section title="Authentification" description="Les identifiants sont chiffrés côté serveur et ne sont jamais renvoyés au navigateur.">
+      <Section title="Authentification" description="Définit seulement comment la requête s’authentifie. Les identifiants eux-mêmes sont gérés dans Connexions.">
         <div className="flex flex-col gap-4">
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3" role="radiogroup" aria-label="Type d’authentification">
             {AUTH_TYPES.map((type) => {
@@ -217,15 +187,12 @@ export function ConnectorConfigForm({ kind, draft, onChange, disabled, hasStored
             })}
           </div>
 
-          {authType === 'basic' && (
-            <Field label="Identifiant"><input autoComplete="off" maxLength={200} value={config.auth.username} onChange={(event) => setAuth({ username: event.target.value })} className={fieldClass} /></Field>
-          )}
           {isKeyAuth && (
             <Field label={authType === 'api_key_header' ? 'Nom de l’en-tête' : 'Nom du paramètre'}>
               <input maxLength={64} spellCheck={false} value={config.auth.keyName} onChange={(event) => setAuth({ keyName: event.target.value })} className={cn(fieldClass, 'font-mono text-[13px]')} />
             </Field>
           )}
-          {needsSecret(authType) && <SecretField type={authType} secret={draft.secret} hasStored={hasStoredSecret} disabled={disabled} onChange={(secret) => set({ secret })} />}
+          {needsSecret(authType) && <CredentialsNotice type={authType} />}
         </div>
       </Section>
 

@@ -1,4 +1,5 @@
 import type { ConnectorConfig, ConnectorHealth, ConnectorKind, ConnectorStatus } from '@/lib/connector-catalog'
+import type { ConnectionOption } from '@/lib/connection-types'
 
 export type ConnectorViewer = {
   id: string
@@ -14,7 +15,7 @@ export type ConnectorSummary = {
   health: ConnectorHealth
   host: string
   version: number
-  hasSecret: boolean
+  connectionCount: number
   authType: string
   lastCheckAt: string | null
   lastCheckMessage: string | null
@@ -48,6 +49,7 @@ export type ConnectorHistoryEntry = { id: number; label: string; detail: string;
 export type ConnectorDetail = {
   connector: ConnectorSummary
   config: ConnectorConfig
+  connections: ConnectionOption[]
   runs: ConnectorRunEntry[]
   history: ConnectorHistoryEntry[]
 }
@@ -66,8 +68,6 @@ export type ConnectorsOverview = {
   connectors: ConnectorSummary[]
   stats: ConnectorStats
 }
-
-export type SecretInput = { mode: 'keep' | 'set' | 'clear'; value: string }
 
 export type TestOutcome = {
   status: 'success' | 'warning' | 'error'

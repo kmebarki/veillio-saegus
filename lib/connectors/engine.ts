@@ -34,7 +34,7 @@ function redact(text: string, secret: string | null) {
   return secret && secret.length >= 3 ? text.split(secret).join(MASK).split(encodeURIComponent(secret)).join(MASK) : text
 }
 
-function buildRequest(kind: ConnectorKind, config: ConnectorConfig, secret: string | null) {
+function buildRequest(kind: ConnectorKind, config: ConnectorConfig, secret: string | null, username: string) {
   const url = new URL(config.url.trim())
   const headers: Record<string, string> = {
     'User-Agent': config.http.userAgent,
@@ -49,7 +49,7 @@ function buildRequest(kind: ConnectorKind, config: ConnectorConfig, secret: stri
       headers.Authorization = `Bearer ${secret}`
       sensitive.push('Authorization')
     } else if (config.auth.type === 'basic') {
-      headers.Authorization = `Basic ${Buffer.from(`${config.auth.username}:${secret}`).toString('base64')}`
+      headers.Authorization = `Basic ${Buffer.from(`${username}:${secret}`).toString('base64')}`
       sensitive.push('Authorization')
     } else if (config.auth.type === 'api_key_header') {
       headers[config.auth.keyName] = secret
@@ -76,7 +76,7 @@ function buildRequest(kind: ConnectorKind, config: ConnectorConfig, secret: stri
   return { url: url.toString(), headers, body, sensitive }
 }
 
-export async function runConnectorTest(kind: ConnectorKind, config: ConnectorConfig, secret: string | null): Promise<TestResult> {
+export async function runConnectorTest(kind: ConnectorKind, config: ConnectorConfig, secret: string | null, username = ''): Promise<TestResult> {
   const startedAt = Date.now()
   const checks: TestCheck[] = []
   const push = (id: string, label: string, status: CheckStatus, detail: string) => checks.push({ id, label, status, detail: redact(detail, secret) })
@@ -98,7 +98,7 @@ export async function runConnectorTest(kind: ConnectorKind, config: ConnectorCon
   let request: ReturnType<typeof buildRequest>
   try {
     const target = validateTargetUrl(config.url)
-    request = buildRequest(kind, config, secret)
+    request = buildRequest(kind, config, secret, username)
     push('url', CHECK_LABELS.url, target.protocol === 'http:' ? 'warning' : 'ok', target.protocol === 'http:' ? `Hôte ${target.hostname} joint en HTTP non chiffré : privilégiez HTTPS.` : `Hôte ${target.hostname}, connexion chiffrée (HTTPS).`)
   } catch (error) {
     const message = error instanceof SafeFetchError ? error.message : 'Adresse invalide.'

@@ -34,7 +34,15 @@ export const PERMISSION_MODULES: PermissionModule[] = [
     label: 'Connecteurs',
     permissions: [
       { key: 'connectors.view', label: 'Consulter les connecteurs', description: 'Voir les connecteurs, leur configuration technique et leur santé (sans les secrets).' },
-      { key: 'connectors.manage', label: 'Gérer les connecteurs', description: 'Créer, configurer, tester, activer et supprimer des connecteurs ; définir leurs identifiants.', sensitive: true },
+      { key: 'connectors.manage', label: 'Gérer les connecteurs', description: 'Créer, configurer, tester, activer et supprimer des connecteurs (sans identifiants).', sensitive: true },
+    ],
+  },
+  {
+    id: 'connections',
+    label: 'Connexions',
+    permissions: [
+      { key: 'connections.view', label: 'Utiliser les connexions', description: 'Voir les connexions de l’organisation et gérer ses propres connexions personnelles (clés API, jetons).' },
+      { key: 'connections.manage', label: 'Gérer les connexions', description: 'Créer, tester et supprimer les connexions partagées de l’organisation et leurs identifiants.', sensitive: true },
     ],
   },
   {
@@ -91,7 +99,7 @@ export function normalizePermissions(values: readonly string[]) {
 export const ROLE_PERMISSIONS: Record<RoleKey, string[]> = {
   super_admin: PERMISSION_KEYS,
   admin: PERMISSION_KEYS,
-  pilot: ['watches.view', 'watches.contribute', 'watches.manage', 'watches.publish', 'sources.manage', 'users.view', 'admissions.review', 'teams.view', 'connectors.view'],
+  pilot: ['watches.view', 'watches.contribute', 'watches.manage', 'watches.publish', 'sources.manage', 'users.view', 'admissions.review', 'teams.view', 'connectors.view', 'connections.view'],
   contributor: ['watches.view', 'watches.contribute'],
   reader: ['watches.view'],
 }

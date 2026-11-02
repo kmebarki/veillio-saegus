@@ -139,7 +139,7 @@ export function ConnectorDetailDialog({ connectorId, viewer, initialTab = 'overv
                 {connector.description && <p className="text-sm leading-6 text-muted-foreground">{connector.description}</p>}
                 <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                   <Fact label="Authentification" value={AUTH_LABELS[connector.authType as AuthType]?.label.split(' (')[0] ?? 'Aucune'} />
-                  <Fact label="Secret" value={connector.hasSecret ? 'Chiffré' : '—'} />
+                  <Fact label="Connexions" value={connector.authType === 'none' ? 'Non requises' : String(connector.connectionCount)} />
                   <Fact label="Latence" value={formatDuration(connector.lastLatencyMs)} />
                   <Fact label="Dernier test" value={connector.lastCheckAt ?? 'Jamais'} />
                   <Fact label="Version" value={`v${connector.version}`} />
@@ -191,7 +191,7 @@ export function ConnectorDetailDialog({ connectorId, viewer, initialTab = 'overv
 
           {tab === 'config' && (
             <div role="tabpanel">
-              <ConnectorWorkbench key={connector.version} kind={connector.kind} existing={{ connector, config: detail.config }} canManage={viewer.canManage} onSaved={({ message }) => { onNotify(message); refresh() }} onCancel={onClose} />
+              <ConnectorWorkbench key={connector.version} kind={connector.kind} existing={{ connector, config: detail.config, connections: detail.connections }} canManage={viewer.canManage} onSaved={({ message }) => { onNotify(message); refresh() }} onCancel={onClose} />
             </div>
           )}
 

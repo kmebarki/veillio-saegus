@@ -18,13 +18,14 @@ import {
   type ConnectorKind,
   type ConnectorStatus,
 } from '@/lib/connector-catalog'
+import type { ConnectionOption } from '@/lib/connection-types'
 import type { ConnectorDetail, ConnectorHistoryEntry, ConnectorRunEntry, ConnectorSummary, ConnectorsOverview, TestOutcome } from '@/lib/connector-types'
-import { decryptSecret, encryptSecret } from '@/lib/connectors/crypto'
+import { decryptSecret } from '@/lib/connectors/crypto'
 import { runConnectorTest } from '@/lib/connectors/engine'
 import { SafeFetchError, validateTargetUrl } from '@/lib/connectors/safe-fetch'
 import { getDefaultOrganization, requirePermission } from '@/lib/authorization'
 import { db } from '@/lib/db'
-import { auditEvents, connectorRuns, connectors, users, type ConnectorRunDetails } from '@/lib/db/schema'
+import { auditEvents, connections, connectorRuns, connectors, users, type ConnectorRunDetails } from '@/lib/db/schema'
 import { isRateLimited, isUniqueViolation } from '@/lib/rate-limit'
 
 const dateTimeFormatter = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })
@@ -35,13 +36,13 @@ const TEST_MAX_PER_WINDOW = 30
 
 const nameField = z.string().trim().min(2, 'Le nom doit contenir au moins 2 caractères.').max(80, 'Le nom ne peut pas dépasser 80 caractères.').transform((value) => value.replace(/\s+/g, ' '))
 const descriptionField = z.string().trim().max(300, 'La description ne peut pas dépasser 300 caractères.')
-const secretField = z.object({ mode: z.enum(['keep', 'set', 'clear']), value: z.string().max(2000, 'Le secret est trop long (2000 caractères maximum).') })
 const kindField = z.enum(CONNECTOR_KINDS)
 
-const createSchema = z.object({ kind: kindField, name: nameField, description: descriptionField.optional(), config: configSchema, secret: secretField })
+const createSchema = z.object({ kind: kindField, name: nameField, description: descriptionField.optional(), config: configSchema })
 const updateSchema = createSchema.omit({ kind: true }).extend({ id: z.string().uuid(), version: z.number().int().positive() })
-const draftTestSchema = z.object({ id: z.string().uuid().optional(), kind: kindField, config: configSchema, secret: secretField })
+const draftTestSchema = z.object({ id: z.string().uuid().optional(), kind: kindField, config: configSchema, connectionId: z.string().uuid().optional() })
 const idSchema = z.object({ id: z.string().uuid() })
+const testSchema = z.object({ id: z.string().uuid(), connectionId: z.string().uuid().optional() })
 const statusSchema = z.object({ id: z.string().uuid(), status: z.enum(['active', 'paused']) })
 
 const ACTION_LABELS: Record<string, string> = {
@@ -49,7 +50,6 @@ const ACTION_LABELS: Record<string, string> = {
   'connector.duplicated': 'Connecteur dupliqué',
   'connector.updated': 'Informations modifiées',
   'connector.reconfigured': 'Configuration technique modifiée',
-  'connector.secret_changed': 'Identifiants modifiés',
   'connector.tested': 'Test de connexion',
   'connector.activated': 'Connecteur activé',
   'connector.paused': 'Connecteur mis en pause',
@@ -92,7 +92,7 @@ function hostOf(url: string) {
   }
 }
 
-function toSummary(row: Row): ConnectorSummary {
+function toSummary(row: Row, connectionCount: number): ConnectorSummary {
   const kind: ConnectorKind = isConnectorKind(row.kind) ? row.kind : 'rss'
   const config = readConfig(kind, row.config)
   return {
@@ -105,7 +105,7 @@ function toSummary(row: Row): ConnectorSummary {
     host: hostOf(config.url),
 
     version: row.version,
-    hasSecret: Boolean(row.secretCiphertext),
+    connectionCount,
     authType: config.auth.type,
     lastCheckAt: row.lastCheckAt ? dateTimeFormatter.format(row.lastCheckAt) : null,
     lastCheckMessage: row.lastCheckMessage,
@@ -139,18 +139,25 @@ function checkTarget(kind: ConnectorKind, config: ConnectorConfig): string | nul
   return validateKindConfig(kind, config)
 }
 
-type SecretInputValue = z.infer<typeof secretField>
+async function visibleConnections(actorId: string, connectorId: string): Promise<ConnectionOption[]> {
+  const rows = await db.select().from(connections).where(eq(connections.connectorId, connectorId)).orderBy(connections.name)
+  return rows
+    .filter((row) => row.scope === 'organization' || row.ownerUserId === actorId)
+    .map((row) => ({ id: row.id, name: row.name, scope: row.scope === 'user' ? 'user' : 'organization' }))
+}
 
-function resolveSecret(config: ConnectorConfig, input: SecretInputValue, existing: string | null, connectorId: string): { ok: true; ciphertext: string | null; changed: boolean } | Failure {
-  if (!needsSecret(config.auth.type)) return { ok: true, ciphertext: null, changed: existing !== null }
-  if (input.mode === 'set') {
-    const value = input.value.trim()
-    if (value.length < 3) return fail('Le secret est trop court (3 caractères minimum).')
-    if (/[\r\n]/.test(value)) return fail('Le secret ne peut pas contenir de saut de ligne.')
-    return { ok: true, ciphertext: encryptSecret(value, connectorId), changed: true }
-  }
-  if (input.mode === 'keep' && existing) return { ok: true, ciphertext: existing, changed: false }
-  return fail('Renseignez le secret (mot de passe, jeton ou clé) correspondant au type d’authentification choisi.')
+async function resolveCredential(actorId: string, connectorId: string | undefined, connectionId: string | undefined) {
+  if (!connectorId) return null
+  const rows = await db
+    .select()
+    .from(connections)
+    .where(and(eq(connections.connectorId, connectorId), connectionId ? eq(connections.id, connectionId) : undefined))
+    .orderBy(connections.createdAt)
+  const usable = rows.filter((row) => row.scope === 'organization' || row.ownerUserId === actorId)
+  const row = connectionId ? usable[0] : usable.find((item) => item.scope === 'organization')
+  if (!row) return null
+  const secret = decryptSecret(row.secretCiphertext, row.id)
+  return secret ? { secret, username: row.username ?? '' } : null
 }
 
 function describeChanges(before: ConnectorConfig, after: ConnectorConfig) {
@@ -167,7 +174,15 @@ export async function getConnectorsOverview(): Promise<ConnectorsOverview> {
   const actor = await requirePermission('connectors.view')
   const organization = await getDefaultOrganization()
   const rows = organization ? await db.select().from(connectors).where(eq(connectors.organizationId, organization.id)).orderBy(connectors.name) : []
-  const summaries = rows.map(toSummary)
+  const countRows = organization
+    ? await db
+        .select({ connectorId: connections.connectorId, total: count() })
+        .from(connections)
+        .where(and(eq(connections.organizationId, organization.id), eq(connections.scope, 'organization')))
+        .groupBy(connections.connectorId)
+    : []
+  const counts = new Map(countRows.map((item) => [item.connectorId, item.total]))
+  const summaries = rows.map((row) => toSummary(row, counts.get(row.id) ?? 0))
 
   const latencies = summaries.map((item) => item.lastLatencyMs).filter((value): value is number => value !== null)
   return {
@@ -185,7 +200,7 @@ export async function getConnectorsOverview(): Promise<ConnectorsOverview> {
 }
 
 export async function getConnectorDetail(input: unknown): Promise<{ ok: true; detail: ConnectorDetail } | Failure> {
-  await requirePermission('connectors.view')
+  const actor = await requirePermission('connectors.view')
   const parsed = idSchema.safeParse(input)
   if (!parsed.success) return fail('Connecteur invalide.')
   const row = await loadConnector(parsed.data.id)
@@ -239,7 +254,9 @@ export async function getConnectorDetail(input: unknown): Promise<{ ok: true; de
     return { id: entry.id, label: ACTION_LABELS[entry.action] ?? entry.action, detail, actor: entry.actor ?? 'Utilisateur supprimé', at: dateTimeFormatter.format(entry.createdAt) }
   })
 
-  return { ok: true, detail: { connector: toSummary(row), config: readConfig(kind, row.config), runs, history } }
+  const options = await visibleConnections(actor.id, row.id)
+  const sharedCount = (await db.select({ total: count() }).from(connections).where(and(eq(connections.connectorId, row.id), eq(connections.scope, 'organization'))))[0]?.total ?? 0
+  return { ok: true, detail: { connector: toSummary(row, sharedCount), config: readConfig(kind, row.config), connections: options, runs, history } }
 }
 
 export async function createConnector(input: unknown): Promise<{ ok: true; message: string; id: string } | Failure> {
@@ -259,12 +276,9 @@ export async function createConnector(input: unknown): Promise<{ ok: true; messa
   if (total >= MAX_CONNECTORS) return fail(`Limite atteinte : ${MAX_CONNECTORS} connecteurs maximum par organisation.`)
 
   const id = randomUUID()
-  const secret = resolveSecret(config, parsed.data.secret, null, id)
-  if (!secret.ok) return secret
-
   try {
     await db.transaction(async (tx) => {
-      await tx.insert(connectors).values({ id, organizationId: organization.id, name, description: description || null, kind, status: 'draft', config, secretCiphertext: secret.ciphertext, createdByUserId: actor.id })
+      await tx.insert(connectors).values({ id, organizationId: organization.id, name, description: description || null, kind, status: 'draft', config, createdByUserId: actor.id })
       await tx.insert(auditEvents).values(audit(actor.id, 'connector.created', id, { name, kind }))
     })
   } catch (error) {
@@ -272,7 +286,8 @@ export async function createConnector(input: unknown): Promise<{ ok: true; messa
     throw error
   }
   revalidateConnectors()
-  return { ok: true, message: 'Connecteur créé en brouillon. Testez-le avant de l’activer.', id }
+  const needsConnection = needsSecret(config.auth.type)
+  return { ok: true, message: needsConnection ? 'Connecteur créé en brouillon. Ajoutez une connexion (clé API) dans « Connexions », puis testez-le.' : 'Connecteur créé en brouillon. Testez-le avant de l’activer.', id }
 }
 
 export async function updateConnector(input: unknown): Promise<{ ok: true; message: string } | Failure> {
@@ -289,13 +304,9 @@ export async function updateConnector(input: unknown): Promise<{ ok: true; messa
   if (invalid) return fail(invalid)
   if (await findDuplicateName(row.organizationId, parsed.data.name, row.id)) return fail('Un connecteur porte déjà ce nom.')
 
-  const secret = resolveSecret(config, parsed.data.secret, row.secretCiphertext, row.id)
-  if (!secret.ok) return secret
-
   const previous = readConfig(kind, row.config)
   const sections = describeChanges(previous, config)
-  const secretChanged = secret.changed
-  const technicalChanged = sections.length > 0 || secretChanged
+  const technicalChanged = sections.length > 0
   const description = parsed.data.description || null
   const infoChanged = row.name !== parsed.data.name || (row.description ?? null) !== description
   if (!technicalChanged && !infoChanged) return { ok: true, message: 'Aucune modification à enregistrer.' }
@@ -309,7 +320,6 @@ export async function updateConnector(input: unknown): Promise<{ ok: true; messa
           name: parsed.data.name,
           description,
           config,
-          secretCiphertext: secret.ciphertext,
           status: mustPause ? 'paused' : row.status,
           version: sql`${connectors.version} + 1`,
           lastCheckVersion: technicalChanged ? row.lastCheckVersion : row.lastCheckVersion === row.version ? row.version + 1 : row.lastCheckVersion,
@@ -320,7 +330,6 @@ export async function updateConnector(input: unknown): Promise<{ ok: true; messa
       if (!updated) return 'conflict' as const
       if (infoChanged) await tx.insert(auditEvents).values(audit(actor.id, 'connector.updated', row.id, { name: parsed.data.name, previousName: row.name }))
       if (sections.length > 0) await tx.insert(auditEvents).values(audit(actor.id, 'connector.reconfigured', row.id, { sections: sections.join(', '), paused: mustPause }))
-      if (secretChanged) await tx.insert(auditEvents).values(audit(actor.id, 'connector.secret_changed', row.id, {}))
       return 'ok' as const
     })
     if (outcome === 'conflict') return fail('Ce connecteur vient d’être modifié par quelqu’un d’autre. Rechargez-le avant de réessayer.')
@@ -340,14 +349,14 @@ async function enforceTestRateLimit(actorId: string) {
 
 const RATE_MESSAGE = `Trop de tests en peu de temps (${TEST_MAX_PER_WINDOW} par 10 minutes). Patientez un instant.`
 
-function missingSecretOutcome(): TestOutcome {
+function missingConnectionOutcome(): TestOutcome {
   return {
     status: 'error',
-    message: 'Le secret d’authentification n’est pas renseigné.',
+    message: 'Aucune connexion utilisable pour ce connecteur.',
     httpStatus: null,
     durationMs: 0,
     itemsFound: null,
-    checks: [{ id: 'url', label: 'Adresse', status: 'error', detail: 'Renseignez le mot de passe, le jeton ou la clé API avant de tester.' }],
+    checks: [{ id: 'url', label: 'Identifiants', status: 'error', detail: 'Ajoutez une connexion (clé API, jeton, mot de passe) dans « Connexions », puis choisissez-la pour tester.' }],
     sample: [],
   }
 }
@@ -363,24 +372,18 @@ export async function testConnectorDraft(input: unknown): Promise<{ ok: true; ou
   const invalid = validateKindConfig(kind, config)
   if (invalid) return fail(invalid)
 
-  let secret: string | null = null
-  if (needsSecret(config.auth.type)) {
-    if (parsed.data.secret.mode === 'set') secret = parsed.data.secret.value.trim() || null
-    else if (parsed.data.secret.mode === 'keep' && parsed.data.id) {
-      const row = await loadConnector(parsed.data.id)
-      secret = row ? decryptSecret(row.secretCiphertext, row.id) : null
-    }
-  }
+  const requiresCredential = needsSecret(config.auth.type)
+  const credential = requiresCredential ? await resolveCredential(actor.id, parsed.data.id, parsed.data.connectionId) : null
 
   const targetId = parsed.data.id ?? 'brouillon'
-  const outcome = needsSecret(config.auth.type) && !secret ? missingSecretOutcome() : await runConnectorTest(kind, config, secret)
+  const outcome = requiresCredential && !credential ? missingConnectionOutcome() : await runConnectorTest(kind, config, credential?.secret ?? null, credential?.username ?? '')
   await db.insert(auditEvents).values(audit(actor.id, 'connector.tested', targetId, { status: outcome.status, draft: true, host: hostOf(config.url) }))
   return { ok: true, outcome }
 }
 
 export async function testConnector(input: unknown): Promise<{ ok: true; outcome: TestOutcome; message: string } | Failure> {
   const actor = await requirePermission('connectors.manage')
-  const parsed = idSchema.safeParse(input)
+  const parsed = testSchema.safeParse(input)
   if (!parsed.success) return fail('Connecteur invalide.')
   const row = await loadConnector(parsed.data.id)
   if (!row) return fail('Connecteur introuvable.')
@@ -388,16 +391,11 @@ export async function testConnector(input: unknown): Promise<{ ok: true; outcome
 
   const kind: ConnectorKind = isConnectorKind(row.kind) ? row.kind : 'rss'
   const config = readConfig(kind, row.config)
-  const secret = decryptSecret(row.secretCiphertext, row.id)
+  const requiresCredential = needsSecret(config.auth.type)
+  const credential = requiresCredential ? await resolveCredential(actor.id, row.id, parsed.data.connectionId) : null
 
-  let outcome: TestOutcome
-  if (needsSecret(config.auth.type) && !secret) {
-    outcome = row.secretCiphertext
-      ? { ...missingSecretOutcome(), message: 'Le secret enregistré est illisible. Saisissez-le à nouveau dans la configuration.' }
-      : missingSecretOutcome()
-  } else {
-    outcome = await runConnectorTest(kind, config, secret)
-  }
+  const outcome: TestOutcome =
+    requiresCredential && !credential ? missingConnectionOutcome() : await runConnectorTest(kind, config, credential?.secret ?? null, credential?.username ?? '')
 
   await db.transaction(async (tx) => {
     await tx.insert(connectorRuns).values({
@@ -440,6 +438,11 @@ export async function setConnectorStatus(input: unknown): Promise<{ ok: true; me
   if (parsed.data.status === 'active') {
     if (row.lastCheckVersion !== row.version || !row.lastCheckStatus) return fail('Lancez un test de connexion avec la configuration actuelle avant d’activer ce connecteur.')
     if (row.lastCheckStatus === 'error') return fail('Le dernier test a échoué : corrigez la configuration puis relancez un test avant d’activer.')
+    const kind: ConnectorKind = isConnectorKind(row.kind) ? row.kind : 'rss'
+    if (needsSecret(readConfig(kind, row.config).auth.type)) {
+      const [{ total }] = await db.select({ total: count() }).from(connections).where(and(eq(connections.connectorId, row.id), eq(connections.scope, 'organization')))
+      if (total === 0) return fail('Ce connecteur requiert des identifiants : ajoutez une connexion partagée dans « Connexions » avant de l’activer.')
+    }
   }
 
   await db.transaction(async (tx) => {
@@ -468,11 +471,11 @@ export async function duplicateConnector(input: unknown): Promise<{ ok: true; me
 
   const id = randomUUID()
   await db.transaction(async (tx) => {
-    await tx.insert(connectors).values({ id, organizationId: row.organizationId, name: name.slice(0, 80), description: row.description, kind: row.kind, status: 'draft', config: row.config, secretCiphertext: null, createdByUserId: actor.id })
+    await tx.insert(connectors).values({ id, organizationId: row.organizationId, name: name.slice(0, 80), description: row.description, kind: row.kind, status: 'draft', config: row.config, createdByUserId: actor.id })
     await tx.insert(auditEvents).values(audit(actor.id, 'connector.duplicated', id, { name, source: row.name }))
   })
   revalidateConnectors()
-  return { ok: true, message: 'Connecteur dupliqué en brouillon. Les identifiants ne sont pas copiés : saisissez-les avant de tester.', id }
+  return { ok: true, message: 'Connecteur dupliqué en brouillon. Les connexions ne sont pas copiées : ajoutez-en une dans « Connexions » si nécessaire.', id }
 }
 
 export async function deleteConnector(input: unknown): Promise<{ ok: true; message: string } | Failure> {

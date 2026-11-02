@@ -1,18 +1,21 @@
 'use client'
 
 import { FlaskConical, LoaderCircle, Save, TestTubeDiagonal } from 'lucide-react'
+import Link from 'next/link'
 import { useMemo, useState, useTransition } from 'react'
 
 import { createConnector, testConnectorDraft, updateConnector } from '@/app/actions/connectors'
 import { ConnectorConfigForm, type ConnectorDraft } from '@/components/connector-config-form'
 import { ConnectorTestResult } from '@/components/connector-test-panel'
 import { Button } from '@/components/ui/button'
+import { fieldClass } from '@/components/ui/modal'
+import type { ConnectionOption } from '@/lib/connection-types'
 import { defaultConfig, needsSecret, type ConnectorConfig, type ConnectorKind } from '@/lib/connector-catalog'
 import type { ConnectorSummary, TestOutcome } from '@/lib/connector-types'
 
 type Props = {
   kind: ConnectorKind
-  existing?: { connector: ConnectorSummary; config: ConnectorConfig }
+  existing?: { connector: ConnectorSummary; config: ConnectorConfig; connections?: ConnectionOption[] }
   canManage: boolean
   onSaved: (result: { message: string; id?: string }) => void
   onCancel?: () => void
@@ -29,25 +32,22 @@ export function ConnectorWorkbench({ kind, existing, canManage, onSaved, onCance
       name: existing?.connector.name ?? '',
       description: existing?.connector.description ?? '',
       config: existing?.config ?? defaultConfig(kind),
-      secret: { mode: existing?.connector.hasSecret ? 'keep' : 'set', value: '' },
     }),
     [existing, kind],
   )
   const [draft, setDraft] = useState<ConnectorDraft>(initial)
+  const [connectionId, setConnectionId] = useState('')
+  const connections = existing?.connections ?? []
   const [outcome, setOutcome] = useState<{ result: TestOutcome; snapshot: string; at: string } | null>(null)
   const [error, setError] = useState('')
   const [isTesting, startTesting] = useTransition()
   const [isSaving, startSaving] = useTransition()
 
-  const hasStoredSecret = Boolean(existing?.connector.hasSecret)
-  const snapshot = JSON.stringify(draft)
-  const dirty = snapshot !== JSON.stringify(initial)
+  const snapshot = JSON.stringify({ draft, connectionId })
+  const dirty = JSON.stringify(draft) !== JSON.stringify(initial)
   const stale = outcome !== null && outcome.snapshot !== snapshot
   const readOnly = !canManage
-
-  function payloadSecret() {
-    return needsSecret(draft.config.auth.type) ? draft.secret : { mode: 'keep' as const, value: '' }
-  }
+  const requiresCredential = needsSecret(draft.config.auth.type)
 
   function test() {
     setError('')
@@ -56,7 +56,7 @@ export function ConnectorWorkbench({ kind, existing, canManage, onSaved, onCance
       return
     }
     startTesting(async () => {
-      const result = await testConnectorDraft({ id: existing?.connector.id, kind, config: draft.config, secret: payloadSecret() })
+      const result = await testConnectorDraft({ id: existing?.connector.id, kind, config: draft.config, connectionId: connectionId || undefined })
       if (!result.ok) {
         setError(result.message)
         return
@@ -72,7 +72,7 @@ export function ConnectorWorkbench({ kind, existing, canManage, onSaved, onCance
       return
     }
     startSaving(async () => {
-      const base = { name: draft.name, description: draft.description, config: draft.config, secret: payloadSecret() }
+      const base = { name: draft.name, description: draft.description, config: draft.config }
       if (existing) {
         const updated = await updateConnector({ ...base, id: existing.connector.id, version: existing.connector.version })
         if (!updated.ok) {
@@ -102,7 +102,7 @@ export function ConnectorWorkbench({ kind, existing, canManage, onSaved, onCance
       }}
     >
       <div className="min-w-0">
-        <ConnectorConfigForm kind={kind} draft={draft} onChange={setDraft} disabled={readOnly || isSaving} hasStoredSecret={hasStoredSecret} />
+        <ConnectorConfigForm kind={kind} draft={draft} onChange={setDraft} disabled={readOnly || isSaving} />
       </div>
 
       <aside className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-0 lg:max-h-[calc(92dvh-8rem)] lg:self-start lg:overflow-y-auto lg:pr-1" aria-label="Test de connexion">
@@ -114,6 +114,23 @@ export function ConnectorWorkbench({ kind, existing, canManage, onSaved, onCance
               <p className="text-xs text-muted-foreground">Teste la configuration en cours, sans l’enregistrer.</p>
             </div>
           </div>
+          {canManage && requiresCredential && (
+            existing && connections.length > 0 ? (
+              <label className="flex flex-col gap-1.5 text-xs font-medium">
+                Connexion utilisée pour le test
+                <select value={connectionId} onChange={(event) => setConnectionId(event.target.value)} className={fieldClass}>
+                  <option value="">Connexion partagée par défaut</option>
+                  {connections.map((item) => <option key={item.id} value={item.id}>{item.name} ({item.scope === 'user' ? 'personnelle' : 'partagée'})</option>)}
+                </select>
+              </label>
+            ) : (
+              <p className="rounded-xl bg-chart-4/15 px-3 py-2 text-xs leading-5">
+                Ce connecteur exige une authentification. {existing ? 'Aucune connexion n’existe encore : ' : 'Enregistrez-le, puis '}
+                <Link href="/admin/connections" className="font-medium text-primary underline-offset-4 hover:underline">créez une connexion</Link>
+                {existing ? ' pour pouvoir tester.' : ' pour pouvoir le tester.'}
+              </p>
+            )
+          )}
           {canManage ? (
             <Button type="button" onClick={test} disabled={isTesting || isSaving || !draft.config.url.trim()} variant={outcome && !stale ? 'outline' : 'default'}>
               {isTesting ? <LoaderCircle className="animate-spin" data-icon="inline-start" /> : <TestTubeDiagonal data-icon="inline-start" />}
