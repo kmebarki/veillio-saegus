@@ -4,7 +4,7 @@
   "description": "Plateforme professionnelle de veille, d’analyse et de diffusion.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f6faf8",
-  "theme_color": "#173f39",
+  "background_color": "#FAF9FB",
+  "theme_color": "#5525E4",
   "icons": [{ "src": "/apple-icon.png", "sizes": "180x180", "type": "image/png" }]
 }

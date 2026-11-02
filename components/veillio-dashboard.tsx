@@ -111,7 +111,7 @@ function Brand() {
       <div className="brand-mark" aria-hidden="true"><span /></div>
       <div>
         <p className="text-[17px] font-semibold tracking-[-0.03em]">Veillio</p>
-        <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Intelligence de veille</p>
+        <p className="text-[10px] font-medium text-muted-foreground">Intelligence de veille</p>
       </div>
     </div>
   )
@@ -176,17 +176,17 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
         </div>
         <nav className="flex flex-1 flex-col overflow-y-auto px-3 py-5" aria-label="Navigation principale">
           <section className="flex flex-col gap-1" aria-labelledby="workspace-navigation">
-            <h2 id="workspace-navigation" className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Mon espace</h2>
+            <h2 id="workspace-navigation" className="px-3 pb-1 text-[11px] font-semibold text-muted-foreground">Mon espace</h2>
             {workspaceItems.map((item, index) => renderMenuItem(item, index === 0))}
           </section>
 
           <section className="mt-5 flex flex-col gap-1 border-t pt-5" aria-labelledby="steering-navigation">
-            <h2 id="steering-navigation" className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Pilotage</h2>
+            <h2 id="steering-navigation" className="px-3 pb-1 text-[11px] font-semibold text-muted-foreground">Pilotage</h2>
             {steeringItems.map((item) => renderMenuItem(item))}
           </section>
 
           <section className="mt-5 flex flex-col gap-1 border-t pt-5" aria-labelledby="administration-navigation">
-            <h2 id="administration-navigation" className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Administration</h2>
+            <h2 id="administration-navigation" className="px-3 pb-1 text-[11px] font-semibold text-muted-foreground">Administration</h2>
             {administrationItems.map((item) => renderMenuItem(item))}
           </section>
         </nav>
@@ -236,7 +236,7 @@ function PublicationList() {
         {publications.map((publication) => (
           <button key={`${publication.type}-${publication.title}`} className="flex min-h-20 w-full items-center gap-3 px-5 text-left transition-colors hover:bg-muted/50 sm:gap-4 sm:px-6">
             <div className={cn('publication-icon', `tone-${publication.color}`)}><FileText /></div>
-            <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{publication.type}</span><span className="text-xs text-muted-foreground">{publication.date}</span></div><p className="mt-1 truncate text-sm font-semibold">{publication.title}</p></div>
+            <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><span className="rounded-md bg-secondary px-1.5 py-0.5 text-[10px] font-semibold text-secondary-foreground">{publication.type}</span><span className="text-xs text-muted-foreground">{publication.date}</span></div><p className="mt-1 truncate text-sm font-semibold">{publication.title}</p></div>
             <span className="hidden text-xs text-muted-foreground sm:block">{publication.meta}</span>
             <ChevronRight className="size-4 text-muted-foreground" />
           </button>
@@ -249,12 +249,12 @@ function PublicationList() {
 function AttentionPanel() {
   return (
     <aside className="rounded-2xl bg-primary p-5 text-primary-foreground sm:p-6">
-      <div className="flex items-center justify-between"><div className="grid size-9 place-items-center rounded-xl bg-white/10"><Sparkles className="size-[18px]" /></div><span className="rounded-full bg-white/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide">3 actions</span></div>
+      <div className="flex items-center justify-between"><div className="grid size-9 place-items-center rounded-xl bg-white/10"><Sparkles className="size-[18px]" /></div><span className="rounded-full bg-white/10 px-2 py-1 text-[10px] font-semibold">3 actions</span></div>
       <h2 className="mt-6 text-lg font-semibold tracking-[-0.02em]">À votre attention</h2>
       <p className="mt-2 text-sm leading-5 text-white/60">Des éléments nécessitent votre validation avant diffusion.</p>
       <div className="mt-5 flex flex-col gap-2">
-        <button className="flex min-h-14 items-center gap-3 rounded-xl bg-white/8 px-3 text-left hover:bg-white/12"><div className="grid size-8 place-items-center rounded-lg bg-amber-300 text-amber-950"><FileText className="size-4" /></div><div className="flex-1"><p className="text-xs font-semibold">2 publications à valider</p><p className="mt-0.5 text-[11px] text-white/50">Avant demain, 09:00</p></div><ChevronRight className="size-4 text-white/40" /></button>
-        <button className="flex min-h-14 items-center gap-3 rounded-xl bg-white/8 px-3 text-left hover:bg-white/12"><div className="grid size-8 place-items-center rounded-lg bg-cyan-200 text-cyan-950"><Users className="size-4" /></div><div className="flex-1"><p className="text-xs font-semibold">1 demande d’admission</p><p className="mt-0.5 text-[11px] text-white/50">Reçue il y a 3 h</p></div><ChevronRight className="size-4 text-white/40" /></button>
+        <button className="flex min-h-14 items-center gap-3 rounded-xl bg-white/8 px-3 text-left hover:bg-white/12"><div className="grid size-8 place-items-center rounded-lg bg-[#F5A623] text-[#0E0A19]"><FileText className="size-4" /></div><div className="flex-1"><p className="text-xs font-semibold">2 publications à valider</p><p className="mt-0.5 text-[11px] text-white/50">Avant demain, 09:00</p></div><ChevronRight className="size-4 text-white/40" /></button>
+        <button className="flex min-h-14 items-center gap-3 rounded-xl bg-white/8 px-3 text-left hover:bg-white/12"><div className="grid size-8 place-items-center rounded-lg bg-[#DDD3FD] text-[#2D1574]"><Users className="size-4" /></div><div className="flex-1"><p className="text-xs font-semibold">1 demande d’admission</p><p className="mt-0.5 text-[11px] text-white/50">Reçue il y a 3 h</p></div><ChevronRight className="size-4 text-white/40" /></button>
       </div>
     </aside>
   )
@@ -277,7 +277,7 @@ export function VeillioDashboard() {
           <div className="ml-auto flex items-center gap-1">
             <Button variant="ghost" size="icon-lg" aria-label="Aide"><CircleHelp /></Button>
             <Button variant="ghost" size="icon-lg" aria-label="Paramètres"><Settings /></Button>
-            <Button variant="ghost" size="icon-lg" aria-label="Notifications" className="relative"><Bell /><span className="absolute right-2 top-2 size-2 rounded-full border-2 border-background bg-amber-500" /></Button>
+            <Button variant="ghost" size="icon-lg" aria-label="Notifications" className="relative"><Bell /><span className="absolute right-2 top-2 size-2 rounded-full border-2 border-background bg-[#F5A623]" /></Button>
           </div>
         </header>
 
