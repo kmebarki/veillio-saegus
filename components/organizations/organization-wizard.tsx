@@ -281,9 +281,24 @@ export function OrganizationWizard({ organization }: { organization?: Organizati
 
                   {error && <p role="alert" className="mt-5 rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</p>}
                 </div>
-                <div className="sticky bottom-0 z-10 flex flex-col-reverse justify-between gap-3 border-t bg-card/95 px-5 py-4 backdrop-blur-sm sm:flex-row sm:px-7">
-                  <Button type="button" variant="outline" disabled={currentStep === 0 || isPending} onClick={() => { setCurrentStep((step) => Math.max(step - 1, 0)); setError('') }}><ArrowLeft data-icon="inline-start" />Précédent</Button>
-                  {isEditing ? <div className="flex flex-col-reverse gap-2 sm:flex-row">{currentStep < visibleSteps.length - 1 && <Button type="button" variant="outline" disabled={isPending} onClick={goNext}>Section suivante<ArrowRight data-icon="inline-end" /></Button>}<Button type="button" disabled={isPending} onClick={submit}><Save data-icon="inline-start" />{isPending ? 'Enregistrement…' : 'Enregistrer les modifications'}</Button></div> : currentStep < visibleSteps.length - 1 ? <Button type="button" onClick={goNext}>Continuer<ArrowRight data-icon="inline-end" /></Button> : <Button type="button" disabled={isPending || !confirmed} onClick={submit}><UserRoundPlus data-icon="inline-start" />{isPending ? 'Création…' : 'Créer l’organisation'}</Button>}
+                <div className="sticky bottom-0 z-10 flex flex-col gap-3 border-t bg-card/95 px-5 py-4 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:px-7">
+                  {isEditing ? (
+                    <>
+                      <div className="grid grid-cols-2 gap-2 sm:flex">
+                        <Button type="button" variant="outline" disabled={currentStep === 0 || isPending} onClick={() => { setCurrentStep((step) => Math.max(step - 1, 0)); setError('') }}><ArrowLeft data-icon="inline-start" />Précédent</Button>
+                        <Button type="button" variant="outline" disabled={currentStep === visibleSteps.length - 1 || isPending} onClick={goNext}>Suivant<ArrowRight data-icon="inline-end" /></Button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 sm:flex">
+                        <Button type="button" variant="outline" disabled={isPending} onClick={() => router.push('/admin/organizations')}>Annuler</Button>
+                        <Button type="button" disabled={isPending} onClick={submit}><Save data-icon="inline-start" />{isPending ? 'Enregistrement…' : 'Enregistrer'}</Button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <Button type="button" variant="outline" disabled={currentStep === 0 || isPending} onClick={() => { setCurrentStep((step) => Math.max(step - 1, 0)); setError('') }}><ArrowLeft data-icon="inline-start" />Précédent</Button>
+                      {currentStep < visibleSteps.length - 1 ? <Button type="button" onClick={goNext}>Continuer<ArrowRight data-icon="inline-end" /></Button> : <Button type="button" disabled={isPending || !confirmed} onClick={submit}><UserRoundPlus data-icon="inline-start" />{isPending ? 'Création…' : 'Créer l’organisation'}</Button>}
+                    </>
+                  )}
                 </div>
               </section>
             </div>
