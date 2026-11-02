@@ -85,7 +85,6 @@ export function UserProfileDialog({ profile, onClose, onSaved }: { profile: User
   }
 
   const fullName = `${profile.firstName} ${profile.lastName}`.trim()
-  const address = [profile.addressLine1, profile.addressLine2].filter(Boolean).join(' — ')
 
   return (
     <Modal open onClose={onClose} title={fullName || 'Fiche utilisateur'} size="xl" bare>
@@ -137,10 +136,11 @@ export function UserProfileDialog({ profile, onClose, onSaved }: { profile: User
               </Section>
               <Section icon={MapPin} title="Localisation">
                 <dl className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Ville" value={profile.city} required />
-                  <Field label="Pays" value={profile.country} required />
-                  <Field label="Adresse" value={address} className="sm:col-span-2" />
+                  <Field label="Adresse (ligne 1)" value={profile.addressLine1} className="sm:col-span-2" />
+                  <Field label="Adresse (ligne 2)" value={profile.addressLine2} className="sm:col-span-2" />
                   <Field label="Code postal" value={profile.postalCode} />
+                  <Field label="Ville" value={profile.city} required />
+                  <Field label="Pays" value={profile.country} required className="sm:col-span-2" />
                 </dl>
               </Section>
               <Section icon={Phone} title="Coordonnées">
