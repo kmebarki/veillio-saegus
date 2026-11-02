@@ -136,7 +136,7 @@ export async function getSourcesOverview(): Promise<SourcesOverview> {
       detail: item.action === 'source.created' ? 'Définition de Source créée.' : 'Configuration de Source mise à jour.',
     }))
     return [{
-      id: row.id, name: row.name, description: row.description ?? '', endpoint: row.endpoint, scope: row.scope === 'user' ? 'user' : 'organization', ownerName: row.ownerUserId ? names.get(row.ownerUserId) ?? 'Utilisateur' : organization.name,
+      id: row.id, name: row.name, description: row.description ?? '', imageUrl: row.imageUrl, endpoint: row.endpoint, scope: row.scope === 'user' ? 'user' : 'organization', ownerName: row.ownerUserId ? names.get(row.ownerUserId) ?? 'Utilisateur' : organization.name,
       connectorId: connector.id, connectorName: connector.name, connectorKind: kind, connectorCategory: categoryByKind[kind], connectionId: row.connectionId, connectionName: connection?.name ?? null,
       diagnostic, diagnosticLabel, diagnosticDetail, lastTestAt: testCandidates[0] ? dateTime.format(testCandidates[0]) : null, lastTestResult: diagnosticDetail,
       lastCollection, watches, collections: collections.slice(0, 30), audit, createdAt: dateTime.format(row.createdAt), updatedAt: dateTime.format(row.updatedAt), canManage: true,
@@ -184,7 +184,7 @@ export async function createSource(input: unknown): Promise<{ ok: true; message:
   if (duplicate) return fail('Une Source de même nom existe déjà dans ce périmètre.')
 
   const [created] = await db.transaction(async (tx) => {
-    const rows = await tx.insert(sources).values({ organizationId: organization.id, connectorId: connector.id, connectionId: connection?.id ?? null, name: parsed.data.name, description: parsed.data.description || null, endpoint: parsed.data.endpoint, scope: parsed.data.scope, ownerUserId: parsed.data.scope === 'user' ? actor.id : null, createdByUserId: actor.id }).returning({ id: sources.id })
+    const rows = await tx.insert(sources).values({ organizationId: organization.id, connectorId: connector.id, connectionId: connection?.id ?? null, name: parsed.data.name, description: parsed.data.description || null, imageUrl: parsed.data.imageUrl || null, endpoint: parsed.data.endpoint, scope: parsed.data.scope, ownerUserId: parsed.data.scope === 'user' ? actor.id : null, createdByUserId: actor.id }).returning({ id: sources.id })
     await tx.insert(auditEvents).values({ actorUserId: actor.id, action: 'source.created', targetType: 'source', targetId: rows[0].id, metadata: { connectorId: connector.id, scope: parsed.data.scope, connectionScope: connection?.scope ?? null } })
     return rows
   })
