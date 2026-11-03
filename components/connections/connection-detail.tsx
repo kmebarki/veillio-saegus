@@ -48,7 +48,9 @@ export function ConnectionDetail({ connection, activity, busy, onEdit, onTest, o
           <Fact label="Authentification">{AUTH_LABELS[authType]?.label.split(' (')[0] ?? 'Clé API'}</Fact>
           {(authType === 'api_key_header' || authType === 'api_key_query') && <Fact label={authType === 'api_key_header' ? 'En-tête' : 'Paramètre'}><span className="font-mono">{connection.keyName}</span></Fact>}
           {connection.username && <Fact label="Identifiant">{connection.username}</Fact>}
-          <Fact label="Portée">{connection.scope === 'user' ? `Personnelle · ${connection.ownerName}` : 'Partagée'}</Fact>
+          <Fact label="Portée">{connection.scope === 'private' ? `Privée · ${connection.ownerName}` : connection.scope === 'public' ? 'Publique' : 'Organisationnelle'}</Fact>
+          <Fact label="Méthode"><span className="font-mono">{connection.methodId}@{connection.methodVersion}</span></Fact>
+          <Fact label="Adaptateur"><span className="font-mono">{connection.adapterId}@{connection.adapterVersion}</span></Fact>
           <Fact label="Secret"><span className="font-mono">{connection.secretHint ?? 'Chiffré'}</span></Fact>
           <Fact label="Dernière rotation">{connection.secretRotatedAt} ({ageLabel(connection.secretAgeDays)})</Fact>
           <Fact label="Expiration">{expiry ? <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs', TONE_CLASSES[expiry.tone])}><CalendarClock className="size-3" aria-hidden />{expiry.label}</span> : 'Non définie'}</Fact>

@@ -1,8 +1,10 @@
 'use client'
 
 import { CheckCircle2, CircleDashed, Filter, KeyRound, Plus, Search, ShieldAlert, ShieldCheck, type LucideIcon } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useMemo, useState, useTransition } from 'react'
 
+import { transitionAuthenticationMethod } from '@/app/actions/authentication-methods'
 import { AuthenticationProposalWizard } from '@/components/authentication/proposal-wizard'
 import { Sidebar } from '@/components/veillio-dashboard'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -13,6 +15,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/u
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
 import type { AuthenticationMethodView, AuthenticationOverview } from '@/lib/authentication/view-model'
 import { cn } from '@/lib/utils'
 
@@ -24,7 +27,23 @@ const STAT_CARDS: { label: string; key: keyof AuthenticationOverview['stats']; i
   { label: 'À valider', key: 'awaitingReview', icon: CircleDashed },
 ]
 
-function MethodDetail({ method }: { method: AuthenticationMethodView }) {
+function MethodDetail({ method, viewer, onChanged }: { method: AuthenticationMethodView; viewer: AuthenticationOverview['viewer']; onChanged: () => void }) {
+  const [reason, setReason] = useState('')
+  const [feedback, setFeedback] = useState('')
+  const [pending, startTransition] = useTransition()
+  const canSubmit = method.status === 'brouillon' && viewer.canPropose
+  const canReview = method.status === 'a_valider' && viewer.canReview
+  const canDeactivate = method.status === 'disponible' && viewer.canDeactivate
+
+  function transition(target: 'brouillon' | 'a_valider' | 'disponible' | 'desactivee') {
+    setFeedback('')
+    startTransition(async () => {
+      const result = await transitionAuthenticationMethod({ versionId: method.id, target, reason })
+      setFeedback(result.message)
+      if (result.ok) onChanged()
+    })
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center gap-2"><Badge variant="outline">{method.methodId}</Badge><Badge variant="secondary">v{method.version}</Badge><Badge variant={method.status === 'disponible' ? 'default' : 'outline'}>{STATUS_LABELS[method.status]}</Badge></div>
@@ -35,11 +54,13 @@ function MethodDetail({ method }: { method: AuthenticationMethodView }) {
         <Card><CardHeader><CardTitle>Transmission</CardTitle><CardDescription>Résolue par l’adaptateur vérifié</CardDescription></CardHeader><CardContent className="flex flex-col gap-2 text-sm"><p><span className="text-muted-foreground">Type :</span> {method.transmission.type}</p><p><span className="text-muted-foreground">Protocole :</span> {method.transmission.protocol}</p><p><span className="text-muted-foreground">TLS :</span> {method.transmission.requiresTls ? 'Requis' : 'Non requis'}</p></CardContent></Card>
       </div>
       <Card><CardHeader><CardTitle>Schéma de Connexion</CardTitle><CardDescription>{method.fields.length} champ{method.fields.length > 1 ? 's' : ''} · les secrets ne sont jamais relus</CardDescription></CardHeader><CardContent>{method.fields.length ? <ul className="flex flex-col gap-2">{method.fields.map((field) => <li key={field.code} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3"><div><p className="text-sm font-medium">{field.label}</p><p className="font-mono text-xs text-muted-foreground">{field.code} · {field.valueSource}</p></div><div className="flex gap-2">{field.required && <Badge variant="outline">Requis</Badge>}{field.secret && <Badge variant="secondary">Secret</Badge>}{!field.editableInConnection && <Badge variant="outline">Adaptateur</Badge>}</div></li>)}</ul> : <p className="text-sm text-muted-foreground">Aucun champ requis.</p>}</CardContent></Card>
+      {(canSubmit || canReview || canDeactivate) && <Card><CardHeader><CardTitle>Gouvernance</CardTitle><CardDescription>Chaque transition exige un motif et produit un événement d’audit.</CardDescription></CardHeader><CardContent className="flex flex-col gap-3"><Textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Motif de la transition (8 caractères minimum)…" aria-label="Motif de la transition" />{feedback && <p className="text-sm text-muted-foreground" role="status">{feedback}</p>}<div className="flex flex-wrap gap-2">{canSubmit && <Button disabled={pending || reason.trim().length < 8} onClick={() => transition('a_valider')}>Soumettre à validation</Button>}{canReview && <><Button variant="outline" disabled={pending || reason.trim().length < 8} onClick={() => transition('brouillon')}>Demander des corrections</Button>{viewer.canPublish && <Button disabled={pending || reason.trim().length < 8} onClick={() => transition('disponible')}>Publier</Button>}</>}{canDeactivate && <Button variant="destructive" disabled={pending || reason.trim().length < 8} onClick={() => transition('desactivee')}>Désactiver</Button>}</div></CardContent></Card>}
     </div>
   )
 }
 
 export function AuthenticationModule({ overview, openProposal = false }: { overview: AuthenticationOverview; openProposal?: boolean }) {
+  const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [family, setFamily] = useState('all')
@@ -80,7 +101,7 @@ export function AuthenticationModule({ overview, openProposal = false }: { overv
         </main>
       </div>
 
-      <Modal open={Boolean(selected)} onClose={() => setSelected(null)} title={selected?.displayName ?? 'Méthode'} description="Définition contractuelle, transmission et état runtime" size="xl">{selected && <MethodDetail method={selected} />}</Modal>
+      <Modal open={Boolean(selected)} onClose={() => setSelected(null)} title={selected?.displayName ?? 'Méthode'} description="Définition contractuelle, transmission et état runtime" size="xl">{selected && <MethodDetail method={selected} viewer={overview.viewer} onChanged={() => { setSelected(null); router.refresh() }} />}</Modal>
       <Modal open={proposalOpen} onClose={() => setProposalOpen(false)} title="Proposer une méthode" description="La proposition est enregistrée uniquement en brouillon." size="2xl"><AuthenticationProposalWizard families={overview.families} onClose={() => setProposalOpen(false)} /></Modal>
     </div>
   )

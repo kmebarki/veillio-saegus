@@ -39,7 +39,13 @@ export function ConnectionsModule({ overview }: { overview: ConnectionsOverview 
   const detail = connections.find((item) => item.id === detailId) ?? null
   const uncovered = viewer.canManage ? connectors.filter((item) => item.requiresAuth && item.sharedCount === 0) : []
 
-  const counts = useMemo(() => ({ all: connections.length, organization: stats.shared, user: stats.personal, attention: stats.attention }), [connections.length, stats])
+  const counts = useMemo(() => ({
+    all: connections.length,
+    organization: connections.filter((item) => item.scope === 'organization').length,
+    public: connections.filter((item) => item.scope === 'public').length,
+    private: stats.personal,
+    attention: stats.attention,
+  }), [connections, stats.attention, stats.personal])
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase()
     return connections.filter((item) => {
@@ -84,8 +90,9 @@ export function ConnectionsModule({ overview }: { overview: ConnectionsOverview 
 
   const filters: { id: Filter; label: string }[] = [
     { id: 'all', label: 'Toutes' },
-    { id: 'organization', label: 'Partagées' },
-    { id: 'user', label: 'Personnelles' },
+    { id: 'private', label: 'Privées' },
+    { id: 'organization', label: 'Organisationnelles' },
+    { id: 'public', label: 'Publiques' },
     { id: 'attention', label: 'À surveiller' },
   ]
   const canCreate = connectors.some((item) => item.requiresAuth)
@@ -106,15 +113,15 @@ export function ConnectionsModule({ overview }: { overview: ConnectionsOverview 
               <div>
                 <p className="mb-2 text-xs font-medium text-primary">{overview.organizationName}</p>
                 <h1 className="text-2xl font-semibold tracking-[-0.04em] sm:text-[30px]">Connexions</h1>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Une connexion donne l’accès réel à un fournisseur de données : clé API, jeton ou mot de passe, partagés par l’organisation ou propres à un utilisateur. Le <Link href="/admin/connectors" className="font-medium text-primary underline-offset-4 hover:underline">connecteur</Link> définit seulement comment communiquer avec le fournisseur.</p>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Une connexion donne l’accès réel à un fournisseur de données : clé API, jeton ou mot de passe, avec une portée privée, organisationnelle ou publique. Le <Link href="/admin/connectors" className="font-medium text-primary underline-offset-4 hover:underline">connecteur</Link> définit seulement comment communiquer avec le fournisseur.</p>
               </div>
               {canCreate && <Button onClick={() => setForm({ mode: 'create' })}><Plus data-icon="inline-start" />Nouvelle connexion</Button>}
             </section>
 
             <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Indicateurs">
               <div className="metric-card"><p>Connexions</p><strong>{stats.total}</strong><span>Visibles par vous</span></div>
-              <div className="metric-card"><p>Partagées</p><strong>{stats.shared}</strong><span>Utilisables par l’organisation</span></div>
-              <div className="metric-card"><p>Personnelles</p><strong>{stats.personal}</strong><span>Réservées à leur propriétaire</span></div>
+              <div className="metric-card"><p>Partagées</p><strong>{stats.shared}</strong><span>Organisationnelles ou publiques</span></div>
+              <div className="metric-card"><p>Privées</p><strong>{stats.personal}</strong><span>Réservées à leur propriétaire</span></div>
               <div className="metric-card"><p>À surveiller</p><strong>{stats.attention}</strong><span>{stats.attention > 0 ? 'Échec, expiration proche ou à retester' : 'Rien à signaler'}</span></div>
             </section>
 

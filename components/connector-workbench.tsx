@@ -123,7 +123,7 @@ export function ConnectorWorkbench({ kind, initialConfig, existing, canManage, o
                 Connexion utilisée pour le test
                 <select value={connectionId} onChange={(event) => setConnectionId(event.target.value)} className={fieldClass}>
                   <option value="">Connexion partagée par défaut</option>
-                  {connections.map((item) => <option key={item.id} value={item.id}>{item.name} ({item.scope === 'user' ? 'personnelle' : 'partagée'})</option>)}
+                  {connections.map((item) => <option key={item.id} value={item.id}>{item.name} ({item.scope === 'private' ? 'privée' : item.scope === 'public' ? 'publique' : 'organisationnelle'})</option>)}
                 </select>
               </label>
             ) : (
