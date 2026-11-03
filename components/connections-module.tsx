@@ -12,7 +12,7 @@ import { ConnectionForm, type FormTarget } from '@/components/connections/connec
 import { inputClass, needsAttention } from '@/components/connections/helpers'
 import { TestResult } from '@/components/connections/test-result'
 import { KindIcon } from '@/components/connector-ui'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
 import { UserMenu } from '@/components/user-menu'
 import { Sidebar } from '@/components/veillio-dashboard'
@@ -175,7 +175,7 @@ export function ConnectionsModule({ overview }: { overview: ConnectionsOverview 
                   </p>
                 </div>
                 {connections.length === 0 && canCreate && <Button onClick={() => setForm({ mode: 'create' })}><Plus data-icon="inline-start" />Créer une connexion</Button>}
-                {!canCreate && <Button variant="outline" render={<Link href="/admin/connectors" />}>Ouvrir les connecteurs</Button>}
+                {!canCreate && <Link href="/admin/connectors" className={buttonVariants({ variant: 'outline' })}>Ouvrir les connecteurs</Link>}
               </section>
             )}
           </div>
