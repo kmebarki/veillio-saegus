@@ -57,11 +57,10 @@ export function validateAuthMethodDefinition(value: unknown): ContractValidation
 
   for (const binding of method.transmission.bindings) {
     const target = binding.target as { name?: unknown; nameFixedByAdapter?: unknown }
-    const source = binding.source as { kind?: unknown }
     const isProtectedHeader = typeof target.name === 'string' && PROTECTED_HEADERS.has(target.name.toLowerCase())
-    const isServerControlled = target.nameFixedByAdapter === true && typeof source.kind === 'string' && source.kind.startsWith('handler.')
+    const isServerControlled = target.nameFixedByAdapter === true && !binding.clientEditable
 
-    if (isProtectedHeader && !isServerControlled) errors.push(`L’en-tête protégé « ${target.name} » doit être fixé par l’adaptateur et dérivé par le handler serveur.`)
+    if (isProtectedHeader && !isServerControlled) errors.push(`L’en-tête protégé « ${target.name} » doit être fixé par l’adaptateur et non modifiable par le client.`)
     if (binding.clientEditable) errors.push('Une liaison de transmission ne peut jamais être modifiable par le client.')
   }
 
