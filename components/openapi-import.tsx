@@ -5,8 +5,8 @@ import { useId, useMemo, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { fieldClass, Modal } from '@/components/ui/modal'
-import { AUTH_LABELS, MAX_API_ENDPOINTS, type ConnectorConfig } from '@/lib/connector-catalog'
-import { addEndpoints, removeEndpoint, switchEndpoint } from '@/lib/connectors/endpoints'
+import { AUTH_LABELS, MAX_API_ENDPOINTS, PAGINATION_TYPES, type ConnectorConfig, type KeyValue } from '@/lib/connector-catalog'
+import { addEndpoints, commitActiveEndpoint, removeEndpoint, switchEndpoint } from '@/lib/connectors/endpoints'
 import { MAX_SPEC_CHARS, OpenApiError, isAbsoluteHttpUrl, parseOpenApi, toApiEndpoint, type ImportedEndpoint, type OpenApiImport } from '@/lib/connectors/openapi'
 import { cn } from '@/lib/utils'
 
@@ -14,24 +14,38 @@ type Props = {
   config: ConnectorConfig
   onChange: (config: ConnectorConfig) => void
   disabled?: boolean
+  allowEndpointEditing?: boolean
 }
 
 const CONFIDENCE_LABELS = { high: 'Mapping fiable', medium: 'Mapping probable', low: 'Mapping à vérifier' } as const
+const PAGINATION_LABELS: Record<(typeof PAGINATION_TYPES)[number], string> = {
+  none: 'Aucune (une seule requête)',
+  page: 'Par numéro de page',
+  offset: 'Par décalage (offset)',
+  cursor: 'Par curseur',
+}
 
 function MethodBadge({ method }: { method: string }) {
   return <span className="inline-flex h-5 shrink-0 items-center rounded-md bg-secondary px-1.5 font-mono text-[11px] font-semibold text-secondary-foreground">{method}</span>
 }
 
-export function EndpointsSection({ config, onChange, disabled }: Props) {
+export function EndpointsSection({ config, onChange, disabled, allowEndpointEditing = false }: Props) {
   const [open, setOpen] = useState(false)
+  const [editConfig, setEditConfig] = useState<ConnectorConfig | null>(null)
   const { endpoints, activeEndpointId } = config.api
+
+  function editEndpoint(id: string) {
+    const next = switchEndpoint(config, id)
+    onChange(next)
+    setEditConfig(next)
+  }
 
   return (
     <section className="flex flex-col gap-4 rounded-2xl border bg-card p-4 sm:p-5">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold tracking-[-0.01em]">Endpoints</h3>
-          <p className="mt-0.5 max-w-xl text-[13px] leading-5 text-muted-foreground">Importez une spécification OpenAPI (JSON ou YAML) pour créer les endpoints automatiquement, ou saisissez-en un à la main ci-dessous.</p>
+          <p className="mt-0.5 max-w-xl text-[13px] leading-5 text-muted-foreground">Importez une spécification OpenAPI (JSON ou YAML) pour créer les endpoints automatiquement.</p>
         </div>
         <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={() => setOpen(true)}><FileUp data-icon="inline-start" />Importer OpenAPI</Button>
       </header>
@@ -49,7 +63,9 @@ export function EndpointsSection({ config, onChange, disabled }: Props) {
                   <p className="truncate text-[13px] font-semibold">{endpoint.label}</p>
                   <p className="truncate font-mono text-xs text-muted-foreground" title={endpoint.url}>{endpoint.url}</p>
                 </div>
-                {active ? (
+                {allowEndpointEditing ? (
+                  <Button type="button" variant="ghost" size="sm" disabled={disabled} onClick={() => editEndpoint(endpoint.id)}><Pencil data-icon="inline-start" />{active ? 'Modifier' : 'Éditer'}</Button>
+                ) : active ? (
                   <span className="shrink-0 text-xs font-medium text-primary">En édition</span>
                 ) : (
                   <Button type="button" variant="ghost" size="sm" disabled={disabled} onClick={() => onChange(switchEndpoint(config, endpoint.id))}><Pencil data-icon="inline-start" />Éditer</Button>
@@ -60,12 +76,113 @@ export function EndpointsSection({ config, onChange, disabled }: Props) {
           })}
         </ul>
       )}
-      {endpoints.length > 0 && <p className="text-xs leading-5 text-muted-foreground">L’endpoint « en édition » est modifié via les sections Source, Mapping et Pagination.</p>}
+      {endpoints.length > 0 && !allowEndpointEditing && <p className="text-xs leading-5 text-muted-foreground">L’endpoint « en édition » est modifié via les sections Source, Mapping et Pagination.</p>}
 
       <Modal open={open} onClose={() => setOpen(false)} size="xl" title="Importer une spécification OpenAPI" description="OpenAPI 3.x ou Swagger 2.0, au format JSON ou YAML. Le fichier est analysé dans votre navigateur.">
         {open && <ImportDialog config={config} onClose={() => setOpen(false)} onApply={(next) => { onChange(next); setOpen(false) }} />}
       </Modal>
+      <Modal open={Boolean(editConfig)} onClose={() => setEditConfig(null)} size="xl" title="Modifier l’endpoint" description="Ajustez la requête, le mapping de réponse et la pagination de cet endpoint.">
+        {editConfig && <EndpointEditor config={editConfig} onCancel={() => setEditConfig(null)} onApply={(next) => { onChange(commitActiveEndpoint(next)); setEditConfig(null) }} />}
+      </Modal>
     </section>
+  )
+}
+
+function EndpointEditor({ config, onCancel, onApply }: { config: ConnectorConfig; onCancel: () => void; onApply: (config: ConnectorConfig) => void }) {
+  const [draft, setDraft] = useState(config)
+  const activeEndpoint = draft.api.endpoints.find((endpoint) => endpoint.id === draft.api.activeEndpointId)
+  const pagination = draft.api.pagination
+
+  function setApi(patch: Partial<ConnectorConfig['api']>) {
+    setDraft((current) => ({ ...current, api: { ...current.api, ...patch } }))
+  }
+
+  function setMetadata(patch: { label?: string; summary?: string }) {
+    setDraft((current) => ({
+      ...current,
+      api: {
+        ...current.api,
+        endpoints: current.api.endpoints.map((endpoint) => endpoint.id === current.api.activeEndpointId ? { ...endpoint, ...patch } : endpoint),
+      },
+    }))
+  }
+
+  function setQuery(query: KeyValue[]) {
+    setApi({ query })
+  }
+
+  if (!activeEndpoint) return null
+
+  return (
+    <form className="flex flex-col gap-6" onSubmit={(event) => { event.preventDefault(); onApply(draft) }}>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="flex flex-col gap-1.5 sm:col-span-2">
+          <span className="text-sm font-medium">Nom de l&apos;endpoint</span>
+          <input required maxLength={120} value={activeEndpoint.label} onChange={(event) => setMetadata({ label: event.target.value })} className={fieldClass} />
+        </label>
+        <label className="flex flex-col gap-1.5 sm:col-span-2">
+          <span className="text-sm font-medium">Description</span>
+          <input maxLength={300} value={activeEndpoint.summary} onChange={(event) => setMetadata({ summary: event.target.value })} className={fieldClass} />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium">Méthode</span>
+          <select value={draft.api.method} onChange={(event) => setApi({ method: event.target.value as 'GET' | 'POST' })} className={fieldClass}>
+            <option value="GET">GET</option>
+            <option value="POST">POST</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-1.5 sm:col-span-2 sm:row-start-3 sm:col-start-2">
+          <span className="text-sm font-medium">URL</span>
+          <input type="url" required spellCheck={false} maxLength={2000} value={draft.url} onChange={(event) => setDraft((current) => ({ ...current, url: event.target.value }))} className={cn(fieldClass, 'font-mono text-[13px]')} />
+        </label>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <div><h4 className="text-sm font-semibold">Paramètres de requête</h4><p className="text-xs text-muted-foreground">Ajoutez les paramètres transmis dans l&apos;URL.</p></div>
+          <Button type="button" variant="outline" size="sm" disabled={draft.api.query.length >= 15} onClick={() => setQuery([...draft.api.query, { name: '', value: '' }])}>Ajouter</Button>
+        </div>
+        {draft.api.query.length === 0 ? <p className="rounded-xl border border-dashed p-3 text-center text-xs text-muted-foreground">Aucun paramètre.</p> : draft.api.query.map((item, index) => (
+          <div key={index} className="flex items-center gap-2">
+            <input aria-label={`Nom du paramètre ${index + 1}`} maxLength={100} value={item.name} onChange={(event) => setQuery(draft.api.query.map((entry, entryIndex) => entryIndex === index ? { ...entry, name: event.target.value } : entry))} className={cn(fieldClass, 'font-mono text-[13px]')} placeholder="nom" />
+            <input aria-label={`Valeur du paramètre ${index + 1}`} maxLength={500} value={item.value} onChange={(event) => setQuery(draft.api.query.map((entry, entryIndex) => entryIndex === index ? { ...entry, value: event.target.value } : entry))} className={cn(fieldClass, 'font-mono text-[13px]')} placeholder="valeur" />
+            <Button type="button" variant="ghost" size="icon" aria-label={`Retirer le paramètre ${index + 1}`} onClick={() => setQuery(draft.api.query.filter((_, entryIndex) => entryIndex !== index))}><Trash2 /></Button>
+          </div>
+        ))}
+      </div>
+
+      {draft.api.method === 'POST' && <label className="flex flex-col gap-1.5"><span className="text-sm font-medium">Corps JSON</span><textarea rows={5} spellCheck={false} maxLength={5000} value={draft.api.body} onChange={(event) => setApi({ body: event.target.value })} className={cn(fieldClass, 'h-auto resize-y py-2.5 font-mono text-[13px] leading-5')} /></label>}
+
+      <div className="flex flex-col gap-3">
+        <div><h4 className="text-sm font-semibold">Mapping de la réponse</h4><p className="text-xs text-muted-foreground">Chemins JSON en notation pointée.</p></div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="flex flex-col gap-1.5 sm:col-span-2"><span className="text-sm font-medium">Liste des éléments</span><input maxLength={120} value={draft.api.itemsPath} onChange={(event) => setApi({ itemsPath: event.target.value })} className={cn(fieldClass, 'font-mono text-[13px]')} placeholder="data.items" /></label>
+          <label className="flex flex-col gap-1.5"><span className="text-sm font-medium">Titre</span><input required maxLength={120} value={draft.api.titlePath} onChange={(event) => setApi({ titlePath: event.target.value })} className={cn(fieldClass, 'font-mono text-[13px]')} /></label>
+          <label className="flex flex-col gap-1.5"><span className="text-sm font-medium">Lien</span><input required maxLength={120} value={draft.api.linkPath} onChange={(event) => setApi({ linkPath: event.target.value })} className={cn(fieldClass, 'font-mono text-[13px]')} /></label>
+          <label className="flex flex-col gap-1.5"><span className="text-sm font-medium">Date</span><input maxLength={120} value={draft.api.datePath} onChange={(event) => setApi({ datePath: event.target.value })} className={cn(fieldClass, 'font-mono text-[13px]')} /></label>
+          <label className="flex flex-col gap-1.5"><span className="text-sm font-medium">Résumé</span><input maxLength={120} value={draft.api.summaryPath} onChange={(event) => setApi({ summaryPath: event.target.value })} className={cn(fieldClass, 'font-mono text-[13px]')} /></label>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <div><h4 className="text-sm font-semibold">Pagination</h4><p className="text-xs text-muted-foreground">Configurez la récupération des pages suivantes.</p></div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="flex flex-col gap-1.5 sm:col-span-2"><span className="text-sm font-medium">Mode</span><select value={pagination.type} onChange={(event) => setApi({ pagination: { ...pagination, type: event.target.value as typeof pagination.type } })} className={fieldClass}>{PAGINATION_TYPES.map((type) => <option key={type} value={type}>{PAGINATION_LABELS[type]}</option>)}</select></label>
+          {pagination.type !== 'none' && <>
+            <label className="flex flex-col gap-1.5"><span className="text-sm font-medium">Paramètre de page</span><input maxLength={64} value={pagination.param} onChange={(event) => setApi({ pagination: { ...pagination, param: event.target.value } })} className={cn(fieldClass, 'font-mono text-[13px]')} /></label>
+            <label className="flex flex-col gap-1.5"><span className="text-sm font-medium">Paramètre de taille</span><input maxLength={64} value={pagination.sizeParam} onChange={(event) => setApi({ pagination: { ...pagination, sizeParam: event.target.value } })} className={cn(fieldClass, 'font-mono text-[13px]')} /></label>
+            <label className="flex flex-col gap-1.5"><span className="text-sm font-medium">Éléments par page</span><input type="number" min={1} max={500} value={pagination.pageSize} onChange={(event) => setApi({ pagination: { ...pagination, pageSize: Number(event.target.value) } })} className={fieldClass} /></label>
+            <label className="flex flex-col gap-1.5"><span className="text-sm font-medium">Pages maximum</span><input type="number" min={1} max={10} value={pagination.maxPages} onChange={(event) => setApi({ pagination: { ...pagination, maxPages: Number(event.target.value) } })} className={fieldClass} /></label>
+            {pagination.type === 'cursor' && <label className="flex flex-col gap-1.5 sm:col-span-2"><span className="text-sm font-medium">Chemin du curseur suivant</span><input maxLength={120} value={pagination.cursorPath} onChange={(event) => setApi({ pagination: { ...pagination, cursorPath: event.target.value } })} className={cn(fieldClass, 'font-mono text-[13px]')} /></label>}
+          </>}
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-2 border-t pt-4">
+        <Button type="button" variant="outline" onClick={onCancel}>Annuler</Button>
+        <Button type="submit">Enregistrer l&apos;endpoint</Button>
+      </div>
+    </form>
   )
 }
 
