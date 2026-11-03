@@ -56,12 +56,17 @@ export function validateAuthMethodDefinition(value: unknown): ContractValidation
   }
 
   for (const binding of method.transmission.bindings) {
-    const target = binding.target as { name?: unknown }
-    if (typeof target.name === 'string' && PROTECTED_HEADERS.has(target.name.toLowerCase())) errors.push(`L’en-tête protégé « ${target.name} » ne peut pas être défini par le contrat.`)
+    const target = binding.target as { name?: unknown; nameFixedByAdapter?: unknown }
+    const source = binding.source as { kind?: unknown }
+    const isProtectedHeader = typeof target.name === 'string' && PROTECTED_HEADERS.has(target.name.toLowerCase())
+    const isServerControlled = target.nameFixedByAdapter === true && typeof source.kind === 'string' && source.kind.startsWith('handler.')
+
+    if (isProtectedHeader && !isServerControlled) errors.push(`L’en-tête protégé « ${target.name} » doit être fixé par l’adaptateur et dérivé par le handler serveur.`)
     if (binding.clientEditable) errors.push('Une liaison de transmission ne peut jamais être modifiable par le client.')
   }
 
-  if (method.transmission.requiresTls === false && method.fieldSchema.fields.some((field) => field.secret)) errors.push('Une méthode contenant un secret doit exiger TLS.')
+  const usesHttpTransport = method.transmission.protocol.toLowerCase().startsWith('http') || method.transmission.bindings.some((binding) => binding.channel.startsWith('http.'))
+  if (usesHttpTransport && method.transmission.requiresTls === false && method.fieldSchema.fields.some((field) => field.secret)) errors.push('Une méthode HTTP contenant un secret doit exiger TLS.')
   if (method.lifecycle.status === 'disponible') {
     const runtime = method.runtime
     if (!runtime.handlerKey || !runtime.handlerVersion || !runtime.deployed || !runtime.securityReviewed || !runtime.contractTestsPassed || !runtime.enabled) errors.push('Une méthode disponible doit fournir toutes les preuves runtime.')
