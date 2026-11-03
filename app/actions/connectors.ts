@@ -24,6 +24,7 @@ import {
   type ConnectorStatus,
 } from '@/lib/connector-catalog'
 import type { ConnectionOption } from '@/lib/connection-types'
+import { getServiceDefinition, selectedAuthMethods } from '@/lib/connector-service-catalog'
 import type { ConnectorDetail, ConnectorHistoryEntry, ConnectorRunEntry, ConnectorSummary, ConnectorsOverview, TestOutcome } from '@/lib/connector-types'
 import { decryptSecret } from '@/lib/connectors/crypto'
 import { runConnectorTest } from '@/lib/connectors/engine'
@@ -110,6 +111,7 @@ function hostOf(kind: ConnectorKind, config: ConnectorConfig) {
 function toSummary(row: Row, connectionCount: number): ConnectorSummary {
   const kind: ConnectorKind = isConnectorKind(row.kind) ? row.kind : 'rss'
   const config = readConfig(kind, row.config)
+  const service = getServiceDefinition(config.integration.templateId)
   return {
     id: row.id,
     name: row.name,
@@ -117,7 +119,11 @@ function toSummary(row: Row, connectionCount: number): ConnectorSummary {
     logoUrl: row.logoUrl ?? '',
     kind,
     category: connectorCategoryOf(kind, config),
-    provider: getConnectorTemplate(config.integration.templateId)?.label ?? getKindInfo(kind)?.label ?? kind,
+    provider: service?.name ?? getConnectorTemplate(config.integration.templateId)?.label ?? getKindInfo(kind)?.label ?? kind,
+    serviceId: service?.id ?? config.integration.templateId,
+    adapter: service?.adapter ?? config.integration.parameters.adapter ?? getKindInfo(kind)?.label ?? kind,
+    authMethods: service ? selectedAuthMethods(config) : [config.auth.type],
+    operational: config.integration.parameters.operational !== 'false',
     status: (['draft', 'active', 'paused'].includes(row.status) ? row.status : 'draft') as ConnectorStatus,
     health: healthOf(row.lastCheckStatus),
     host: describeTarget(kind, config),

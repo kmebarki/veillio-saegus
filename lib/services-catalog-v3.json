@@ -1,0 +1,1592 @@
+{
+  "version": "V3",
+  "statusNote": "Catalogue UX indicatif, distinct du registre réel des adaptateurs déployés. Les méthodes sont des candidates à confirmer, pas des capacités attestées.",
+  "categories": [
+    "Web",
+    "Bases de données",
+    "Flux RSS / Atom",
+    "Réseaux sociaux",
+    "Stockage cloud",
+    "Boîtes mail",
+    "Dossiers locaux",
+    "Messageries collaboratives",
+    "Bases de connaissances"
+  ],
+  "services": [
+    {
+      "id": "site-web-generique-html",
+      "name": "Site Web générique — HTML",
+      "category": "Web",
+      "ecosystem": "Web générique",
+      "adapter": "Extracteur Web HTML",
+      "authCandidates": [
+        "NONE",
+        "BASIC_AUTH"
+      ],
+      "description": "Scraping HTML",
+      "api": false,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "site-web-dynamique-javascript",
+      "name": "Site Web dynamique — JavaScript",
+      "category": "Web",
+      "ecosystem": "Web générique",
+      "adapter": "Extracteur navigateur dynamique",
+      "authCandidates": [
+        "NONE",
+        "BASIC_AUTH"
+      ],
+      "description": "Pages dynamiques ; conditions et robots à vérifier",
+      "api": false,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "wordpress-site-web",
+      "name": "WordPress — Site Web",
+      "category": "Web",
+      "ecosystem": "CMS",
+      "adapter": "Extracteur HTML pour WordPress",
+      "authCandidates": [
+        "NONE",
+        "BASIC_AUTH"
+      ],
+      "description": "Scraping de site WordPress",
+      "api": false,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "drupal-site-web",
+      "name": "Drupal — Site Web",
+      "category": "Web",
+      "ecosystem": "CMS",
+      "adapter": "Extracteur HTML pour Drupal",
+      "authCandidates": [
+        "NONE",
+        "BASIC_AUTH"
+      ],
+      "description": "Scraping de site Drupal",
+      "api": false,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "joomla-site-web",
+      "name": "Joomla — Site Web",
+      "category": "Web",
+      "ecosystem": "CMS",
+      "adapter": "Extracteur HTML pour Joomla",
+      "authCandidates": [
+        "NONE",
+        "BASIC_AUTH"
+      ],
+      "description": "Scraping de site Joomla",
+      "api": false,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "wix-site-web",
+      "name": "Wix — Site Web",
+      "category": "Web",
+      "ecosystem": "CMS",
+      "adapter": "Extracteur HTML générique",
+      "authCandidates": [
+        "NONE",
+        "BASIC_AUTH"
+      ],
+      "description": "Scraping du site publié",
+      "api": false,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "squarespace-site-web",
+      "name": "Squarespace — Site Web",
+      "category": "Web",
+      "ecosystem": "CMS",
+      "adapter": "Extracteur HTML générique",
+      "authCandidates": [
+        "NONE",
+        "BASIC_AUTH"
+      ],
+      "description": "Scraping du site publié",
+      "api": false,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "ghost-site-web",
+      "name": "Ghost — Site Web",
+      "category": "Web",
+      "ecosystem": "CMS",
+      "adapter": "Extracteur HTML générique",
+      "authCandidates": [
+        "NONE",
+        "BASIC_AUTH"
+      ],
+      "description": "Scraping du site publié",
+      "api": false,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "site-institutionnel-html",
+      "name": "Site institutionnel — HTML",
+      "category": "Web",
+      "ecosystem": "Web générique",
+      "adapter": "Extracteur HTML générique",
+      "authCandidates": [
+        "NONE",
+        "BASIC_AUTH"
+      ],
+      "description": "Sections publiques",
+      "api": false,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "site-de-presse-html",
+      "name": "Site de presse — HTML",
+      "category": "Web",
+      "ecosystem": "Web générique",
+      "adapter": "Extracteur HTML générique",
+      "authCandidates": [
+        "NONE",
+        "BASIC_AUTH"
+      ],
+      "description": "Droits et éventuel paywall à respecter",
+      "api": false,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "blog-site-documentaire-html",
+      "name": "Blog / site documentaire — HTML",
+      "category": "Web",
+      "ecosystem": "Web générique",
+      "adapter": "Extracteur HTML générique",
+      "authCandidates": [
+        "NONE",
+        "BASIC_AUTH"
+      ],
+      "description": "Pages et rubriques",
+      "api": false,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "autre-web",
+      "name": "Autre service / Connecteur personnalisé",
+      "category": "Web",
+      "ecosystem": "Personnalisé",
+      "adapter": "Adaptateur à définir / implémenter",
+      "authCandidates": [
+        "NONE",
+        "API_KEY",
+        "BEARER_TOKEN",
+        "OAUTH2_AUTH_CODE",
+        "OAUTH2_CLIENT",
+        "BASIC_AUTH",
+        "USER_PASSWORD",
+        "CUSTOM"
+      ],
+      "description": "Parcours personnalisé ; import OpenAPI possible si protocole API compatible",
+      "api": true,
+      "status": "Personnalisé — non opérationnel",
+      "custom": true
+    },
+    {
+      "id": "pubmed-ncbi",
+      "name": "PubMed — NCBI",
+      "category": "Bases de données",
+      "ecosystem": "NCBI",
+      "adapter": "NCBI E-utilities API",
+      "authCandidates": [
+        "NONE",
+        "API_KEY"
+      ],
+      "description": "Base bibliographique",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "boamp-api-officielle",
+      "name": "BOAMP — API officielle",
+      "category": "Bases de données",
+      "ecosystem": "France",
+      "adapter": "API BOAMP",
+      "authCandidates": [
+        "NONE"
+      ],
+      "description": "Appels d’offres et avis publics",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "ted-marches-publics-europeens",
+      "name": "TED — Marchés publics européens",
+      "category": "Bases de données",
+      "ecosystem": "Union européenne",
+      "adapter": "TED API",
+      "authCandidates": [
+        "NONE",
+        "API_KEY"
+      ],
+      "description": "Avis européens",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "eur-lex",
+      "name": "EUR-Lex",
+      "category": "Bases de données",
+      "ecosystem": "Union européenne",
+      "adapter": "Services EUR-Lex",
+      "authCandidates": [
+        "NONE",
+        "API_KEY"
+      ],
+      "description": "Droit européen",
+      "api": false,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "inpi-brevets",
+      "name": "INPI — Brevets",
+      "category": "Bases de données",
+      "ecosystem": "INPI",
+      "adapter": "API INPI",
+      "authCandidates": [
+        "API_KEY",
+        "OAUTH2_CLIENT"
+      ],
+      "description": "Données de propriété industrielle",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "espacenet",
+      "name": "Espacenet",
+      "category": "Bases de données",
+      "ecosystem": "Office européen des brevets",
+      "adapter": "EPO OPS / services brevets",
+      "authCandidates": [
+        "OAUTH2_CLIENT"
+      ],
+      "description": "Base brevets ; accès selon contrat",
+      "api": false,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "scopus",
+      "name": "Scopus",
+      "category": "Bases de données",
+      "ecosystem": "Elsevier",
+      "adapter": "Scopus API",
+      "authCandidates": [
+        "API_KEY"
+      ],
+      "description": "Base scientifique sous abonnement",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "web-of-science",
+      "name": "Web of Science",
+      "category": "Bases de données",
+      "ecosystem": "Clarivate",
+      "adapter": "Web of Science APIs",
+      "authCandidates": [
+        "API_KEY"
+      ],
+      "description": "Accès soumis à licence",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "sciencedirect",
+      "name": "ScienceDirect",
+      "category": "Bases de données",
+      "ecosystem": "Elsevier",
+      "adapter": "ScienceDirect API",
+      "authCandidates": [
+        "API_KEY"
+      ],
+      "description": "Documents et métadonnées selon abonnement",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "crossref",
+      "name": "Crossref",
+      "category": "Bases de données",
+      "ecosystem": "Crossref",
+      "adapter": "Crossref REST API",
+      "authCandidates": [
+        "NONE"
+      ],
+      "description": "Métadonnées DOI",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "openalex",
+      "name": "OpenAlex",
+      "category": "Bases de données",
+      "ecosystem": "OpenAlex",
+      "adapter": "OpenAlex API",
+      "authCandidates": [
+        "NONE",
+        "API_KEY"
+      ],
+      "description": "Métadonnées scientifiques selon plan",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "arxiv",
+      "name": "arXiv",
+      "category": "Bases de données",
+      "ecosystem": "Cornell",
+      "adapter": "arXiv API",
+      "authCandidates": [
+        "NONE"
+      ],
+      "description": "Prépublications",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "clinicaltrials-gov",
+      "name": "ClinicalTrials.gov",
+      "category": "Bases de données",
+      "ecosystem": "NLM",
+      "adapter": "ClinicalTrials.gov API",
+      "authCandidates": [
+        "NONE"
+      ],
+      "description": "Essais cliniques",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "hal-publications",
+      "name": "HAL — Publications",
+      "category": "Bases de données",
+      "ecosystem": "CCSD",
+      "adapter": "HAL API",
+      "authCandidates": [
+        "NONE"
+      ],
+      "description": "Archives ouvertes",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "europe-pmc",
+      "name": "Europe PMC",
+      "category": "Bases de données",
+      "ecosystem": "EMBL-EBI",
+      "adapter": "Europe PMC API",
+      "authCandidates": [
+        "NONE"
+      ],
+      "description": "Documents biomédicaux",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "epo-open-patent-services",
+      "name": "EPO — Open Patent Services",
+      "category": "Bases de données",
+      "ecosystem": "Office européen des brevets",
+      "adapter": "EPO OPS",
+      "authCandidates": [
+        "OAUTH2_CLIENT"
+      ],
+      "description": "Accès et quotas sous conditions",
+      "api": false,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "insee-donnees-et-indicateurs",
+      "name": "INSEE — Données et indicateurs",
+      "category": "Bases de données",
+      "ecosystem": "INSEE",
+      "adapter": "INSEE API",
+      "authCandidates": [
+        "OAUTH2_CLIENT"
+      ],
+      "description": "Séries statistiques",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "eurostat",
+      "name": "Eurostat",
+      "category": "Bases de données",
+      "ecosystem": "Union européenne",
+      "adapter": "Eurostat APIs",
+      "authCandidates": [
+        "NONE"
+      ],
+      "description": "Statistiques européennes",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "banque-mondiale-open-data",
+      "name": "Banque mondiale — Open Data",
+      "category": "Bases de données",
+      "ecosystem": "Banque mondiale",
+      "adapter": "World Bank API",
+      "authCandidates": [
+        "NONE"
+      ],
+      "description": "Indicateurs internationaux",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "data-gouv-fr-jeux-de-donnees",
+      "name": "data.gouv.fr — Jeux de données",
+      "category": "Bases de données",
+      "ecosystem": "France",
+      "adapter": "API data.gouv.fr",
+      "authCandidates": [
+        "NONE"
+      ],
+      "description": "Données ouvertes",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "autre-bases-de-donnees",
+      "name": "Autre service / Connecteur personnalisé",
+      "category": "Bases de données",
+      "ecosystem": "Personnalisé",
+      "adapter": "Adaptateur à définir / implémenter",
+      "authCandidates": [
+        "NONE",
+        "API_KEY",
+        "BEARER_TOKEN",
+        "OAUTH2_AUTH_CODE",
+        "OAUTH2_CLIENT",
+        "BASIC_AUTH",
+        "USER_PASSWORD",
+        "CUSTOM"
+      ],
+      "description": "Parcours personnalisé ; import OpenAPI possible si protocole API compatible",
+      "api": true,
+      "status": "Personnalisé — non opérationnel",
+      "custom": true
+    },
+    {
+      "id": "flux-rss-2-0-generique",
+      "name": "Flux RSS 2.0 générique",
+      "category": "Flux RSS / Atom",
+      "ecosystem": "Standard ouvert",
+      "adapter": "Lecteur RSS 2.0",
+      "authCandidates": [
+        "NONE",
+        "BASIC_AUTH"
+      ],
+      "description": "Flux RSS 2.0",
+      "api": false,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "flux-atom-1-0-generique",
+      "name": "Flux Atom 1.0 générique",
+      "category": "Flux RSS / Atom",
+      "ecosystem": "Standard ouvert",
+      "adapter": "Lecteur Atom 1.0",
+      "authCandidates": [
+        "NONE",
+        "BASIC_AUTH"
+      ],
+      "description": "Flux Atom",
+      "api": false,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "wordpress-flux-rss",
+      "name": "WordPress — Flux RSS",
+      "category": "Flux RSS / Atom",
+      "ecosystem": "WordPress",
+      "adapter": "Lecteur RSS 2.0",
+      "authCandidates": [
+        "NONE",
+        "BASIC_AUTH"
+      ],
+      "description": "Flux WordPress",
+      "api": false,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "flux-de-presse",
+      "name": "Flux de presse",
+      "category": "Flux RSS / Atom",
+      "ecosystem": "Presse",
+      "adapter": "Lecteur RSS / Atom",
+      "authCandidates": [
+        "NONE",
+        "BASIC_AUTH"
+      ],
+      "description": "Flux structurés",
+      "api": false,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "flux-institutionnels",
+      "name": "Flux institutionnels",
+      "category": "Flux RSS / Atom",
+      "ecosystem": "Institutions",
+      "adapter": "Lecteur RSS / Atom",
+      "authCandidates": [
+        "NONE",
+        "BASIC_AUTH"
+      ],
+      "description": "Flux structurés",
+      "api": false,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "flux-rss-atom-protege",
+      "name": "Flux RSS / Atom protégé",
+      "category": "Flux RSS / Atom",
+      "ecosystem": "Standard ouvert",
+      "adapter": "Lecteur RSS / Atom authentifié",
+      "authCandidates": [
+        "BASIC_AUTH",
+        "BEARER_TOKEN"
+      ],
+      "description": "Authentification si prise en charge par l’origine",
+      "api": false,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "autre-flux-rss-atom",
+      "name": "Autre service / Connecteur personnalisé",
+      "category": "Flux RSS / Atom",
+      "ecosystem": "Personnalisé",
+      "adapter": "Adaptateur à définir / implémenter",
+      "authCandidates": [
+        "NONE",
+        "API_KEY",
+        "BEARER_TOKEN",
+        "OAUTH2_AUTH_CODE",
+        "OAUTH2_CLIENT",
+        "BASIC_AUTH",
+        "USER_PASSWORD",
+        "CUSTOM"
+      ],
+      "description": "Parcours personnalisé ; import OpenAPI possible si protocole API compatible",
+      "api": true,
+      "status": "Personnalisé — non opérationnel",
+      "custom": true
+    },
+    {
+      "id": "x-twitter",
+      "name": "X (Twitter)",
+      "category": "Réseaux sociaux",
+      "ecosystem": "X",
+      "adapter": "X API",
+      "authCandidates": [
+        "OAUTH2_AUTH_CODE",
+        "BEARER_TOKEN"
+      ],
+      "description": "Accès/API selon offre et permissions",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "reddit",
+      "name": "Reddit",
+      "category": "Réseaux sociaux",
+      "ecosystem": "Reddit",
+      "adapter": "Reddit Data API",
+      "authCandidates": [
+        "OAUTH2_AUTH_CODE"
+      ],
+      "description": "OAuth et conditions d’utilisation",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "facebook-pages",
+      "name": "Facebook Pages",
+      "category": "Réseaux sociaux",
+      "ecosystem": "Meta",
+      "adapter": "Meta Graph API — Pages",
+      "authCandidates": [
+        "OAUTH2_AUTH_CODE"
+      ],
+      "description": "Permissions de pages requises",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "facebook-groups",
+      "name": "Facebook Groups",
+      "category": "Réseaux sociaux",
+      "ecosystem": "Meta",
+      "adapter": "Meta Graph API — Groups",
+      "authCandidates": [
+        "OAUTH2_AUTH_CODE"
+      ],
+      "description": "Capacités soumises à restrictions fortes",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "instagram-professionnel",
+      "name": "Instagram professionnel",
+      "category": "Réseaux sociaux",
+      "ecosystem": "Meta",
+      "adapter": "Instagram Graph API",
+      "authCandidates": [
+        "OAUTH2_AUTH_CODE"
+      ],
+      "description": "Compte professionnel et permissions",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "linkedin",
+      "name": "LinkedIn",
+      "category": "Réseaux sociaux",
+      "ecosystem": "LinkedIn",
+      "adapter": "LinkedIn API",
+      "authCandidates": [
+        "OAUTH2_AUTH_CODE"
+      ],
+      "description": "Produit API et permissions requises",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "youtube",
+      "name": "YouTube",
+      "category": "Réseaux sociaux",
+      "ecosystem": "Google",
+      "adapter": "YouTube Data API",
+      "authCandidates": [
+        "API_KEY",
+        "OAUTH2_AUTH_CODE"
+      ],
+      "description": "Accès public ou privé selon opération",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "tiktok",
+      "name": "TikTok",
+      "category": "Réseaux sociaux",
+      "ecosystem": "TikTok",
+      "adapter": "TikTok APIs",
+      "authCandidates": [
+        "OAUTH2_AUTH_CODE"
+      ],
+      "description": "Accès sous approbation et conditions",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "threads",
+      "name": "Threads",
+      "category": "Réseaux sociaux",
+      "ecosystem": "Meta",
+      "adapter": "Threads API",
+      "authCandidates": [
+        "OAUTH2_AUTH_CODE"
+      ],
+      "description": "Permissions selon plateforme",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "bluesky",
+      "name": "Bluesky",
+      "category": "Réseaux sociaux",
+      "ecosystem": "Bluesky",
+      "adapter": "AT Protocol",
+      "authCandidates": [
+        "USER_PASSWORD",
+        "OAUTH2_AUTH_CODE"
+      ],
+      "description": "Méthodes selon implémentation du protocole",
+      "api": false,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "mastodon",
+      "name": "Mastodon",
+      "category": "Réseaux sociaux",
+      "ecosystem": "Fediverse",
+      "adapter": "Mastodon API",
+      "authCandidates": [
+        "NONE",
+        "OAUTH2_AUTH_CODE",
+        "BEARER_TOKEN"
+      ],
+      "description": "Instance et permissions variables",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "pinterest",
+      "name": "Pinterest",
+      "category": "Réseaux sociaux",
+      "ecosystem": "Pinterest",
+      "adapter": "Pinterest API",
+      "authCandidates": [
+        "OAUTH2_AUTH_CODE"
+      ],
+      "description": "Autorisations selon API",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "autre-reseaux-sociaux",
+      "name": "Autre service / Connecteur personnalisé",
+      "category": "Réseaux sociaux",
+      "ecosystem": "Personnalisé",
+      "adapter": "Adaptateur à définir / implémenter",
+      "authCandidates": [
+        "NONE",
+        "API_KEY",
+        "BEARER_TOKEN",
+        "OAUTH2_AUTH_CODE",
+        "OAUTH2_CLIENT",
+        "BASIC_AUTH",
+        "USER_PASSWORD",
+        "CUSTOM"
+      ],
+      "description": "Parcours personnalisé ; import OpenAPI possible si protocole API compatible",
+      "api": true,
+      "status": "Personnalisé — non opérationnel",
+      "custom": true
+    },
+    {
+      "id": "microsoft-onedrive",
+      "name": "Microsoft OneDrive",
+      "category": "Stockage cloud",
+      "ecosystem": "Microsoft 365",
+      "adapter": "Microsoft Graph — OneDrive",
+      "authCandidates": [
+        "OAUTH2_AUTH_CODE",
+        "OAUTH2_CLIENT"
+      ],
+      "description": "Dossiers et fichiers",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "microsoft-sharepoint",
+      "name": "Microsoft SharePoint",
+      "category": "Stockage cloud",
+      "ecosystem": "Microsoft 365",
+      "adapter": "Microsoft Graph — SharePoint",
+      "authCandidates": [
+        "OAUTH2_AUTH_CODE",
+        "OAUTH2_CLIENT"
+      ],
+      "description": "Sites et bibliothèques",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "google-drive",
+      "name": "Google Drive",
+      "category": "Stockage cloud",
+      "ecosystem": "Google Workspace",
+      "adapter": "Google Drive API",
+      "authCandidates": [
+        "OAUTH2_AUTH_CODE",
+        "SERVICE_ACCOUNT"
+      ],
+      "description": "Dossiers et documents",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "google-shared-drives",
+      "name": "Google Shared Drives",
+      "category": "Stockage cloud",
+      "ecosystem": "Google Workspace",
+      "adapter": "Google Drive API — Shared Drives",
+      "authCandidates": [
+        "OAUTH2_AUTH_CODE",
+        "SERVICE_ACCOUNT"
+      ],
+      "description": "Espaces partagés",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "dropbox",
+      "name": "Dropbox",
+      "category": "Stockage cloud",
+      "ecosystem": "Dropbox",
+      "adapter": "Dropbox API",
+      "authCandidates": [
+        "OAUTH2_AUTH_CODE"
+      ],
+      "description": "Documents et dossiers",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "box",
+      "name": "Box",
+      "category": "Stockage cloud",
+      "ecosystem": "Box",
+      "adapter": "Box Platform API",
+      "authCandidates": [
+        "OAUTH2_AUTH_CODE",
+        "OAUTH2_CLIENT"
+      ],
+      "description": "Fichiers Box",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "nextcloud",
+      "name": "Nextcloud",
+      "category": "Stockage cloud",
+      "ecosystem": "Nextcloud",
+      "adapter": "Nextcloud WebDAV / API",
+      "authCandidates": [
+        "USER_PASSWORD",
+        "BEARER_TOKEN"
+      ],
+      "description": "Configuration selon instance",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "aws-s3",
+      "name": "AWS S3",
+      "category": "Stockage cloud",
+      "ecosystem": "Amazon Web Services",
+      "adapter": "AWS S3 REST / SDK",
+      "authCandidates": [
+        "CUSTOM"
+      ],
+      "description": "Signature AWS SigV4",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "stockage-compatible-s3",
+      "name": "Stockage compatible S3",
+      "category": "Stockage cloud",
+      "ecosystem": "S3 générique",
+      "adapter": "S3 compatible SDK",
+      "authCandidates": [
+        "CUSTOM"
+      ],
+      "description": "Signature compatible SigV4",
+      "api": false,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "egnyte",
+      "name": "Egnyte",
+      "category": "Stockage cloud",
+      "ecosystem": "Egnyte",
+      "adapter": "Egnyte Public API",
+      "authCandidates": [
+        "OAUTH2_AUTH_CODE"
+      ],
+      "description": "Accès selon environnement",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "pcloud",
+      "name": "pCloud",
+      "category": "Stockage cloud",
+      "ecosystem": "pCloud",
+      "adapter": "pCloud API",
+      "authCandidates": [
+        "OAUTH2_AUTH_CODE"
+      ],
+      "description": "API et disponibilité à qualifier",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "azure-blob-storage",
+      "name": "Azure Blob Storage",
+      "category": "Stockage cloud",
+      "ecosystem": "Microsoft Azure",
+      "adapter": "Azure Storage REST / SDK",
+      "authCandidates": [
+        "CUSTOM",
+        "OAUTH2_CLIENT"
+      ],
+      "description": "SAS, Shared Key ou Azure AD",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "google-cloud-storage",
+      "name": "Google Cloud Storage",
+      "category": "Stockage cloud",
+      "ecosystem": "Google Cloud",
+      "adapter": "Google Cloud Storage API",
+      "authCandidates": [
+        "SERVICE_ACCOUNT",
+        "OAUTH2_AUTH_CODE"
+      ],
+      "description": "Identité Google Cloud",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "wasabi-s3",
+      "name": "Wasabi S3",
+      "category": "Stockage cloud",
+      "ecosystem": "Wasabi",
+      "adapter": "S3 compatible SDK",
+      "authCandidates": [
+        "CUSTOM"
+      ],
+      "description": "Signature S3",
+      "api": false,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "backblaze-b2",
+      "name": "Backblaze B2",
+      "category": "Stockage cloud",
+      "ecosystem": "Backblaze",
+      "adapter": "B2 API / S3 compatible",
+      "authCandidates": [
+        "API_KEY",
+        "CUSTOM"
+      ],
+      "description": "Méthode selon API choisie",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "autre-stockage-cloud",
+      "name": "Autre service / Connecteur personnalisé",
+      "category": "Stockage cloud",
+      "ecosystem": "Personnalisé",
+      "adapter": "Adaptateur à définir / implémenter",
+      "authCandidates": [
+        "NONE",
+        "API_KEY",
+        "BEARER_TOKEN",
+        "OAUTH2_AUTH_CODE",
+        "OAUTH2_CLIENT",
+        "BASIC_AUTH",
+        "USER_PASSWORD",
+        "CUSTOM"
+      ],
+      "description": "Parcours personnalisé ; import OpenAPI possible si protocole API compatible",
+      "api": true,
+      "status": "Personnalisé — non opérationnel",
+      "custom": true
+    },
+    {
+      "id": "gmail",
+      "name": "Gmail",
+      "category": "Boîtes mail",
+      "ecosystem": "Google Workspace",
+      "adapter": "Gmail API",
+      "authCandidates": [
+        "OAUTH2_AUTH_CODE",
+        "SERVICE_ACCOUNT"
+      ],
+      "description": "Délégation Workspace selon configuration",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "outlook-microsoft-365",
+      "name": "Outlook / Microsoft 365",
+      "category": "Boîtes mail",
+      "ecosystem": "Microsoft 365",
+      "adapter": "Microsoft Graph Mail",
+      "authCandidates": [
+        "OAUTH2_AUTH_CODE",
+        "OAUTH2_CLIENT"
+      ],
+      "description": "Messagerie Microsoft",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "exchange-online",
+      "name": "Exchange Online",
+      "category": "Boîtes mail",
+      "ecosystem": "Microsoft 365",
+      "adapter": "Microsoft Graph / Exchange Online",
+      "authCandidates": [
+        "OAUTH2_AUTH_CODE",
+        "OAUTH2_CLIENT"
+      ],
+      "description": "Accès selon politiques de tenant",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "imap-generique",
+      "name": "IMAP générique",
+      "category": "Boîtes mail",
+      "ecosystem": "Standard ouvert",
+      "adapter": "Adaptateur IMAP",
+      "authCandidates": [
+        "USER_PASSWORD",
+        "OAUTH2_AUTH_CODE"
+      ],
+      "description": "Selon serveur / mécanisme réellement supporté",
+      "api": false,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "yahoo-mail",
+      "name": "Yahoo Mail",
+      "category": "Boîtes mail",
+      "ecosystem": "Yahoo",
+      "adapter": "Adaptateur IMAP Yahoo",
+      "authCandidates": [
+        "USER_PASSWORD",
+        "OAUTH2_AUTH_CODE"
+      ],
+      "description": "Selon politique du service",
+      "api": false,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "zoho-mail",
+      "name": "Zoho Mail",
+      "category": "Boîtes mail",
+      "ecosystem": "Zoho",
+      "adapter": "Zoho Mail API / IMAP",
+      "authCandidates": [
+        "OAUTH2_AUTH_CODE",
+        "USER_PASSWORD"
+      ],
+      "description": "Selon interface choisie",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "fastmail",
+      "name": "Fastmail",
+      "category": "Boîtes mail",
+      "ecosystem": "Fastmail",
+      "adapter": "Fastmail API / IMAP",
+      "authCandidates": [
+        "BEARER_TOKEN",
+        "USER_PASSWORD"
+      ],
+      "description": "App password selon configuration",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "autre-boites-mail",
+      "name": "Autre service / Connecteur personnalisé",
+      "category": "Boîtes mail",
+      "ecosystem": "Personnalisé",
+      "adapter": "Adaptateur à définir / implémenter",
+      "authCandidates": [
+        "NONE",
+        "API_KEY",
+        "BEARER_TOKEN",
+        "OAUTH2_AUTH_CODE",
+        "OAUTH2_CLIENT",
+        "BASIC_AUTH",
+        "USER_PASSWORD",
+        "CUSTOM"
+      ],
+      "description": "Parcours personnalisé ; import OpenAPI possible si protocole API compatible",
+      "api": true,
+      "status": "Personnalisé — non opérationnel",
+      "custom": true
+    },
+    {
+      "id": "repertoire-local-autorise",
+      "name": "Répertoire local autorisé",
+      "category": "Dossiers locaux",
+      "ecosystem": "Système de fichiers",
+      "adapter": "Lecteur de répertoire local",
+      "authCandidates": [
+        "NONE"
+      ],
+      "description": "Chemin accessible au worker",
+      "api": false,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "dossier-serveur-monte",
+      "name": "Dossier serveur monté",
+      "category": "Dossiers locaux",
+      "ecosystem": "Système de fichiers",
+      "adapter": "Lecteur de volume monté",
+      "authCandidates": [
+        "NONE"
+      ],
+      "description": "Volume autorisé dans le système",
+      "api": false,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "partage-smb-cifs-monte",
+      "name": "Partage SMB/CIFS monté",
+      "category": "Dossiers locaux",
+      "ecosystem": "Réseau local",
+      "adapter": "Lecteur de volume SMB monté",
+      "authCandidates": [
+        "NONE"
+      ],
+      "description": "Secrets de montage hors définition Source",
+      "api": false,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "partage-nfs-monte",
+      "name": "Partage NFS monté",
+      "category": "Dossiers locaux",
+      "ecosystem": "Réseau local",
+      "adapter": "Lecteur de volume NFS monté",
+      "authCandidates": [
+        "NONE"
+      ],
+      "description": "Droits système du montage",
+      "api": false,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "repertoire-nas-monte",
+      "name": "Répertoire NAS monté",
+      "category": "Dossiers locaux",
+      "ecosystem": "Stockage local",
+      "adapter": "Lecteur de volume NAS monté",
+      "authCandidates": [
+        "NONE"
+      ],
+      "description": "Accès au volume déjà configuré",
+      "api": false,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "autre-dossiers-locaux",
+      "name": "Autre service / Connecteur personnalisé",
+      "category": "Dossiers locaux",
+      "ecosystem": "Personnalisé",
+      "adapter": "Adaptateur à définir / implémenter",
+      "authCandidates": [
+        "NONE",
+        "API_KEY",
+        "BEARER_TOKEN",
+        "OAUTH2_AUTH_CODE",
+        "OAUTH2_CLIENT",
+        "BASIC_AUTH",
+        "USER_PASSWORD",
+        "CUSTOM"
+      ],
+      "description": "Parcours personnalisé ; import OpenAPI possible si protocole API compatible",
+      "api": true,
+      "status": "Personnalisé — non opérationnel",
+      "custom": true
+    },
+    {
+      "id": "microsoft-teams",
+      "name": "Microsoft Teams",
+      "category": "Messageries collaboratives",
+      "ecosystem": "Microsoft 365",
+      "adapter": "Microsoft Graph — Teams",
+      "authCandidates": [
+        "OAUTH2_AUTH_CODE",
+        "OAUTH2_CLIENT"
+      ],
+      "description": "Canaux et messages selon autorisations",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "slack",
+      "name": "Slack",
+      "category": "Messageries collaboratives",
+      "ecosystem": "Slack",
+      "adapter": "Slack Web API",
+      "authCandidates": [
+        "OAUTH2_AUTH_CODE",
+        "BEARER_TOKEN"
+      ],
+      "description": "Scopes selon workspace",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "google-chat",
+      "name": "Google Chat",
+      "category": "Messageries collaboratives",
+      "ecosystem": "Google Workspace",
+      "adapter": "Google Chat API",
+      "authCandidates": [
+        "OAUTH2_AUTH_CODE",
+        "SERVICE_ACCOUNT"
+      ],
+      "description": "Accès selon modèle d’application",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "discord",
+      "name": "Discord",
+      "category": "Messageries collaboratives",
+      "ecosystem": "Discord",
+      "adapter": "Discord API",
+      "authCandidates": [
+        "BEARER_TOKEN",
+        "OAUTH2_AUTH_CODE"
+      ],
+      "description": "Bot / OAuth selon actions",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "mattermost",
+      "name": "Mattermost",
+      "category": "Messageries collaboratives",
+      "ecosystem": "Mattermost",
+      "adapter": "Mattermost REST API",
+      "authCandidates": [
+        "BEARER_TOKEN",
+        "USER_PASSWORD"
+      ],
+      "description": "Selon installation",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "rocket-chat",
+      "name": "Rocket.Chat",
+      "category": "Messageries collaboratives",
+      "ecosystem": "Rocket.Chat",
+      "adapter": "Rocket.Chat REST API",
+      "authCandidates": [
+        "BEARER_TOKEN",
+        "USER_PASSWORD"
+      ],
+      "description": "Selon installation",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "telegram",
+      "name": "Telegram",
+      "category": "Messageries collaboratives",
+      "ecosystem": "Telegram",
+      "adapter": "Telegram Bot API",
+      "authCandidates": [
+        "BEARER_TOKEN"
+      ],
+      "description": "Bot token, accès dépendant du bot",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "zulip",
+      "name": "Zulip",
+      "category": "Messageries collaboratives",
+      "ecosystem": "Zulip",
+      "adapter": "Zulip API",
+      "authCandidates": [
+        "API_KEY"
+      ],
+      "description": "Clé API et compte",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "autre-messageries-collaboratives",
+      "name": "Autre service / Connecteur personnalisé",
+      "category": "Messageries collaboratives",
+      "ecosystem": "Personnalisé",
+      "adapter": "Adaptateur à définir / implémenter",
+      "authCandidates": [
+        "NONE",
+        "API_KEY",
+        "BEARER_TOKEN",
+        "OAUTH2_AUTH_CODE",
+        "OAUTH2_CLIENT",
+        "BASIC_AUTH",
+        "USER_PASSWORD",
+        "CUSTOM"
+      ],
+      "description": "Parcours personnalisé ; import OpenAPI possible si protocole API compatible",
+      "api": true,
+      "status": "Personnalisé — non opérationnel",
+      "custom": true
+    },
+    {
+      "id": "confluence",
+      "name": "Confluence",
+      "category": "Bases de connaissances",
+      "ecosystem": "Atlassian",
+      "adapter": "Confluence REST API",
+      "authCandidates": [
+        "OAUTH2_AUTH_CODE",
+        "API_KEY"
+      ],
+      "description": "Selon cloud et instance",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "notion",
+      "name": "Notion",
+      "category": "Bases de connaissances",
+      "ecosystem": "Notion",
+      "adapter": "Notion API",
+      "authCandidates": [
+        "OAUTH2_AUTH_CODE",
+        "BEARER_TOKEN"
+      ],
+      "description": "Intégration Notion",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "mediawiki",
+      "name": "MediaWiki",
+      "category": "Bases de connaissances",
+      "ecosystem": "MediaWiki",
+      "adapter": "MediaWiki Action API",
+      "authCandidates": [
+        "NONE",
+        "USER_PASSWORD",
+        "OAUTH2_AUTH_CODE"
+      ],
+      "description": "Permissions propres au wiki",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "gitbook",
+      "name": "GitBook",
+      "category": "Bases de connaissances",
+      "ecosystem": "GitBook",
+      "adapter": "GitBook API",
+      "authCandidates": [
+        "BEARER_TOKEN"
+      ],
+      "description": "Selon offre",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "guru",
+      "name": "Guru",
+      "category": "Bases de connaissances",
+      "ecosystem": "Guru",
+      "adapter": "Guru API",
+      "authCandidates": [
+        "OAUTH2_AUTH_CODE",
+        "BEARER_TOKEN"
+      ],
+      "description": "API selon offre",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "slab",
+      "name": "Slab",
+      "category": "Bases de connaissances",
+      "ecosystem": "Slab",
+      "adapter": "Slab API",
+      "authCandidates": [
+        "BEARER_TOKEN"
+      ],
+      "description": "Disponibilité selon offre",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "zendesk-guide",
+      "name": "Zendesk Guide",
+      "category": "Bases de connaissances",
+      "ecosystem": "Zendesk",
+      "adapter": "Zendesk Help Center API",
+      "authCandidates": [
+        "API_KEY",
+        "OAUTH2_AUTH_CODE"
+      ],
+      "description": "Selon permission et plan",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "intercom-help-center",
+      "name": "Intercom Help Center",
+      "category": "Bases de connaissances",
+      "ecosystem": "Intercom",
+      "adapter": "Intercom API",
+      "authCandidates": [
+        "BEARER_TOKEN"
+      ],
+      "description": "Selon permission et plan",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "help-scout-docs",
+      "name": "Help Scout Docs",
+      "category": "Bases de connaissances",
+      "ecosystem": "Help Scout",
+      "adapter": "Help Scout Docs API",
+      "authCandidates": [
+        "OAUTH2_CLIENT"
+      ],
+      "description": "Selon API",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "servicenow-knowledge",
+      "name": "ServiceNow Knowledge",
+      "category": "Bases de connaissances",
+      "ecosystem": "ServiceNow",
+      "adapter": "ServiceNow Table API",
+      "authCandidates": [
+        "OAUTH2_AUTH_CODE",
+        "OAUTH2_CLIENT",
+        "USER_PASSWORD"
+      ],
+      "description": "Selon instance et politique",
+      "api": true,
+      "status": "Référencé — adaptateur à vérifier",
+      "custom": false
+    },
+    {
+      "id": "autre-bases-de-connaissances",
+      "name": "Autre service / Connecteur personnalisé",
+      "category": "Bases de connaissances",
+      "ecosystem": "Personnalisé",
+      "adapter": "Adaptateur à définir / implémenter",
+      "authCandidates": [
+        "NONE",
+        "API_KEY",
+        "BEARER_TOKEN",
+        "OAUTH2_AUTH_CODE",
+        "OAUTH2_CLIENT",
+        "BASIC_AUTH",
+        "USER_PASSWORD",
+        "CUSTOM"
+      ],
+      "description": "Parcours personnalisé ; import OpenAPI possible si protocole API compatible",
+      "api": true,
+      "status": "Personnalisé — non opérationnel",
+      "custom": true
+    }
+  ],
+  "aliasV2": {
+    "pubmed": "pubmed-ncbi",
+    "boamp": "boamp-api-officielle",
+    "sharepoint": "microsoft-sharepoint",
+    "onedrive": "microsoft-onedrive",
+    "drive": "google-drive",
+    "dropbox": "dropbox",
+    "imap": "imap-generique",
+    "rss": "flux-rss-2-0-generique",
+    "web": "site-web-generique-html",
+    "slack": "slack",
+    "teams": "microsoft-teams"
+  }
+}

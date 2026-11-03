@@ -219,6 +219,17 @@ export const DEFAULT_USER_AGENT = 'VeillioBot/1.0 (+collecte de veille)'
 
 export type KeyValue = { name: string; value: string }
 
+export type HttpHeaderRule = {
+  id: string
+  name: string
+  source: 'fixed' | 'default' | 'connection' | 'runtime' | 'auth'
+  value: string
+  scope: 'global' | 'endpoint'
+  endpointId: string
+  required: boolean
+  sensitive: boolean
+}
+
 export type ApiPagination = { type: (typeof PAGINATION_TYPES)[number]; param: string; sizeParam: string; pageSize: number; maxPages: number; cursorPath: string }
 
 export const MAX_API_ENDPOINTS = 50
@@ -311,7 +322,7 @@ export type ConnectorConfig = {
   imap: ImapConfig
   webhook: WebhookConfig
   m365: M365Config
-  http: { timeoutSec: number; userAgent: string; headers: KeyValue[]; followRedirects: boolean; maxItems: number }
+  http: { timeoutSec: number; userAgent: string; headers: KeyValue[]; headerPolicy: HttpHeaderRule[]; followRedirects: boolean; maxItems: number }
   retry: { maxAttempts: number; backoffSec: number }
   dedupe: 'link' | 'guid' | 'title'
   web: { itemSelector: string; titleSelector: string; linkSelector: string; dateSelector: string; summarySelector: string }
@@ -379,7 +390,7 @@ export function defaultConfig(kind: ConnectorKind): ConnectorConfig {
     imap: { ...DEFAULT_IMAP },
     webhook: { ...DEFAULT_WEBHOOK },
     m365: { ...DEFAULT_M365 },
-    http: { timeoutSec: kind === 'imap' || kind === 'm365' ? 20 : 15, userAgent: DEFAULT_USER_AGENT, headers: [], followRedirects: true, maxItems: 100 },
+    http: { timeoutSec: kind === 'imap' || kind === 'm365' ? 20 : 15, userAgent: DEFAULT_USER_AGENT, headers: [], headerPolicy: [], followRedirects: true, maxItems: 100 },
     retry: { maxAttempts: 3, backoffSec: 30 },
     dedupe: kind === 'rss' || kind === 'imap' || kind === 'webhook' || kind === 'm365' ? 'guid' : 'link',
     web: { itemSelector: 'article', titleSelector: 'h2 a', linkSelector: 'h2 a', dateSelector: 'time', summarySelector: 'p' },
@@ -431,6 +442,17 @@ const headerName = z
   .regex(/^[A-Za-z0-9_.\-[\]]+$/, 'Nom invalide : lettres, chiffres, tiret, point et underscore uniquement.')
 
 const keyValue = z.object({ name: headerName, value: z.string().max(500, 'Valeur trop longue (500 caractères maximum).') })
+
+const headerRuleSchema = z.object({
+  id: z.string().trim().min(1).max(64),
+  name: headerName,
+  source: z.enum(['fixed', 'default', 'connection', 'runtime', 'auth']),
+  value: z.string().max(500),
+  scope: z.enum(['global', 'endpoint']),
+  endpointId: z.string().trim().max(160),
+  required: z.boolean(),
+  sensitive: z.boolean(),
+})
 
 const selector = z.string().trim().max(200, 'Sélecteur trop long (200 caractères maximum).')
 const path = z.string().trim().max(120, 'Chemin trop long (120 caractères maximum).').regex(/^[A-Za-z0-9_$.\-[\]]*$/, 'Chemin invalide : utilisez la notation a.b[0].c.')
@@ -520,6 +542,7 @@ export const configSchema = z.object({
     timeoutSec: z.number().int().min(2, 'Délai minimum : 2 s.').max(30, 'Délai maximum : 30 s.'),
     userAgent: z.string().trim().min(3, 'User-Agent trop court.').max(200, 'User-Agent trop long.').regex(/^[\x20-\x7e]+$/, 'User-Agent : caractères ASCII uniquement.'),
     headers: z.array(keyValue).max(10, '10 en-têtes personnalisés maximum.'),
+    headerPolicy: z.array(headerRuleSchema).max(30, '30 règles d’en-tête maximum.').default([]),
     followRedirects: z.boolean(),
     maxItems: z.number().int().min(1, 'Au moins 1 élément.').max(500, '500 éléments maximum par collecte.'),
   }),

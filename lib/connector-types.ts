@@ -14,6 +14,10 @@ export type ConnectorSummary = {
   kind: ConnectorKind
   category: ConnectorCategory
   provider: string
+  serviceId: string
+  adapter: string
+  authMethods: string[]
+  operational: boolean
   status: ConnectorStatus
   health: ConnectorHealth
   host: string
