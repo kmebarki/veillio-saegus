@@ -23,6 +23,7 @@ import Link from 'next/link'
 import { useMemo, useState, useTransition } from 'react'
 
 import { createConnector, testConnectorDraft } from '@/app/actions/connectors'
+import { EndpointsSection } from '@/components/openapi-import'
 import { authMethodRegistry } from '@/lib/auth-method-registry'
 import {
   SERVICE_CATALOG,
@@ -34,7 +35,8 @@ import {
   type ServiceCategory,
   type ServiceDefinition,
 } from '@/lib/connector-service-catalog'
-import type { HttpHeaderRule } from '@/lib/connector-catalog'
+import { defaultConfig, type ConnectorConfig, type HttpHeaderRule } from '@/lib/connector-catalog'
+import { commitActiveEndpoint } from '@/lib/connectors/endpoints'
 import type { TestOutcome } from '@/lib/connector-types'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
@@ -90,7 +92,7 @@ function WizardStep({ step, current }: { step: (typeof STEPS)[number]; current: 
   )
 }
 
-function SummaryCard({ service, name, authMethods, endpoint, headers }: { service: ServiceDefinition | undefined; name: string; authMethods: AuthMethodId[]; endpoint: string; headers: HeaderDraft[] }) {
+function SummaryCard({ service, name, authMethods, endpoint, endpointCount, headers }: { service: ServiceDefinition | undefined; name: string; authMethods: AuthMethodId[]; endpoint: string; endpointCount: number; headers: HeaderDraft[] }) {
   const Icon = service ? CATEGORY_ICONS[service.category] : Database
   return (
     <aside className="flex flex-col gap-4 rounded-2xl border bg-card p-5 lg:sticky lg:top-24 lg:self-start" aria-label="Aperçu du connecteur">
@@ -103,6 +105,7 @@ function SummaryCard({ service, name, authMethods, endpoint, headers }: { servic
         <div><dt className="text-xs text-muted-foreground">Adaptateur associé</dt><dd className="mt-1 font-medium">{service?.adapter ?? '—'}</dd></div>
         <div><dt className="text-xs text-muted-foreground">Authentification</dt><dd className="mt-1">{authMethods.length ? authMethods.map((id) => authMethodRegistry.get(id)?.label ?? id).join(', ') : 'À définir'}</dd></div>
         <div><dt className="text-xs text-muted-foreground">Cible technique</dt><dd className="mt-1 break-all font-mono text-xs">{endpoint || 'Non renseignée'}</dd></div>
+        {service?.api && <div><dt className="text-xs text-muted-foreground">Endpoints API</dt><dd className="mt-1">{endpointCount} endpoint{endpointCount > 1 ? 's' : ''}</dd></div>}
         <div><dt className="text-xs text-muted-foreground">Politique HTTP</dt><dd className="mt-1">{headers.length} règle{headers.length > 1 ? 's' : ''}</dd></div>
       </dl>
       {service && (
@@ -125,6 +128,7 @@ export function ConnectorWizard({ onCancel, onCreated }: Props) {
   const [authMethods, setAuthMethods] = useState<AuthMethodId[]>([])
   const [capabilities, setCapabilities] = useState<string[]>([])
   const [headers, setHeaders] = useState<HeaderDraft[]>([])
+  const [apiDraft, setApiDraft] = useState<ConnectorConfig['api']>(() => defaultConfig('api').api)
   const [outcome, setOutcome] = useState<TestOutcome | null>(null)
   const [error, setError] = useState('')
   const [isTesting, startTesting] = useTransition()
@@ -134,6 +138,14 @@ export function ConnectorWizard({ onCancel, onCreated }: Props) {
   const service = SERVICE_CATALOG.find((item) => item.id === serviceId)
   const supportedMethods = service ? authMethodRegistry.listSupported(service.authCandidates) : []
   const categoryItems = SERVICE_CATEGORIES.map((item) => ({ value: item, label: item }))
+  const endpointEditorConfig = useMemo(() => {
+    if (!service) return null
+    const config = configForService(service, authMethods)
+    config.url = endpoint
+    config.api = apiDraft
+    config.http.headerPolicy = headers
+    return config
+  }, [apiDraft, authMethods, endpoint, headers, service])
 
   function chooseService(nextService: ServiceDefinition) {
     setServiceId(nextService.id)
@@ -141,6 +153,8 @@ export function ConnectorWizard({ onCancel, onCreated }: Props) {
     const usableMethods = nextService.authCandidates.filter((method) => method !== 'CUSTOM')
     setAuthMethods(usableMethods.includes('NONE') ? ['NONE'] : usableMethods.slice(0, 1))
     setCapabilities(nextService.api ? ['endpoints', 'headers', 'mapping'] : ['lecture', 'normalisation', 'deduplication'])
+    setEndpoint('')
+    setApiDraft(defaultConfig(connectorKindForService(nextService)).api)
     setOutcome(null)
   }
 
@@ -157,6 +171,22 @@ export function ConnectorWizard({ onCancel, onCreated }: Props) {
   function updateHeader(id: string, patch: Partial<HeaderDraft>) {
     setHeaders((current) => current.map((header) => header.id === id ? { ...header, ...patch } : header))
     setOutcome(null)
+  }
+
+  function updateApiEndpoints(next: ConnectorConfig) {
+    setApiDraft(next.api)
+    setEndpoint(next.url)
+    setOutcome(null)
+    const detectedMethod: Partial<Record<ConnectorConfig['auth']['type'], AuthMethodId>> = {
+      none: 'NONE',
+      basic: 'BASIC_AUTH',
+      bearer: 'BEARER_TOKEN',
+      api_key_header: 'API_KEY',
+      api_key_query: 'API_KEY',
+      oauth_client: 'OAUTH2_CLIENT',
+    }
+    const method = detectedMethod[next.auth.type]
+    if (method && service?.authCandidates.includes(method)) setAuthMethods([method])
   }
 
   function validateCurrentStep() {
@@ -196,10 +226,11 @@ export function ConnectorWizard({ onCancel, onCreated }: Props) {
     if (kind === 'imap') config.imap.host = endpoint.replace(/^https?:\/\//, '').split('/')[0]
     else if (kind === 'webhook') config.integration.parameters.receiver = endpoint
     else config.url = endpoint
+    config.api = apiDraft
     config.http.headerPolicy = headers
     config.http.headers = headers.filter((header) => (header.source === 'fixed' || header.source === 'default') && header.scope === 'global' && header.name && header.value).map((header) => ({ name: header.name, value: header.value }))
     config.integration.parameters.capabilities = capabilities.join(',')
-    return { kind, config }
+    return { kind, config: commitActiveEndpoint(config) }
   }
 
   function testDraft() {
@@ -297,6 +328,7 @@ export function ConnectorWizard({ onCancel, onCreated }: Props) {
               <FieldGroup>
                 <Field><FieldLabel htmlFor="endpoint">{connectorKindForService(service) === 'imap' ? 'Serveur de messagerie' : connectorKindForService(service) === 'webhook' ? 'Identifiant du récepteur (facultatif)' : 'Adresse technique'}</FieldLabel><Input id="endpoint" value={endpoint} onChange={(event) => { setEndpoint(event.target.value); setOutcome(null) }} placeholder={connectorKindForService(service) === 'imap' ? 'imap.exemple.fr' : 'https://api.exemple.fr/v1'} /><FieldDescription>Ce champ décrit la cible du Connecteur, jamais un identifiant personnel.</FieldDescription></Field>
                 <Field><FieldLabel>Capacités déclarées</FieldLabel><div className="grid gap-2 sm:grid-cols-3">{(service.api ? [['endpoints', 'Endpoints'], ['headers', 'En-têtes HTTP'], ['mapping', 'Mapping des sorties']] : [['lecture', 'Lecture'], ['normalisation', 'Normalisation'], ['deduplication', 'Déduplication']]).map(([id, label]) => <label key={id} className="flex items-center gap-3 rounded-xl border p-3 text-sm font-medium"><Checkbox checked={capabilities.includes(id)} onCheckedChange={(checked) => setCapabilities((current) => checked ? [...new Set([...current, id])] : current.filter((item) => item !== id))} />{label}</label>)}</div></Field>
+                {service.api && endpointEditorConfig && <EndpointsSection config={endpointEditorConfig} onChange={updateApiEndpoints} />}
                 <Field><div className="flex flex-wrap items-end justify-between gap-3"><span><FieldLabel>En-têtes HTTP</FieldLabel><FieldDescription>Globaux ou liés à un endpoint. Authorization est réservé au référentiel d’authentification.</FieldDescription></span><Button type="button" variant="outline" size="sm" onClick={addHeader}><Plus data-icon="inline-start" />Ajouter une règle</Button></div>
                   <div className="flex flex-col gap-2">{headers.length === 0 && <p className="rounded-xl border border-dashed p-5 text-center text-sm text-muted-foreground">Aucune règle personnalisée. Les en-têtes système restent gérés par l’adaptateur.</p>}{headers.map((header, index) => <div key={header.id} className="grid gap-2 rounded-xl border p-3 md:grid-cols-[1fr_1fr_150px_150px_auto]"><Input aria-label={`Nom de l’en-tête ${index + 1}`} value={header.name} onChange={(event) => updateHeader(header.id, { name: event.target.value })} placeholder="X-Client-Version" className="font-mono" /><Input aria-label={`Valeur de l’en-tête ${index + 1}`} value={header.value} onChange={(event) => updateHeader(header.id, { value: event.target.value })} placeholder="Valeur ou paramètre" className="font-mono" /><select aria-label={`Source de l’en-tête ${index + 1}`} value={header.source} onChange={(event) => updateHeader(header.id, { source: event.target.value as HeaderDraft['source'] })} className="h-9 rounded-lg border bg-background px-2 text-sm"><option value="fixed">Fixe</option><option value="default">Défaut modifiable</option><option value="connection">Paramètre Connexion</option><option value="runtime">Généré</option><option value="auth">Authentification</option></select><select aria-label={`Portée de l’en-tête ${index + 1}`} value={header.scope} onChange={(event) => updateHeader(header.id, { scope: event.target.value as HeaderDraft['scope'] })} className="h-9 rounded-lg border bg-background px-2 text-sm"><option value="global">Global</option><option value="endpoint">Par endpoint</option></select><Button type="button" variant="ghost" size="icon" onClick={() => setHeaders((current) => current.filter((item) => item.id !== header.id))} aria-label={`Supprimer la règle ${index + 1}`}><Trash2 /></Button>{header.scope === 'endpoint' && <Input value={header.endpointId} onChange={(event) => updateHeader(header.id, { endpointId: event.target.value })} placeholder="GET /articles" className="font-mono md:col-span-2" />}</div>)}</div>
                 </Field>
@@ -308,7 +340,7 @@ export function ConnectorWizard({ onCancel, onCreated }: Props) {
             <div className="flex flex-col gap-6">
               <div><p className="text-xs font-semibold text-primary">04 — Vérification</p><h2 className="mt-1 font-serif text-2xl">Contrôlez avant l’enregistrement</h2><p className="mt-2 text-sm text-muted-foreground">Le Connecteur sera créé en brouillon. L’activation reste conditionnée à un adaptateur disponible, une Connexion valide et un test réussi.</p></div>
               <div className="grid gap-3 sm:grid-cols-2">
-                {[['Service', service.name], ['Adaptateur', service.adapter], ['Méthodes', authMethods.join(', ') || 'À valider dans le référentiel central'], ['Cible', endpoint || 'Non requise'], ['Capacités', capabilities.join(', ') || 'Aucune'], ['En-têtes', `${headers.length} règle${headers.length > 1 ? 's' : ''}`]].map(([label, value]) => <div key={label} className="rounded-xl bg-muted/50 p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 break-words text-sm font-semibold">{value}</p></div>)}
+                {[['Service', service.name], ['Adaptateur', service.adapter], ['Méthodes', authMethods.join(', ') || 'À valider dans le référentiel central'], ['Cible', endpoint || 'Non requise'], ['Endpoints', service.api ? `${apiDraft.endpoints.length} importé${apiDraft.endpoints.length > 1 ? 's' : ''}` : 'Non applicable'], ['Capacités', capabilities.join(', ') || 'Aucune'], ['En-têtes', `${headers.length} règle${headers.length > 1 ? 's' : ''}`]].map(([label, value]) => <div key={label} className="rounded-xl bg-muted/50 p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 break-words text-sm font-semibold">{value}</p></div>)}
               </div>
               {!isServiceOperational(service) && <div className="flex items-start gap-3 rounded-xl bg-secondary p-4 text-sm"><CircleAlert className="mt-0.5 shrink-0" aria-hidden /><p><strong>Adaptateur non attesté.</strong> Cette définition restera en brouillon et ne pourra pas être activée tant que le registre technique n’aura pas validé l’adaptateur.</p></div>}
               {outcome && <div className={cn('flex items-start gap-3 rounded-xl p-4 text-sm', outcome.status === 'error' ? 'bg-destructive/10 text-destructive' : 'bg-primary/10 text-primary')}><CircleCheck className="mt-0.5 shrink-0" aria-hidden /><div><p className="font-semibold">{outcome.message}</p><p className="mt-1 text-xs">{outcome.httpStatus ? `HTTP ${outcome.httpStatus} · ` : ''}{outcome.durationMs} ms · {outcome.itemsFound ?? 0} élément(s)</p></div></div>}
@@ -318,7 +350,7 @@ export function ConnectorWizard({ onCancel, onCreated }: Props) {
 
           {error && <FieldError className="mt-5">{error}</FieldError>}
         </div>
-        <SummaryCard service={service} name={name} authMethods={authMethods} endpoint={endpoint} headers={headers} />
+        <SummaryCard service={service} name={name} authMethods={authMethods} endpoint={endpoint} endpointCount={apiDraft.endpoints.length} headers={headers} />
       </div>
 
       <footer className="flex flex-col-reverse justify-between gap-3 border-t pt-5 sm:flex-row sm:items-center">
