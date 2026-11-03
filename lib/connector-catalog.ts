@@ -660,7 +660,8 @@ export function validateKindConfig(kind: ConnectorKind, config: ConnectorConfig)
     if (pagination.type !== 'none' && !pagination.param) return 'Indiquez le nom du paramètre de pagination.'
     if (pagination.type === 'cursor' && !pagination.cursorPath) return 'Indiquez le chemin du curseur de page suivante dans la réponse.'
   }
-  const forbidden = config.http.headers.find((header) => FORBIDDEN_HEADERS.includes(header.name.toLowerCase()))
+  const configuredHeaders = config.http.headerPolicy.length > 0 ? config.http.headerPolicy : config.http.headers
+  const forbidden = configuredHeaders.find((header) => FORBIDDEN_HEADERS.includes(header.name.toLowerCase()))
   if (forbidden) return `L’en-tête « ${forbidden.name} » est réservé : utilisez l’authentification pour les identifiants.`
   return null
 }

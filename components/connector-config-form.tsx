@@ -7,6 +7,7 @@ import { Field, NumberField, Section } from '@/components/connector-form-primiti
 import { ImapSections, M365Sections, WebhookSections } from '@/components/connector-kind-sections'
 import { ConnectorLogoField } from '@/components/connector-logo-field'
 import { EndpointsSection } from '@/components/openapi-import'
+import { headerRulesToStaticHeaders, HttpHeaderPolicyEditor, legacyHeadersToRules } from '@/components/http-header-policy-editor'
 import { Button } from '@/components/ui/button'
 import { fieldClass } from '@/components/ui/modal'
 import {
@@ -305,7 +306,12 @@ export function ConnectorConfigForm({ kind, draft, onChange, disabled, connector
             <input type="checkbox" checked={config.http.followRedirects} onChange={(event) => setHttp({ followRedirects: event.target.checked })} className="mt-0.5 size-4 accent-primary" />
             <span><span className="font-medium">Suivre les redirections</span><span className="block text-xs leading-5 text-muted-foreground">Jusqu’à 5 redirections, chacune revalidée (jamais vers une adresse interne). Les identifiants ne sont pas transmis à un autre domaine.</span></span>
           </label>
-          <KeyValueEditor label="En-têtes personnalisés" items={config.http.headers} max={10} namePlaceholder="X-Exemple" valuePlaceholder="valeur" disabled={disabled} onChange={(headers) => setHttp({ headers })} />
+          <HttpHeaderPolicyEditor
+            rules={config.http.headerPolicy.length > 0 ? config.http.headerPolicy : legacyHeadersToRules(config.http.headers)}
+            endpoints={config.api.endpoints}
+            disabled={disabled}
+            onChange={(headerPolicy) => setHttp({ headerPolicy, headers: headerRulesToStaticHeaders(headerPolicy, config.api.activeEndpointId) })}
+          />
           </>}
         </div>
       </details>}

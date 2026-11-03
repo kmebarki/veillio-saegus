@@ -30,7 +30,10 @@ function buildRequest(kind: HttpKind, config: ConnectorConfig, secret: string | 
     Accept: ACCEPT[kind],
     'Accept-Encoding': 'gzip, deflate, br',
   }
-  for (const header of config.http.headers) if (header.name) headers[header.name] = header.value
+  const policyHeaders = config.http.headerPolicy
+    .filter((header) => (header.source === 'fixed' || header.source === 'default') && (header.scope === 'global' || header.endpointId === config.api.activeEndpointId))
+    .map((header) => ({ name: header.name, value: header.value }))
+  for (const header of config.http.headerPolicy.length > 0 ? policyHeaders : config.http.headers) if (header.name) headers[header.name] = header.value
 
   const sensitive: string[] = []
   if (secret) {
