@@ -72,7 +72,7 @@ const administrationItems: { label: string; icon: typeof Settings; href: string;
   { label: 'Utilisateurs et admissions', icon: UserRoundCheck, href: '/admin/users', access: 'users' },
   { label: 'Équipes', icon: Workflow, href: '/admin/teams', access: 'teams' },
   { label: 'Groupes et permissions', icon: ShieldCheck, href: '/admin/groups', access: 'groups' },
-  { label: 'Paramètres', icon: Settings, href: '#' },
+  { label: 'Paramètres', icon: Settings, href: '/admin/settings/authentication' },
 ]
 
 const sidebarScrollStorageKey = 'veillio:sidebar-scroll-top'

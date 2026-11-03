@@ -26,6 +26,7 @@ import {
 import type { ConnectionOption } from '@/lib/connection-types'
 import { getServiceDefinition, selectedAuthMethods } from '@/lib/connector-service-catalog'
 import type { ConnectorDetail, ConnectorHistoryEntry, ConnectorRunEntry, ConnectorSummary, ConnectorsOverview, TestOutcome } from '@/lib/connector-types'
+import { readSecret } from '@/lib/authentication/vault'
 import { decryptSecret } from '@/lib/connectors/crypto'
 import { runConnectorTest } from '@/lib/connectors/engine'
 import { SafeFetchError, validateTargetUrl } from '@/lib/connectors/safe-fetch'
@@ -167,8 +168,8 @@ function checkTarget(kind: ConnectorKind, config: ConnectorConfig): string | nul
 async function visibleConnections(actorId: string, connectorId: string): Promise<ConnectionOption[]> {
   const rows = await db.select().from(connections).where(eq(connections.connectorId, connectorId)).orderBy(connections.name)
   return rows
-    .filter((row) => row.scope === 'organization' || row.ownerUserId === actorId)
-    .map((row) => ({ id: row.id, name: row.name, scope: row.scope === 'user' ? 'user' : 'organization' }))
+    .filter((row) => row.scope !== 'private' || row.ownerUserId === actorId)
+    .map((row) => ({ id: row.id, name: row.name, scope: row.scope === 'private' || row.scope === 'public' ? row.scope : 'organization' }))
 }
 
 async function resolveCredential(actorId: string, connectorId: string | undefined, connectionId: string | undefined) {
@@ -178,10 +179,10 @@ async function resolveCredential(actorId: string, connectorId: string | undefine
     .from(connections)
     .where(and(eq(connections.connectorId, connectorId), connectionId ? eq(connections.id, connectionId) : undefined))
     .orderBy(connections.createdAt)
-  const usable = rows.filter((row) => row.scope === 'organization' || row.ownerUserId === actorId)
-  const row = connectionId ? usable[0] : usable.find((item) => item.scope === 'organization')
+  const usable = rows.filter((row) => row.scope !== 'private' || row.ownerUserId === actorId)
+  const row = connectionId ? usable[0] : usable.find((item) => item.scope === 'organization' || item.scope === 'public')
   if (!row) return null
-  const secret = decryptSecret(row.secretCiphertext, row.id)
+  const secret = await readSecret(row.secretRef) ?? decryptSecret(row.secretCiphertext, row.id)
   return secret ? { secret, username: row.username ?? '' } : null
 }
 
@@ -283,7 +284,7 @@ export async function getConnectorDetail(input: unknown): Promise<{ ok: true; de
   })
 
   const options = await visibleConnections(actor.id, row.id)
-  const sharedCount = (await db.select({ total: count() }).from(connections).where(and(eq(connections.connectorId, row.id), eq(connections.scope, 'organization'))))[0]?.total ?? 0
+  const sharedCount = (await db.select({ total: count() }).from(connections).where(and(eq(connections.connectorId, row.id), ne(connections.scope, 'private'))))[0]?.total ?? 0
   return { ok: true, detail: { connector: toSummary(row, sharedCount), config: readConfig(kind, row.config), connections: options, runs, history } }
 }
 

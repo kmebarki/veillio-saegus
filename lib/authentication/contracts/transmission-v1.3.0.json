@@ -1,0 +1,271 @@
+{
+  "policyId": "HTTP_TRANSMISSION_POLICY_V1_3",
+  "purpose": "Description contrôlable de la transmission V1.1 réintroduite au niveau du contrat (les écrans HTTP V1.1 originaux ne figurent pas dans le ZIP source V1.2)",
+  "channels": [
+    {
+      "id": "http.header",
+      "placement": "header",
+      "secretPermitted": true,
+      "requiresTls": true
+    },
+    {
+      "id": "http.query",
+      "placement": "query",
+      "secretPermitted": false,
+      "exceptionAllowed": true,
+      "reason": "fuite via URL, proxy, journaux et referer"
+    },
+    {
+      "id": "http.cookie",
+      "placement": "cookie",
+      "secretPermitted": false,
+      "exceptionAllowed": true,
+      "reason": "exposition et contraintes de domaine/CSRF"
+    },
+    {
+      "id": "http.form",
+      "placement": "application/x-www-form-urlencoded",
+      "secretPermitted": false,
+      "exceptionAllowed": true
+    },
+    {
+      "id": "http.json",
+      "placement": "body JSON",
+      "secretPermitted": false,
+      "exceptionAllowed": true
+    },
+    {
+      "id": "http.multipart",
+      "placement": "body multipart",
+      "secretPermitted": false,
+      "exceptionAllowed": true
+    },
+    {
+      "id": "tls.client_certificate",
+      "placement": "TLS handshake",
+      "secretPermitted": true,
+      "requiresTls": true
+    },
+    {
+      "id": "tls.private_key",
+      "placement": "TLS handshake",
+      "secretPermitted": true,
+      "requiresTls": true
+    },
+    {
+      "id": "ssh.private_key",
+      "placement": "SSH handshake",
+      "secretPermitted": true
+    },
+    {
+      "id": "ssh.username",
+      "placement": "SSH handshake",
+      "secretPermitted": false
+    },
+    {
+      "id": "adapter.protocol",
+      "placement": "adaptateur non HTTP",
+      "secretPermitted": true
+    }
+  ],
+  "sensitiveRequestHeaders": [
+    "authorization",
+    "cookie",
+    "proxy-authorization",
+    "set-cookie"
+  ],
+  "protectedHeaderNames": [
+    "authorization",
+    "host",
+    "cookie",
+    "content-length",
+    "proxy-authorization",
+    "transfer-encoding",
+    "connection",
+    "set-cookie"
+  ],
+  "forbiddenHeaderValueCharacters": [
+    "\\r",
+    "\\n"
+  ],
+  "headers": {
+    "rejectCaseInsensitiveDuplicates": true,
+    "rejectConflictsWithAdapterHeaders": true,
+    "neverPermitSecretsInFreeHeaders": true,
+    "rejectCRLFInNamesAndValues": true,
+    "allowSecretWriteOnlyViaConnectionVault": true
+  },
+  "queryAndBodyException": {
+    "defaultDeny": true,
+    "requiredEvidence": [
+      "verifiedProviderRequirement",
+      "adapterAllowlist",
+      "securityReview",
+      "logRedaction",
+      "transportEncryption",
+      "noRedirectLeakage"
+    ],
+    "noGenericOverride": true
+  },
+  "sourceKinds": [
+    "connection.secretRef",
+    "connection.config",
+    "connector.nonSecretConfig",
+    "handler.tokenRef",
+    "handler.derived",
+    "adapter.generated"
+  ],
+  "formatKinds": [
+    "raw",
+    "prefix",
+    "http_basic_base64",
+    "file_ref",
+    "handler_signed",
+    "structured_body"
+  ],
+  "validations": [
+    "validate all binding field references",
+    "reject writable protected headers",
+    "reject insecure HTTP when secrets are present",
+    "reject secret default values",
+    "no URL-encoded token in logs",
+    "reject missing runtime handler"
+  ],
+  "examples": [
+    {
+      "id": "api_key_header",
+      "methodId": "API_KEY",
+      "channel": "http.header",
+      "target": {
+        "name": "X-API-Key",
+        "nameFixedByAdapter": true
+      },
+      "source": {
+        "kind": "connection.secretRef",
+        "fieldCode": "api_key"
+      },
+      "format": {
+        "kind": "raw"
+      }
+    },
+    {
+      "id": "api_key_query_exception",
+      "methodId": "API_KEY",
+      "channel": "http.query",
+      "target": {
+        "name": "api_key",
+        "nameFixedByAdapter": true
+      },
+      "source": {
+        "kind": "connection.secretRef",
+        "fieldCode": "api_key"
+      },
+      "format": {
+        "kind": "raw"
+      },
+      "requiresSecurityException": true,
+      "allowedByDefault": false
+    },
+    {
+      "id": "api_key_cookie_exception",
+      "methodId": "API_KEY",
+      "channel": "http.cookie",
+      "target": {
+        "name": "session_key",
+        "nameFixedByAdapter": true
+      },
+      "source": {
+        "kind": "connection.secretRef",
+        "fieldCode": "api_key"
+      },
+      "format": {
+        "kind": "raw"
+      },
+      "requiresSecurityException": true,
+      "allowedByDefault": false
+    },
+    {
+      "id": "oauth_token_header",
+      "methodId": "OAUTH2_AUTH_CODE",
+      "channel": "http.header",
+      "target": {
+        "name": "Authorization",
+        "nameFixedByAdapter": true
+      },
+      "source": {
+        "kind": "handler.tokenRef"
+      },
+      "format": {
+        "kind": "prefix",
+        "prefix": "Bearer "
+      }
+    },
+    {
+      "id": "nonsecret_form_body",
+      "methodId": null,
+      "channel": "http.form",
+      "target": {
+        "name": "client_id",
+        "nameFixedByAdapter": true
+      },
+      "source": {
+        "kind": "connection.config",
+        "fieldCode": "client_id"
+      },
+      "format": {
+        "kind": "raw"
+      },
+      "allowedByDefault": true
+    },
+    {
+      "id": "nonsecret_json_body",
+      "methodId": null,
+      "channel": "http.json",
+      "target": {
+        "name": "tenant",
+        "nameFixedByAdapter": true
+      },
+      "source": {
+        "kind": "connector.nonSecretConfig",
+        "fieldCode": "tenant"
+      },
+      "format": {
+        "kind": "raw"
+      },
+      "allowedByDefault": true
+    },
+    {
+      "id": "binary_multipart",
+      "methodId": null,
+      "channel": "http.multipart",
+      "target": {
+        "name": "attachment",
+        "nameFixedByAdapter": true
+      },
+      "source": {
+        "kind": "connector.nonSecretConfig",
+        "fieldCode": "attachment_ref"
+      },
+      "format": {
+        "kind": "file_ref"
+      },
+      "allowedByDefault": true
+    },
+    {
+      "id": "ssh_identity",
+      "methodId": "SSH_KEY",
+      "channel": "ssh.private_key",
+      "target": {
+        "name": null,
+        "nameFixedByAdapter": true
+      },
+      "source": {
+        "kind": "connection.secretRef",
+        "fieldCode": "private_key"
+      },
+      "format": {
+        "kind": "file_ref"
+      }
+    }
+  ]
+}

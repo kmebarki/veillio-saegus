@@ -81,6 +81,17 @@ export const PERMISSION_MODULES: PermissionModule[] = [
     ],
   },
   {
+    id: 'authentication',
+    label: 'Référentiel Authentification',
+    permissions: [
+      { key: 'auth.method.view', label: 'Consulter les méthodes', description: 'Consulter le référentiel, ses versions et ses preuves runtime.' },
+      { key: 'auth.method.propose', label: 'Proposer une méthode', description: 'Créer une nouvelle méthode en brouillon.' },
+      { key: 'auth.method.review', label: 'Réviser les méthodes', description: 'Accepter ou renvoyer une proposition dont on n’est pas l’auteur.', sensitive: true },
+      { key: 'auth.method.publish', label: 'Publier les méthodes', description: 'Rendre disponible une version entièrement attestée.', sensitive: true },
+      { key: 'auth.method.deactivate', label: 'Désactiver les méthodes', description: 'Désactiver ou rendre obsolète une version publiée.', sensitive: true },
+    ],
+  },
+  {
     id: 'access',
     label: 'Accès et sécurité',
     permissions: [

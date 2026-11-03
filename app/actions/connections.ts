@@ -10,8 +10,9 @@ import { configSchema, defaultConfig, isConnectorKind, needsSecret, type Connect
 import { analyzeSecret, analyzeUsername, secretHintOf, SECRET_MAX } from '@/lib/connection-secret'
 import type { ConnectionActivityEntry, ConnectionsOverview, ConnectionSummary } from '@/lib/connection-types'
 import type { TestOutcome } from '@/lib/connector-types'
-import { decryptSecret, encryptSecret } from '@/lib/connectors/crypto'
+import { decryptSecret } from '@/lib/connectors/crypto'
 import { runConnectorTest } from '@/lib/connectors/engine'
+import { deleteSecret, putSecret, readSecret } from '@/lib/authentication/vault'
 import { getDefaultOrganization, requirePermission } from '@/lib/authorization'
 import { db } from '@/lib/db'
 import { auditEvents, connections, connectors, users } from '@/lib/db/schema'
@@ -31,7 +32,7 @@ const descriptionField = z.string().trim().max(240, 'La description ne peut pas 
 const usernameField = z.string().max(200, 'L’identifiant est trop long.')
 const secretField = z.string().max(SECRET_MAX * 2, 'Le secret est trop long.')
 const expiryField = z.union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date d’expiration invalide.'), z.literal(''), z.null()]).optional()
-const scopeField = z.enum(['organization', 'user'])
+const scopeField = z.enum(['private', 'public', 'organization'])
 const logoField = z
   .string()
   .trim()
@@ -85,6 +86,13 @@ function kindOf(row: ConnectorRow): ConnectorKind {
   return isConnectorKind(row.kind) ? row.kind : 'rss'
 }
 
+function methodIdForAuth(authType: ConnectorConfig['auth']['type']) {
+  const methods: Partial<Record<ConnectorConfig['auth']['type'], string>> = {
+    none: 'NONE', basic: 'BASIC_AUTH', bearer: 'BEARER_TOKEN', api_key_header: 'API_KEY', api_key_query: 'API_KEY', oauth_client: 'OAUTH2_CLIENT',
+  }
+  return methods[authType] ?? 'CUSTOM'
+}
+
 function audit(actorUserId: string, action: string, connectionId: string, metadata: Record<string, string | number | boolean | null> = {}) {
   return { actorUserId, action, targetType: 'connection', targetId: connectionId, metadata }
 }
@@ -107,11 +115,11 @@ async function loadConnector(id: string) {
 type Actor = Awaited<ReturnType<typeof requirePermission>>
 
 function canSee(actor: Actor, row: Row) {
-  return row.scope === 'organization' || row.ownerUserId === actor.id
+  return row.scope !== 'private' || row.ownerUserId === actor.id
 }
 
 function canEdit(actor: Actor, row: Row) {
-  if (row.scope === 'organization') return actor.permissions.includes('connections.manage')
+  if (row.scope !== 'private') return actor.permissions.includes('connections.manage')
   return row.ownerUserId === actor.id
 }
 
@@ -158,10 +166,14 @@ function toSummary(actor: Actor, row: Row, connectorRow: ConnectorRow, ownerName
     insecure: config.url.trim().toLowerCase().startsWith('http://'),
     authType: config.auth.type,
     keyName: config.auth.keyName,
-    scope: row.scope === 'user' ? 'user' : 'organization',
+    scope: row.scope === 'private' || row.scope === 'public' ? row.scope : 'organization',
     ownerName,
     username: row.username ?? '',
-    hasSecret: Boolean(row.secretCiphertext),
+    hasSecret: Boolean(row.secretRef || row.secretCiphertext),
+    methodId: row.methodId ?? methodIdForAuth(config.auth.type),
+    methodVersion: row.methodVersion ?? '1.0.0',
+    adapterId: row.adapterId ?? connectorRow.kind,
+    adapterVersion: row.adapterVersion ?? String(connectorRow.version),
     secretHint: row.secretHint,
     secretRotatedAt: dateFormatter.format(rotated),
     secretAgeDays: Math.max(0, Math.floor((now - rotated.getTime()) / DAY_MS)),
@@ -194,7 +206,7 @@ export async function getConnectionsOverview(): Promise<ConnectionsOverview> {
   const connectorById = new Map(connectorRows.map((row) => [row.id, row]))
   const names = new Map(userRows.map((row) => [row.id, row.name]))
   const sharedCounts = new Map<string, number>()
-  for (const row of connectionRows) if (row.scope === 'organization') sharedCounts.set(row.connectorId, (sharedCounts.get(row.connectorId) ?? 0) + 1)
+  for (const row of connectionRows) if (row.scope !== 'private') sharedCounts.set(row.connectorId, (sharedCounts.get(row.connectorId) ?? 0) + 1)
 
   const summaries = connectionRows
     .filter((row) => canSee(actor, row))
@@ -231,8 +243,8 @@ export async function getConnectionsOverview(): Promise<ConnectionsOverview> {
     connectors: choices,
     stats: {
       total: summaries.length,
-      shared: summaries.filter((item) => item.scope === 'organization').length,
-      personal: summaries.filter((item) => item.scope === 'user').length,
+      shared: summaries.filter((item) => item.scope !== 'private').length,
+      personal: summaries.filter((item) => item.scope === 'private').length,
       attention: summaries.filter((item) => item.health === 'error' || item.health === 'warning' || !item.testedCurrentVersion || (item.expiresInDays !== null && item.expiresInDays <= EXPIRY_WARNING_DAYS)).length,
     },
   }
@@ -247,7 +259,7 @@ export async function createConnection(input: unknown): Promise<{ ok: true; mess
   if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? 'Les informations saisies sont invalides.')
   const { connectorId, name, scope } = parsed.data
 
-  if (scope === 'organization' && !actor.permissions.includes('connections.manage')) return fail('Vous n’avez pas le droit de créer une connexion partagée.')
+  if (scope !== 'private' && !actor.permissions.includes('connections.manage')) return fail('Vous n’avez pas le droit de créer une connexion partagée ou publique.')
 
   const connectorRow = await loadConnector(connectorId)
   if (!connectorRow || connectorRow.organizationId !== organization.id) return fail('Connecteur introuvable.')
@@ -264,6 +276,9 @@ export async function createConnection(input: unknown): Promise<{ ok: true; mess
   if (existing.some((item) => item.name.toLowerCase() === name.toLowerCase())) return fail('Une connexion porte déjà ce nom.')
 
   const id = randomUUID()
+  const methodId = methodIdForAuth(config.auth.type)
+  const adapterId = kindOf(connectorRow)
+  const secretRef = await putSecret({ organizationId: organization.id, ownerUserId: scope === 'private' ? actor.id : null, plaintext: credentials.secret, hint: secretHintOf(credentials.secret) })
   await db.transaction(async (tx) => {
     await tx.insert(connections).values({
       id,
@@ -273,15 +288,21 @@ export async function createConnection(input: unknown): Promise<{ ok: true; mess
       description: parsed.data.description || null,
       logoUrl: parsed.data.logoUrl || null,
       scope,
-      ownerUserId: scope === 'user' ? actor.id : null,
+      ownerUserId: scope === 'private' ? actor.id : null,
       username: credentials.username || null,
-      secretCiphertext: encryptSecret(credentials.secret, id),
+      config: credentials.username ? { username: credentials.username } : {},
+      secretRef,
+      methodId,
+      methodVersion: '1.0.0',
+      adapterId,
+      adapterVersion: String(connectorRow.version),
+      secretCiphertext: null,
       secretHint: secretHintOf(credentials.secret),
       secretRotatedAt: new Date(),
       expiresAt: expiry.date,
       createdByUserId: actor.id,
     })
-    await tx.insert(auditEvents).values(audit(actor.id, 'connection.created', id, { scope, connectorId }))
+    await tx.insert(auditEvents).values(audit(actor.id, 'connection.created', id, { scope, connectorId, methodId, methodVersion: '1.0.0', adapterId, adapterVersion: String(connectorRow.version) }))
   })
 
   revalidateAll()
@@ -324,6 +345,9 @@ export async function updateConnection(input: unknown): Promise<{ ok: true; mess
   if (expiry.error) return fail(expiry.error)
 
   const credentialsChanged = replacing || username.value !== (row.username ?? '')
+  const nextSecretRef = replacing
+    ? await putSecret({ organizationId: row.organizationId, ownerUserId: row.ownerUserId, plaintext: newSecret, hint: secretHintOf(newSecret), existingRef: row.secretRef })
+    : row.secretRef
   const updated = await db
     .update(connections)
     .set({
@@ -331,11 +355,15 @@ export async function updateConnection(input: unknown): Promise<{ ok: true; mess
       description: parsed.data.description || null,
       logoUrl: parsed.data.logoUrl || null,
       username: username.value || null,
-      secretCiphertext: replacing ? encryptSecret(newSecret, row.id) : row.secretCiphertext,
+      config: username.value ? { ...row.config, username: username.value } : row.config,
+      secretRef: nextSecretRef,
+      secretCiphertext: replacing ? null : row.secretCiphertext,
       secretHint: replacing ? secretHintOf(newSecret) : row.secretHint,
       secretRotatedAt: replacing ? new Date() : row.secretRotatedAt,
       expiresAt: expiry.date,
       version: credentialsChanged ? row.version + 1 : row.version,
+      lastValidatedMethodVersion: credentialsChanged ? null : row.lastValidatedMethodVersion,
+      lastValidatedAdapterVersion: credentialsChanged ? null : row.lastValidatedAdapterVersion,
       updatedAt: new Date(),
     })
     .where(and(eq(connections.id, row.id), eq(connections.version, row.version)))
@@ -359,6 +387,7 @@ export async function deleteConnection(input: unknown): Promise<{ ok: true; mess
     await tx.delete(connections).where(eq(connections.id, row.id))
     await tx.insert(auditEvents).values(audit(actor.id, 'connection.deleted', row.id, { scope: row.scope }))
   })
+  await deleteSecret(row.secretRef)
   revalidateAll()
   return { ok: true, message: 'Connexion supprimée.' }
 }
@@ -393,13 +422,13 @@ export async function testConnection(input: unknown): Promise<{ ok: true; outcom
   const kind = kindOf(connectorRow)
   const config = readConfig(kind, connectorRow.config)
 
-  const secret = decryptSecret(row.secretCiphertext, row.id)
+  const secret = await readSecret(row.secretRef) ?? decryptSecret(row.secretCiphertext, row.id)
   const outcome = secret ? await runConnectorTest(kind, config, secret, row.username ?? '') : unreadableSecretOutcome()
 
   await db.transaction(async (tx) => {
     await tx
       .update(connections)
-      .set({ lastCheckAt: new Date(), lastCheckStatus: outcome.status, lastCheckMessage: outcome.message, lastCheckVersion: row.version, ...(secret && !row.secretHint ? { secretHint: secretHintOf(secret) } : {}) })
+      .set({ lastCheckAt: new Date(), lastCheckStatus: outcome.status, lastCheckMessage: outcome.message, lastCheckVersion: row.version, lastValidatedMethodVersion: outcome.status !== 'error' ? row.methodVersion : null, lastValidatedAdapterVersion: outcome.status !== 'error' ? row.adapterVersion : null, ...(secret && !row.secretHint ? { secretHint: secretHintOf(secret) } : {}) })
       .where(eq(connections.id, row.id))
     await tx.insert(auditEvents).values(audit(actor.id, 'connection.tested', row.id, { status: outcome.status, host: hostOf(config.url), draft: false }))
   })
@@ -427,7 +456,7 @@ export async function testDraftConnection(input: unknown): Promise<{ ok: true; o
   if (parsed.data.secret.trim() === '' && parsed.data.connectionId) {
     const row = await loadConnection(parsed.data.connectionId)
     if (!row || row.connectorId !== connectorRow.id || !canSee(actor, row) || !canEdit(actor, row)) return fail('Connexion introuvable.')
-    const stored = decryptSecret(row.secretCiphertext, row.id)
+    const stored = await readSecret(row.secretRef) ?? decryptSecret(row.secretCiphertext, row.id)
     if (!stored) return fail('Le secret enregistré est illisible. Saisissez-le à nouveau.')
     const user = analyzeUsername(config.auth.type, parsed.data.username ?? row.username ?? '')
     if (user.error) return fail(user.error)

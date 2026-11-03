@@ -42,7 +42,12 @@ function testDetail(row: { version: number; lastCheckStatus: string | null; last
 }
 
 function canSeeConnection(actorId: string, row: { scope: string; ownerUserId: string | null }) {
-  return row.scope === 'organization' || row.ownerUserId === actorId
+  return row.scope !== 'private' || row.ownerUserId === actorId
+}
+
+function versionPinsCurrent(row: { methodId: string | null; methodVersion: string | null; adapterId: string | null; adapterVersion: string | null; lastValidatedMethodVersion: string | null; lastValidatedAdapterVersion: string | null }) {
+  if (!row.methodId && !row.adapterId) return true
+  return Boolean(row.methodId && row.adapterId && row.methodVersion === row.lastValidatedMethodVersion && row.adapterVersion === row.lastValidatedAdapterVersion)
 }
 
 function formatOccurrence(row: typeof collectionOccurrences.$inferSelect): SourceCollectionEntry {
@@ -72,7 +77,7 @@ export async function getSourcesOverview(): Promise<SourcesOverview> {
   const [sourceRows, connectorRows, connectionRows, occurrenceRows, auditRows, userRows] = await Promise.all([
     db.select().from(sources).where(eq(sources.organizationId, organization.id)).orderBy(desc(sources.updatedAt)),
     db.select({ id: connectors.id, name: connectors.name, description: connectors.description, kind: connectors.kind, status: connectors.status, config: connectors.config, version: connectors.version, lastCheckStatus: connectors.lastCheckStatus, lastCheckVersion: connectors.lastCheckVersion, lastCheckAt: connectors.lastCheckAt, lastCheckMessage: connectors.lastCheckMessage }).from(connectors).where(eq(connectors.organizationId, organization.id)).orderBy(connectors.name),
-    db.select({ id: connections.id, connectorId: connections.connectorId, name: connections.name, scope: connections.scope, ownerUserId: connections.ownerUserId, version: connections.version, lastCheckStatus: connections.lastCheckStatus, lastCheckVersion: connections.lastCheckVersion, lastCheckAt: connections.lastCheckAt, lastCheckMessage: connections.lastCheckMessage, expiresAt: connections.expiresAt }).from(connections).where(eq(connections.organizationId, organization.id)).orderBy(connections.name),
+    db.select({ id: connections.id, connectorId: connections.connectorId, name: connections.name, scope: connections.scope, ownerUserId: connections.ownerUserId, version: connections.version, methodId: connections.methodId, methodVersion: connections.methodVersion, adapterId: connections.adapterId, adapterVersion: connections.adapterVersion, lastValidatedMethodVersion: connections.lastValidatedMethodVersion, lastValidatedAdapterVersion: connections.lastValidatedAdapterVersion, lastCheckStatus: connections.lastCheckStatus, lastCheckVersion: connections.lastCheckVersion, lastCheckAt: connections.lastCheckAt, lastCheckMessage: connections.lastCheckMessage, expiresAt: connections.expiresAt }).from(connections).where(eq(connections.organizationId, organization.id)).orderBy(connections.name),
     db.select().from(collectionOccurrences).where(eq(collectionOccurrences.organizationId, organization.id)).orderBy(desc(collectionOccurrences.scheduledFor)).limit(500),
     db.select().from(auditEvents).where(eq(auditEvents.targetType, 'source')).orderBy(desc(auditEvents.createdAt)).limit(500),
     db.select({ id: users.id, name: users.name }).from(users).where(eq(users.organizationId, organization.id)),
@@ -101,7 +106,8 @@ export async function getSourcesOverview(): Promise<SourcesOverview> {
       healthDetail: row.status !== 'active' ? 'Ce Connecteur n’est pas actif.' : testDetail(row),
       connections: visibleConnections.filter((connection) => connection.connectorId === row.id).map((connection) => {
         const expired = connection.expiresAt ? connection.expiresAt.getTime() < now : false
-        return { id: connection.id, name: connection.name, scope: connection.scope === 'user' ? 'user' : 'organization', ready: currentSuccess(connection) && !expired, detail: expired ? 'Identifiants expirés.' : testDetail(connection) }
+        const pinsCurrent = versionPinsCurrent(connection)
+        return { id: connection.id, name: connection.name, scope: connection.scope === 'private' ? 'user' : 'organization', ready: currentSuccess(connection) && pinsCurrent && !expired, detail: expired ? 'Identifiants expirés.' : !pinsCurrent ? 'La méthode ou l’adaptateur a changé depuis le dernier test.' : testDetail(connection) }
       }),
     }
   })
@@ -115,7 +121,7 @@ export async function getSourcesOverview(): Promise<SourcesOverview> {
     const requiresConnection = needsSecret(auth as Parameters<typeof needsSecret>[0])
     const connection = row.connectionId ? connectionById.get(row.connectionId) : null
     const connectorReady = connector.status === 'active' && currentSuccess(connector)
-    const connectionReady = !requiresConnection || Boolean(connection && currentSuccess(connection) && (!connection.expiresAt || connection.expiresAt.getTime() >= now))
+    const connectionReady = !requiresConnection || Boolean(connection && currentSuccess(connection) && versionPinsCurrent(connection) && (!connection.expiresAt || connection.expiresAt.getTime() >= now))
     const collections = occurrenceRows.filter((item) => item.sourceId === row.id).map(formatOccurrence)
     const lastCollection = collections[0] ?? null
     const explicitProblem = connector.lastCheckStatus === 'error' || connector.lastCheckStatus === 'warning' || connection?.lastCheckStatus === 'error' || connection?.lastCheckStatus === 'warning' || lastCollection?.state === 'failed'
@@ -173,7 +179,8 @@ export async function createSource(input: unknown): Promise<{ ok: true; message:
     connection = candidate ?? null
     if (!connection || !canSeeConnection(actor.id, connection)) return fail('Connexion introuvable ou non autorisée.')
     if (connection.connectorId !== connector.id) return fail('Cette Connexion n’est pas compatible avec le Connecteur sélectionné.')
-    if (parsed.data.scope === 'organization' && connection.scope !== 'organization') return fail('Une Source partagée ne peut pas utiliser une Connexion personnelle.')
+    if (parsed.data.scope === 'organization' && connection.scope === 'private') return fail('Une Source partagée ne peut pas utiliser une Connexion privée.')
+    if (!versionPinsCurrent(connection)) return fail('La méthode ou l’adaptateur de cette Connexion doit être retesté avant utilisation.')
   }
   if (requiresConnection && !connection) return fail('Ce Connecteur exige une Connexion vérifiée.')
 

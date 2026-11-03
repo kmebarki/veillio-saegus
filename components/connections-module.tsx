@@ -20,7 +20,7 @@ import type { ConnectionActivityEntry, ConnectionSummary, ConnectionsOverview } 
 import type { TestOutcome } from '@/lib/connector-types'
 import { cn } from '@/lib/utils'
 
-type Filter = 'all' | 'organization' | 'user' | 'attention'
+type Filter = 'all' | 'organization' | 'public' | 'private' | 'attention'
 
 export function ConnectionsModule({ overview }: { overview: ConnectionsOverview }) {
   const router = useRouter()

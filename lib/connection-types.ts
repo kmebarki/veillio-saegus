@@ -1,6 +1,6 @@
 import type { ConnectorHealth, ConnectorKind, ConnectorStatus } from '@/lib/connector-catalog'
 
-export type ConnectionScope = 'organization' | 'user'
+export type ConnectionScope = 'private' | 'public' | 'organization'
 
 export type ConnectionSecretInput = { mode: 'keep' | 'set'; value: string }
 
@@ -28,6 +28,10 @@ export type ConnectionSummary = {
   ownerName: string
   username: string
   hasSecret: boolean
+  methodId: string
+  methodVersion: string
+  adapterId: string
+  adapterVersion: string
   secretHint: string | null
   secretRotatedAt: string
   secretAgeDays: number

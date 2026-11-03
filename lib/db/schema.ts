@@ -181,6 +181,84 @@ export const webhookEvents = pgTable('webhook_events', {
   receivedAt: timestamp('receivedAt', { withTimezone: true }).notNull().defaultNow(),
 })
 
+export type StoredAuthMethodDefinition = Record<string, unknown>
+
+export const authFamilies = pgTable('auth_families', {
+  id: text('id').primaryKey(),
+  label: text('label').notNull(),
+  description: text('description').notNull().default(''),
+  sortOrder: integer('sortOrder').notNull().default(0),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const authVariants = pgTable('auth_variants', {
+  id: text('id').primaryKey(),
+  familyId: text('familyId').notNull(),
+  label: text('label').notNull(),
+  sortOrder: integer('sortOrder').notNull().default(0),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const authMethods = pgTable('auth_methods', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  methodId: text('methodId').notNull().unique(),
+  createdByUserId: text('createdByUserId'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const authMethodVersions = pgTable('auth_method_versions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  methodId: text('methodId').notNull(),
+  version: text('version').notNull(),
+  definition: jsonb('definition').$type<StoredAuthMethodDefinition>().notNull(),
+  status: text('status').notNull().default('brouillon'),
+  authorUserId: text('authorUserId'),
+  reviewerUserId: text('reviewerUserId'),
+  reviewedAt: timestamp('reviewedAt', { withTimezone: true }),
+  isImmutable: boolean('isImmutable').notNull().default(false),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const authCompatibilities = pgTable('auth_compatibilities', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  methodId: text('methodId').notNull(),
+  methodVersion: text('methodVersion').notNull(),
+  serviceId: text('serviceId').notNull(),
+  adapterId: text('adapterId').notNull(),
+  adapterVersion: text('adapterVersion').notNull(),
+  enabled: boolean('enabled').notNull().default(false),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const authRuntimeEvidence = pgTable('auth_runtime_evidence', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  methodId: text('methodId').notNull(),
+  methodVersion: text('methodVersion').notNull(),
+  handlerKey: text('handlerKey'),
+  handlerVersion: text('handlerVersion'),
+  deployed: boolean('deployed').notNull().default(false),
+  securityReviewed: boolean('securityReviewed').notNull().default(false),
+  contractTestsPassed: boolean('contractTestsPassed').notNull().default(false),
+  enabled: boolean('enabled').notNull().default(false),
+  evidenceRefs: jsonb('evidenceRefs').$type<string[]>().notNull().default([]),
+  updatedByUserId: text('updatedByUserId'),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const secretVaultEntries = pgTable('secret_vault_entries', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organizationId').notNull(),
+  ownerUserId: text('ownerUserId'),
+  ciphertext: text('ciphertext').notNull(),
+  hint: text('hint'),
+  encryptionContext: text('encryptionContext').notNull(),
+  rotatedAt: timestamp('rotatedAt', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
 export const connectors = pgTable('connectors', {
   id: uuid('id').primaryKey().defaultRandom(),
   organizationId: uuid('organizationId').notNull(),
@@ -225,6 +303,14 @@ export const connections = pgTable('connections', {
   scope: text('scope').notNull().default('organization'),
   ownerUserId: text('ownerUserId'),
   username: text('username'),
+  config: jsonb('config').$type<Record<string, string>>().notNull().default({}),
+  secretRef: uuid('secretRef'),
+  methodId: text('methodId'),
+  methodVersion: text('methodVersion'),
+  adapterId: text('adapterId'),
+  adapterVersion: text('adapterVersion'),
+  lastValidatedMethodVersion: text('lastValidatedMethodVersion'),
+  lastValidatedAdapterVersion: text('lastValidatedAdapterVersion'),
   secretCiphertext: text('secretCiphertext'),
   secretHint: text('secretHint'),
   secretRotatedAt: timestamp('secretRotatedAt', { withTimezone: true }),
