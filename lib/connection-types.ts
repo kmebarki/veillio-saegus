@@ -1,6 +1,8 @@
 import type { ConnectorHealth, ConnectorKind, ConnectorStatus } from '@/lib/connector-catalog'
 
 export type ConnectionScope = 'private' | 'public' | 'organization'
+export type ConnectionLifecycle = 'draft' | 'active' | 'suspended' | 'archived'
+export type ConnectionHealth = 'unverified' | 'running' | 'healthy' | 'degraded' | 'error' | 'expired' | 'indeterminate'
 
 export type ConnectionSecretInput = { mode: 'keep' | 'set'; value: string }
 
@@ -25,6 +27,11 @@ export type ConnectionSummary = {
   authType: string
   keyName: string
   scope: ConnectionScope
+  lifecycle: ConnectionLifecycle
+  connectionHealth: ConnectionHealth
+  origin: 'manual' | 'source' | 'automatic_none' | 'migration'
+  revision: number
+  technicalRevision: number
   ownerName: string
   username: string
   hasSecret: boolean
@@ -59,6 +66,8 @@ export type ConnectorChoice = {
   host: string
   insecure: boolean
   sharedCount: number
+  runtimeAvailable: boolean
+  runtimeReason: string
 }
 
 export type ConnectionsOverview = {

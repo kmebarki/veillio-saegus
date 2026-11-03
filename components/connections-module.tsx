@@ -95,7 +95,7 @@ export function ConnectionsModule({ overview }: { overview: ConnectionsOverview 
     { id: 'public', label: 'Publiques' },
     { id: 'attention', label: 'À surveiller' },
   ]
-  const canCreate = connectors.some((item) => item.requiresAuth)
+  const canCreate = connectors.some((item) => item.requiresAuth && item.runtimeAvailable)
 
   return (
     <div className="min-h-dvh bg-background">
@@ -113,7 +113,7 @@ export function ConnectionsModule({ overview }: { overview: ConnectionsOverview 
               <div>
                 <p className="mb-2 text-xs font-medium text-primary">{overview.organizationName}</p>
                 <h1 className="text-2xl font-semibold tracking-[-0.04em] sm:text-[30px]">Connexions</h1>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Une connexion donne l’accès réel à un fournisseur de données : clé API, jeton ou mot de passe, avec une portée privée, organisationnelle ou publique. Le <Link href="/admin/connectors" className="font-medium text-primary underline-offset-4 hover:underline">connecteur</Link> définit seulement comment communiquer avec le fournisseur.</p>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Une Connexion est un accès opérationnel versionné à un service, avec une portée privée ou organisationnelle. La publication plateforme suit un parcours d’approbation séparé. Le <Link href="/admin/connectors" className="font-medium text-primary underline-offset-4 hover:underline">Connecteur</Link> définit seulement comment communiquer avec le fournisseur.</p>
               </div>
               {canCreate && <Button onClick={() => setForm({ mode: 'create' })}><Plus data-icon="inline-start" />Nouvelle connexion</Button>}
             </section>
@@ -171,7 +171,7 @@ export function ConnectionsModule({ overview }: { overview: ConnectionsOverview 
                       ? 'Modifiez vos filtres ou votre recherche.'
                       : canCreate
                         ? 'Ajoutez la clé API ou le jeton d’un fournisseur pour que les connecteurs authentifiés puissent interroger ses données.'
-                        : 'Aucun connecteur n’exige d’authentification pour l’instant. Configurez l’authentification d’un connecteur (API JSON) pour pouvoir lui associer une connexion.'}
+                        : 'Aucune combinaison méthode, adaptateur et preuve runtime n’est actuellement activable. Publiez et attestez une méthode dans le référentiel Authentification.'}
                   </p>
                 </div>
                 {connections.length === 0 && canCreate && <Button onClick={() => setForm({ mode: 'create' })}><Plus data-icon="inline-start" />Créer une connexion</Button>}
@@ -240,7 +240,7 @@ export function ConnectionsModule({ overview }: { overview: ConnectionsOverview 
         )}
       </Modal>
 
-      <Modal open={toDelete !== null} onClose={() => setToDelete(null)} size="md" title="Supprimer la connexion ?" description={toDelete ? `« ${toDelete.name} » sera supprimée définitivement. Les collectes qui l’utilisent ne pourront plus s’authentifier.` : undefined}>
+      <Modal open={toDelete !== null} onClose={() => setToDelete(null)} size="md" title="Archiver la Connexion ?" description={toDelete ? `« ${toDelete.name} » sera archivée. L’opération est refusée tant qu’une Source active en dépend.` : undefined}>
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={() => setToDelete(null)}>Annuler</Button>
           <Button
@@ -251,7 +251,7 @@ export function ConnectionsModule({ overview }: { overview: ConnectionsOverview 
               if (target) void remove(target)
             }}
           >
-            Supprimer
+            Archiver
           </Button>
         </div>
       </Modal>

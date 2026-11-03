@@ -8,6 +8,16 @@ export type AuthRuntimeHandler = {
 
 const handlers = new Map<string, AuthRuntimeHandler>()
 
+const BUILTIN_HANDLERS: AuthRuntimeHandler[] = [
+  { key: 'none', version: '1.0.0', operations: ['execute', 'test'] },
+  { key: 'http-api-key', version: '1.0.0', operations: ['execute', 'test'] },
+  { key: 'http-basic', version: '1.0.0', operations: ['execute', 'test'] },
+  { key: 'http-bearer', version: '1.0.0', operations: ['execute', 'test'] },
+  { key: 'oauth2-client-credentials', version: '1.0.0', operations: ['execute', 'test', 'refresh'] },
+]
+
+for (const handler of BUILTIN_HANDLERS) handlers.set(`${handler.key}@${handler.version}`, handler)
+
 export function registerAuthRuntimeHandler(handler: AuthRuntimeHandler) {
   handlers.set(`${handler.key}@${handler.version}`, handler)
 }

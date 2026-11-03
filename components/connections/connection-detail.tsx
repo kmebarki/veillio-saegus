@@ -1,4 +1,4 @@
-import { CalendarClock, Pencil, PlugZap, Trash2 } from 'lucide-react'
+import { Archive, CalendarClock, Pencil, PlugZap } from 'lucide-react'
 
 import { ageLabel, expiryBadge, TONE_CLASSES } from '@/components/connections/helpers'
 import { RequestPreview } from '@/components/connections/request-preview'
@@ -48,14 +48,17 @@ export function ConnectionDetail({ connection, activity, busy, onEdit, onTest, o
           <Fact label="Authentification">{AUTH_LABELS[authType]?.label.split(' (')[0] ?? 'Clé API'}</Fact>
           {(authType === 'api_key_header' || authType === 'api_key_query') && <Fact label={authType === 'api_key_header' ? 'En-tête' : 'Paramètre'}><span className="font-mono">{connection.keyName}</span></Fact>}
           {connection.username && <Fact label="Identifiant">{connection.username}</Fact>}
-          <Fact label="Portée">{connection.scope === 'private' ? `Privée · ${connection.ownerName}` : connection.scope === 'public' ? 'Publique' : 'Organisationnelle'}</Fact>
+          <Fact label="Portée">{connection.scope === 'private' ? `Privée · ${connection.ownerName}` : connection.scope === 'public' ? 'Plateforme publiée' : 'Organisationnelle'}</Fact>
+          <Fact label="Cycle de vie">{connection.lifecycle === 'active' ? 'Active' : connection.lifecycle === 'suspended' ? 'Suspendue' : connection.lifecycle === 'archived' ? 'Archivée' : 'Brouillon'}</Fact>
+          <Fact label="Santé">{connection.connectionHealth === 'healthy' ? 'Saine' : connection.connectionHealth === 'degraded' ? 'Dégradée' : connection.connectionHealth === 'error' ? 'En erreur' : connection.connectionHealth === 'expired' ? 'Expirée' : 'Non vérifiée'}</Fact>
           <Fact label="Méthode"><span className="font-mono">{connection.methodId}@{connection.methodVersion}</span></Fact>
           <Fact label="Adaptateur"><span className="font-mono">{connection.adapterId}@{connection.adapterVersion}</span></Fact>
           <Fact label="Secret"><span className="font-mono">{connection.secretHint ?? 'Chiffré'}</span></Fact>
           <Fact label="Dernière rotation">{connection.secretRotatedAt} ({ageLabel(connection.secretAgeDays)})</Fact>
           <Fact label="Expiration">{expiry ? <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs', TONE_CLASSES[expiry.tone])}><CalendarClock className="size-3" aria-hidden />{expiry.label}</span> : 'Non définie'}</Fact>
           <Fact label="Créée le">{connection.createdAt}</Fact>
-          <Fact label="Révision">v{connection.version}</Fact>
+          <Fact label="Révision fonctionnelle">v{connection.revision}</Fact>
+          <Fact label="Révision technique">v{connection.technicalRevision}</Fact>
         </dl>
 
         <section aria-label="Dernier test" className="flex flex-col gap-1.5">
@@ -68,7 +71,7 @@ export function ConnectionDetail({ connection, activity, busy, onEdit, onTest, o
           <div className="flex flex-wrap gap-2 border-t pt-4">
             <Button variant="outline" disabled={busy} onClick={onTest}><PlugZap data-icon="inline-start" />{busy ? 'Test en cours…' : 'Tester la connexion'}</Button>
             <Button variant="outline" disabled={busy} onClick={onEdit}><Pencil data-icon="inline-start" />Modifier</Button>
-            <Button variant="ghost" disabled={busy} onClick={onDelete} className="ml-auto text-destructive hover:text-destructive"><Trash2 data-icon="inline-start" />Supprimer</Button>
+            <Button variant="ghost" disabled={busy} onClick={onDelete} className="ml-auto text-destructive hover:text-destructive"><Archive data-icon="inline-start" />Archiver</Button>
           </div>
         )}
       </div>

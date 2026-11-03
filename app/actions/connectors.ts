@@ -26,8 +26,8 @@ import {
 import type { ConnectionOption } from '@/lib/connection-types'
 import { getServiceDefinition, selectedAuthMethods } from '@/lib/connector-service-catalog'
 import type { ConnectorDetail, ConnectorHistoryEntry, ConnectorRunEntry, ConnectorSummary, ConnectorsOverview, TestOutcome } from '@/lib/connector-types'
-import { readSecret } from '@/lib/authentication/vault'
-import { decryptSecret } from '@/lib/connectors/crypto'
+import { readLegacySecret, readSecret } from '@/lib/authentication/vault'
+import { evaluateConnectionRuntime } from '@/lib/connections/registry'
 import { runConnectorTest } from '@/lib/connectors/engine'
 import { SafeFetchError, validateTargetUrl } from '@/lib/connectors/safe-fetch'
 import { getDefaultOrganization, requirePermission } from '@/lib/authorization'
@@ -181,8 +181,10 @@ async function resolveCredential(actorId: string, connectorId: string | undefine
     .orderBy(connections.createdAt)
   const usable = rows.filter((row) => row.scope !== 'private' || row.ownerUserId === actorId)
   const row = connectionId ? usable[0] : usable.find((item) => item.scope === 'organization' || item.scope === 'public')
-  if (!row) return null
-  const secret = await readSecret(row.secretRef) ?? decryptSecret(row.secretCiphertext, row.id)
+  if (!row || row.lifecycle !== 'active' || !row.methodId || !row.methodVersion || !row.serviceId || !row.adapterId || !row.adapterVersion) return null
+  const runtime = await evaluateConnectionRuntime({ methodId: row.methodId, methodVersion: row.methodVersion, serviceId: row.serviceId, adapterId: row.adapterId, adapterVersion: row.adapterVersion })
+  if (!runtime.usable) return null
+  const secret = await readSecret(row.secretRef, { organizationId: row.organizationId, connectionId: row.id, fieldCode: 'credential', purpose: 'connector-test' }) ?? readLegacySecret(row.secretCiphertext, row.id)
   return secret ? { secret, username: row.username ?? '' } : null
 }
 

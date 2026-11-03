@@ -298,11 +298,11 @@ export function ConnectorWizard({ onCancel, onCreated }: Props) {
               <div className="grid gap-3 sm:grid-cols-2">
                 {supportedMethods.map((method) => {
                   const checked = authMethods.includes(method.id)
-                  const proposalOnly = method.status === 'proposal-only'
+                  const unavailable = method.status !== 'available'
                   return (
-                    <label key={method.id} className={cn('flex cursor-pointer items-start gap-3 rounded-xl border p-4', checked && 'border-primary bg-primary/5', proposalOnly && 'cursor-default bg-muted/40')}>
-                      <Checkbox checked={checked} disabled={proposalOnly} onCheckedChange={() => toggleAuth(method.id)} aria-label={method.label} />
-                      <span className="min-w-0"><span className="flex flex-wrap items-center gap-2"><strong className="text-sm">{method.label}</strong><Badge variant="outline">{method.id}</Badge></span><span className="mt-1 block text-xs leading-5 text-muted-foreground">{method.description}</span><span className="mt-2 block text-xs font-medium">Transmission : {method.transport}</span></span>
+                    <label key={method.id} className={cn('flex cursor-pointer items-start gap-3 rounded-xl border p-4', checked && 'border-primary bg-primary/5', unavailable && 'cursor-default bg-muted/40')}>
+                      <Checkbox checked={checked} disabled={unavailable} onCheckedChange={() => toggleAuth(method.id)} aria-label={method.label} />
+                      <span className="min-w-0"><span className="flex flex-wrap items-center gap-2"><strong className="text-sm">{method.label}</strong><Badge variant="outline">{method.id}</Badge><Badge variant={unavailable ? 'secondary' : 'default'}>{unavailable ? 'Proposition · non activable' : 'Disponible'}</Badge></span><span className="mt-1 block text-xs leading-5 text-muted-foreground">{method.description}</span><span className="mt-2 block text-xs font-medium">Transmission : {method.transport}</span></span>
                     </label>
                   )
                 })}

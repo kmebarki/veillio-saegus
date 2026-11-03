@@ -1,5 +1,7 @@
 'use server'
 
+import { randomUUID } from 'node:crypto'
+
 import { and, desc, eq, sql } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
@@ -77,7 +79,7 @@ export async function getSourcesOverview(): Promise<SourcesOverview> {
   const [sourceRows, connectorRows, connectionRows, occurrenceRows, auditRows, userRows] = await Promise.all([
     db.select().from(sources).where(eq(sources.organizationId, organization.id)).orderBy(desc(sources.updatedAt)),
     db.select({ id: connectors.id, name: connectors.name, description: connectors.description, kind: connectors.kind, status: connectors.status, config: connectors.config, version: connectors.version, lastCheckStatus: connectors.lastCheckStatus, lastCheckVersion: connectors.lastCheckVersion, lastCheckAt: connectors.lastCheckAt, lastCheckMessage: connectors.lastCheckMessage }).from(connectors).where(eq(connectors.organizationId, organization.id)).orderBy(connectors.name),
-    db.select({ id: connections.id, connectorId: connections.connectorId, name: connections.name, scope: connections.scope, ownerUserId: connections.ownerUserId, version: connections.version, methodId: connections.methodId, methodVersion: connections.methodVersion, adapterId: connections.adapterId, adapterVersion: connections.adapterVersion, lastValidatedMethodVersion: connections.lastValidatedMethodVersion, lastValidatedAdapterVersion: connections.lastValidatedAdapterVersion, lastCheckStatus: connections.lastCheckStatus, lastCheckVersion: connections.lastCheckVersion, lastCheckAt: connections.lastCheckAt, lastCheckMessage: connections.lastCheckMessage, expiresAt: connections.expiresAt }).from(connections).where(eq(connections.organizationId, organization.id)).orderBy(connections.name),
+    db.select({ id: connections.id, connectorId: connections.connectorId, name: connections.name, scope: connections.scope, lifecycle: connections.lifecycle, ownerUserId: connections.ownerUserId, version: connections.version, methodId: connections.methodId, methodVersion: connections.methodVersion, adapterId: connections.adapterId, adapterVersion: connections.adapterVersion, lastValidatedMethodVersion: connections.lastValidatedMethodVersion, lastValidatedAdapterVersion: connections.lastValidatedAdapterVersion, lastCheckStatus: connections.lastCheckStatus, lastCheckVersion: connections.lastCheckVersion, lastCheckAt: connections.lastCheckAt, lastCheckMessage: connections.lastCheckMessage, expiresAt: connections.expiresAt }).from(connections).where(eq(connections.organizationId, organization.id)).orderBy(connections.name),
     db.select().from(collectionOccurrences).where(eq(collectionOccurrences.organizationId, organization.id)).orderBy(desc(collectionOccurrences.scheduledFor)).limit(500),
     db.select().from(auditEvents).where(eq(auditEvents.targetType, 'source')).orderBy(desc(auditEvents.createdAt)).limit(500),
     db.select({ id: users.id, name: users.name }).from(users).where(eq(users.organizationId, organization.id)),
@@ -86,7 +88,7 @@ export async function getSourcesOverview(): Promise<SourcesOverview> {
   const names = new Map(userRows.map((row) => [row.id, row.name]))
   names.set(actor.id, actor.name)
   const connectorById = new Map(connectorRows.map((row) => [row.id, row]))
-  const visibleConnections = connectionRows.filter((row) => canSeeConnection(actor.id, row))
+  const visibleConnections = connectionRows.filter((row) => row.lifecycle === 'active' && canSeeConnection(actor.id, row))
   const connectionById = new Map(visibleConnections.map((row) => [row.id, row]))
   const now = Date.now()
 
@@ -177,12 +179,36 @@ export async function createSource(input: unknown): Promise<{ ok: true; message:
   if (parsed.data.connectionId) {
     const [candidate] = await db.select().from(connections).where(and(eq(connections.id, parsed.data.connectionId), eq(connections.organizationId, organization.id))).limit(1)
     connection = candidate ?? null
-    if (!connection || !canSeeConnection(actor.id, connection)) return fail('Connexion introuvable ou non autorisée.')
+    if (!connection || connection.lifecycle !== 'active' || !canSeeConnection(actor.id, connection)) return fail('Connexion introuvable, inactive ou non autorisée.')
     if (connection.connectorId !== connector.id) return fail('Cette Connexion n’est pas compatible avec le Connecteur sélectionné.')
     if (parsed.data.scope === 'organization' && connection.scope === 'private') return fail('Une Source partagée ne peut pas utiliser une Connexion privée.')
     if (!versionPinsCurrent(connection)) return fail('La méthode ou l’adaptateur de cette Connexion doit être retesté avant utilisation.')
   }
   if (requiresConnection && !connection) return fail('Ce Connecteur exige une Connexion vérifiée.')
+
+  if (!requiresConnection && !connection) {
+    const ownerKey = parsed.data.scope === 'user' ? actor.id : organization.id
+    const autoReuseKey = `${organization.id}:${connector.id}:NONE:${ownerKey}`
+    const [existingNone] = await db.select().from(connections).where(and(eq(connections.organizationId, organization.id), eq(connections.autoReuseKey, autoReuseKey))).limit(1)
+    if (existingNone) {
+      connection = existingNone
+    } else {
+      const integration = (connector.config as { integration?: { templateId?: unknown; adapterVersion?: unknown } }).integration
+      const serviceId = typeof integration?.templateId === 'string' && integration.templateId ? integration.templateId : `custom:${kind}`
+      const adapterVersion = typeof integration?.adapterVersion === 'string' && integration.adapterVersion ? integration.adapterVersion : '1.0.0'
+      const [createdNone] = await db.insert(connections).values({
+        id: randomUUID(), organizationId: organization.id, connectorId: connector.id, serviceId, name: `Accès public · ${connector.name}`, scope: parsed.data.scope === 'user' ? 'private' : 'organization', ownerUserId: parsed.data.scope === 'user' ? actor.id : null, ownerKind: parsed.data.scope === 'user' ? 'user' : 'organization', ownerId: ownerKey, lifecycle: 'active', health: 'unverified', origin: 'automatic_none', methodId: 'NONE', methodVersion: '1.0.0', adapterId: kind, adapterVersion, handlerKey: 'none', handlerVersion: '1.0.0', lastValidatedMethodVersion: '1.0.0', lastValidatedAdapterVersion: adapterVersion, autoReuseKey, createdByUserId: actor.id,
+      }).onConflictDoNothing().returning()
+      if (createdNone) {
+        connection = createdNone
+        await db.insert(auditEvents).values({ actorUserId: actor.id, action: 'connection.none_created', targetType: 'connection', targetId: createdNone.id, metadata: { connectorId: connector.id, sourceScope: parsed.data.scope } })
+      } else {
+        const [racedNone] = await db.select().from(connections).where(eq(connections.autoReuseKey, autoReuseKey)).limit(1)
+        connection = racedNone ?? null
+      }
+    }
+  }
+  if (!connection) return fail('La Connexion technique n’a pas pu être créée ou résolue.')
 
   const duplicateWhere = parsed.data.scope === 'organization'
     ? and(eq(sources.organizationId, organization.id), eq(sources.scope, 'organization'), sql`lower(${sources.name}) = lower(${parsed.data.name})`)

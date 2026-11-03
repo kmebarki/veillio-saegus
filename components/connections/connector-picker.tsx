@@ -44,6 +44,7 @@ export function ConnectorPicker({ connectors, value, onSelect }: Props) {
   ]
 
   function choose(id: string) {
+    if (!usable.find((item) => item.id === id)?.runtimeAvailable) return
     onSelect(id)
     setOpen(false)
     setQuery('')
@@ -142,14 +143,16 @@ export function ConnectorPicker({ connectors, value, onSelect }: Props) {
                 <li key={item.id} role="option" aria-selected={item.id === value}>
                   <button
                     type="button"
+                    disabled={!item.runtimeAvailable}
                     onClick={() => choose(item.id)}
                     onMouseEnter={() => setActive(index)}
-                    className={cn('flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors focus-visible:outline-none', index === active ? 'bg-muted' : 'hover:bg-muted/60')}
+                    title={item.runtimeAvailable ? undefined : item.runtimeReason}
+                    className={cn('flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50', index === active ? 'bg-muted' : 'hover:bg-muted/60')}
                   >
                     <ConnectorLogo kind={item.kind} logoUrl={item.logoUrl} className="size-8 rounded-lg" />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium">{item.name}</span>
-                      <span className="block truncate text-xs text-muted-foreground">{item.host || 'URL à renseigner'} · {authLabel(item.authType)}</span>
+                      <span className="block truncate text-xs text-muted-foreground">{item.runtimeAvailable ? `${item.host || 'URL à renseigner'} · ${authLabel(item.authType)}` : `Indisponible · ${item.runtimeReason}`}</span>
                     </span>
                     {item.sharedCount === 0 && <span className="hidden shrink-0 rounded-full bg-chart-4/15 px-2 py-0.5 text-[11px] font-medium sm:inline-block">Aucune partagée</span>}
                     {item.id === value && <Check className="size-4 shrink-0 text-primary" aria-label="Sélectionné" />}

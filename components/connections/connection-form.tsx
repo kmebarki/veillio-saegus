@@ -1,6 +1,6 @@
 'use client'
 
-import { ChevronDown, Globe2, PlugZap, ShieldCheck, TriangleAlert, User, Users } from 'lucide-react'
+import { ChevronDown, PlugZap, ShieldCheck, TriangleAlert, User, Users } from 'lucide-react'
 import { useMemo, useState, useTransition } from 'react'
 
 import { createConnection, testConnection, testDraftConnection, updateConnection } from '@/app/actions/connections'
@@ -30,7 +30,7 @@ const EXPIRY_PRESETS = [
 
 export function ConnectionForm({ target, overview, onClose, onDone }: Props) {
   const editing = target.mode === 'edit' ? target.connection : null
-  const usableConnectors = overview.connectors.filter((item) => item.requiresAuth)
+  const usableConnectors = overview.connectors.filter((item) => item.requiresAuth && item.runtimeAvailable)
   const initialConnector = editing?.connectorId ?? (target.mode === 'create' ? target.connectorId : undefined) ?? (usableConnectors.length === 1 ? usableConnectors[0].id : '')
 
   const [connectorId, setConnectorId] = useState(initialConnector)
@@ -157,11 +157,10 @@ export function ConnectionForm({ target, overview, onClose, onDone }: Props) {
         {!editing && (
           <fieldset className="flex flex-col gap-2">
             <legend className="mb-1.5 text-sm font-medium">Qui peut l’utiliser ?</legend>
-            <div className="grid gap-2 sm:grid-cols-3">
+            <div className="grid gap-2 sm:grid-cols-2">
               {([
                 { id: 'private', title: 'Privée', text: 'Vous seul pouvez la voir et l’utiliser.', icon: User, disabled: false },
                 { id: 'organization', title: 'Organisationnelle', text: 'Toute l’organisation peut l’utiliser.', icon: Users, disabled: !overview.viewer.canManage },
-                { id: 'public', title: 'Publique', text: 'Disponible pour les usages publics autorisés.', icon: Globe2, disabled: !overview.viewer.canManage },
               ] as const).map((option) => (
                 <label key={option.id} className={cn('flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm transition-colors', scope === option.id ? 'border-primary bg-primary/5 ring-2 ring-primary/15' : 'bg-card', option.disabled && 'cursor-not-allowed opacity-50')}>
                   <input type="radio" name="scope" value={option.id} checked={scope === option.id} disabled={option.disabled} onChange={() => setScope(option.id)} className="sr-only" />
