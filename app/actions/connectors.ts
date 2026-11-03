@@ -9,8 +9,11 @@ import { z } from 'zod'
 import {
   CONNECTOR_KINDS,
   configSchema,
+  connectorCategoryOf,
   defaultConfig,
   describeTarget,
+  getConnectorTemplate,
+  getKindInfo,
   isConnectorKind,
   isHttpKind,
   needsSecret,
@@ -88,7 +91,10 @@ function audit(actorUserId: string, action: string, connectorId: string, metadat
 
 function readConfig(kind: ConnectorKind, raw: unknown): ConnectorConfig {
   const parsed = configSchema.safeParse(raw)
-  if (parsed.success) return parsed.data
+  if (parsed.success) {
+    const stored = (raw ?? {}) as { integration?: unknown }
+    return stored.integration ? parsed.data : { ...parsed.data, integration: defaultConfig(kind).integration }
+  }
   const stored = (raw ?? {}) as { url?: unknown }
   return { ...defaultConfig(kind), url: typeof stored.url === 'string' ? stored.url : '' }
 }
@@ -110,6 +116,8 @@ function toSummary(row: Row, connectionCount: number): ConnectorSummary {
     description: row.description ?? '',
     logoUrl: row.logoUrl ?? '',
     kind,
+    category: connectorCategoryOf(kind, config),
+    provider: getConnectorTemplate(config.integration.templateId)?.label ?? getKindInfo(kind)?.label ?? kind,
     status: (['draft', 'active', 'paused'].includes(row.status) ? row.status : 'draft') as ConnectorStatus,
     health: healthOf(row.lastCheckStatus),
     host: describeTarget(kind, config),

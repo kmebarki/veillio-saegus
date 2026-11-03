@@ -10,7 +10,7 @@ import { ConnectorLogo, HealthDot, StatusBadge, formatDuration } from '@/compone
 import { ConnectorWorkbench } from '@/components/connector-workbench'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
-import { AUTH_LABELS, getKindInfo, type AuthType } from '@/lib/connector-catalog'
+import { AUTH_LABELS, getCategoryInfo, getKindInfo, type AuthType } from '@/lib/connector-catalog'
 import type { ConnectorDetail, ConnectorRunEntry, ConnectorViewer } from '@/lib/connector-types'
 import { cn } from '@/lib/utils'
 
@@ -117,7 +117,7 @@ export function ConnectorDetailDialog({ connectorId, viewer, initialTab = 'overv
             <ConnectorLogo kind={connector.kind} logoUrl={connector.logoUrl} className="size-12 rounded-2xl" />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2"><h3 className="truncate text-lg font-semibold tracking-[-0.02em]">{connector.name}</h3><StatusBadge status={connector.status} /></div>
-              <p className="truncate text-sm text-muted-foreground">{info?.label} · {connector.host || 'adresse non définie'}</p>
+              <p className="truncate text-sm text-muted-foreground">{connector.provider} · {getCategoryInfo(connector.category)?.label} · {connector.host || info?.label || 'adresse non définie'}</p>
             </div>
             <HealthDot connector={connector} />
           </div>

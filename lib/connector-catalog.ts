@@ -15,6 +15,56 @@ export type ConnectorStatus = (typeof CONNECTOR_STATUSES)[number]
 
 export type ConnectorHealth = 'ok' | 'warning' | 'error' | 'unknown'
 
+export const CONNECTOR_CATEGORIES = [
+  'websites',
+  'databases',
+  'rss',
+  'social',
+  'cloud',
+  'email',
+  'local',
+  'collaborative',
+  'knowledge',
+] as const
+export type ConnectorCategory = (typeof CONNECTOR_CATEGORIES)[number]
+
+export type ConnectorCategoryInfo = {
+  id: ConnectorCategory
+  label: string
+  description: string
+}
+
+export const CONNECTOR_CATEGORY_CATALOG: ConnectorCategoryInfo[] = [
+  { id: 'websites', label: 'Sites web', description: 'Pages publiques, sitemaps et API éditoriales.' },
+  { id: 'databases', label: 'Bases de données', description: 'PostgreSQL, MySQL, SQL Server et moteurs de recherche.' },
+  { id: 'rss', label: 'Flux RSS', description: 'Flux RSS, Atom et RDF normalisés.' },
+  { id: 'social', label: 'Réseaux sociaux', description: 'LinkedIn, X, Reddit et YouTube.' },
+  { id: 'cloud', label: 'Stockage cloud', description: 'SharePoint, OneDrive, Google Drive et Dropbox.' },
+  { id: 'email', label: 'Boîtes mail', description: 'Gmail, Outlook et serveurs IMAP.' },
+  { id: 'local', label: 'Dossiers locaux', description: 'Dossiers synchronisés par un agent sécurisé.' },
+  { id: 'collaborative', label: 'Outils collaboratifs', description: 'Slack, Teams, Discord et webhooks métier.' },
+  { id: 'knowledge', label: 'Bases de connaissances', description: 'Notion, Confluence et wikis internes.' },
+]
+
+export type ConnectorTemplateField = {
+  key: string
+  label: string
+  placeholder: string
+  hint?: string
+  required?: boolean
+  type?: 'text' | 'url' | 'number' | 'password'
+}
+
+export type ConnectorTemplate = {
+  id: string
+  category: ConnectorCategory
+  label: string
+  description: string
+  kind: ConnectorKind
+  authType?: AuthType
+  fields: ConnectorTemplateField[]
+}
+
 export type ConnectorKindInfo = {
   kind: ConnectorKind
   label: string
@@ -114,6 +164,43 @@ export const KIND_AUTH_TYPES: Record<ConnectorKind, readonly AuthType[]> = {
   m365: ['oauth_client'],
 }
 
+const urlField = (label: string, placeholder: string, hint?: string): ConnectorTemplateField => ({ key: 'endpoint', label, placeholder, hint, required: true, type: 'url' })
+
+export const CONNECTOR_TEMPLATES: ConnectorTemplate[] = [
+  { id: 'website', category: 'websites', label: 'Site web', description: 'Extrait une liste de contenus avec des sélecteurs CSS.', kind: 'web', fields: [urlField('Adresse du site', 'https://exemple.fr/actualites')] },
+  { id: 'web-api', category: 'websites', label: 'API éditoriale', description: 'Interroge une API JSON publiée par le site.', kind: 'api', fields: [urlField('Endpoint API', 'https://exemple.fr/api/articles')] },
+  { id: 'postgresql', category: 'databases', label: 'PostgreSQL', description: 'Accès via une passerelle SQL HTTPS en lecture seule.', kind: 'api', authType: 'bearer', fields: [urlField('URL de la passerelle', 'https://data.exemple.fr/query'), { key: 'database', label: 'Base', placeholder: 'veille', required: true }, { key: 'query', label: 'Vue ou requête nommée', placeholder: 'latest_articles', required: true }] },
+  { id: 'mysql', category: 'databases', label: 'MySQL', description: 'Accès via une passerelle SQL HTTPS en lecture seule.', kind: 'api', authType: 'bearer', fields: [urlField('URL de la passerelle', 'https://data.exemple.fr/query'), { key: 'database', label: 'Base', placeholder: 'veille', required: true }, { key: 'query', label: 'Vue ou requête nommée', placeholder: 'latest_articles', required: true }] },
+  { id: 'sql-server', category: 'databases', label: 'SQL Server', description: 'Accès via une passerelle SQL HTTPS en lecture seule.', kind: 'api', authType: 'bearer', fields: [urlField('URL de la passerelle', 'https://data.exemple.fr/query'), { key: 'database', label: 'Base', placeholder: 'Veille', required: true }, { key: 'query', label: 'Vue ou procédure', placeholder: 'dbo.LatestArticles', required: true }] },
+  { id: 'elasticsearch', category: 'databases', label: 'Elasticsearch', description: 'Recherche un index via son API REST.', kind: 'api', authType: 'api_key_header', fields: [urlField('Endpoint de recherche', 'https://search.exemple.fr/articles/_search'), { key: 'index', label: 'Index', placeholder: 'articles-*', required: true }] },
+  { id: 'rss', category: 'rss', label: 'RSS / Atom', description: 'Détecte automatiquement RSS, Atom ou RDF.', kind: 'rss', fields: [urlField('URL du flux', 'https://exemple.fr/feed.xml')] },
+  { id: 'linkedin', category: 'social', label: 'LinkedIn', description: 'Collecte les publications accessibles via une application autorisée.', kind: 'api', authType: 'bearer', fields: [urlField('Endpoint LinkedIn', 'https://api.linkedin.com/v2/posts'), { key: 'organization', label: 'Organisation ou auteur', placeholder: 'urn:li:organization:…', required: true }] },
+  { id: 'x', category: 'social', label: 'X', description: 'Collecte une recherche récente via l’API X.', kind: 'api', authType: 'bearer', fields: [urlField('Endpoint X', 'https://api.x.com/2/tweets/search/recent'), { key: 'query', label: 'Requête', placeholder: 'cybersécurité lang:fr', required: true }] },
+  { id: 'reddit', category: 'social', label: 'Reddit', description: 'Suit un subreddit ou une recherche JSON.', kind: 'api', authType: 'bearer', fields: [urlField('Endpoint Reddit', 'https://oauth.reddit.com/r/technology/new'), { key: 'community', label: 'Communauté', placeholder: 'technology', required: true }] },
+  { id: 'youtube', category: 'social', label: 'YouTube', description: 'Suit une chaîne ou une requête via YouTube Data API.', kind: 'api', authType: 'api_key_query', fields: [urlField('Endpoint YouTube', 'https://www.googleapis.com/youtube/v3/search'), { key: 'channel', label: 'Chaîne', placeholder: 'UC…' }] },
+  { id: 'm365', category: 'cloud', label: 'SharePoint / OneDrive', description: 'Lit des listes et bibliothèques via Microsoft Graph.', kind: 'm365', authType: 'oauth_client', fields: [] },
+  { id: 'google-drive', category: 'cloud', label: 'Google Drive', description: 'Liste les fichiers d’un dossier via Google Drive API.', kind: 'api', authType: 'bearer', fields: [urlField('Endpoint Drive', 'https://www.googleapis.com/drive/v3/files'), { key: 'folderId', label: 'ID du dossier', placeholder: '1AbC…', required: true }] },
+  { id: 'dropbox', category: 'cloud', label: 'Dropbox', description: 'Liste les fichiers d’un chemin Dropbox.', kind: 'api', authType: 'bearer', fields: [urlField('Endpoint Dropbox', 'https://api.dropboxapi.com/2/files/list_folder'), { key: 'path', label: 'Chemin', placeholder: '/Veille', required: true }] },
+  { id: 'imap', category: 'email', label: 'Serveur IMAP', description: 'Lit une boîte mail standard en lecture seule.', kind: 'imap', authType: 'basic', fields: [] },
+  { id: 'gmail', category: 'email', label: 'Gmail', description: 'Lit Gmail via IMAP avec un mot de passe d’application.', kind: 'imap', authType: 'basic', fields: [{ key: 'account', label: 'Adresse Gmail', placeholder: 'veille@entreprise.com', required: true }] },
+  { id: 'outlook', category: 'email', label: 'Outlook', description: 'Lit Outlook / Exchange Online via IMAP.', kind: 'imap', authType: 'basic', fields: [{ key: 'account', label: 'Adresse Outlook', placeholder: 'veille@entreprise.com', required: true }] },
+  { id: 'local-agent', category: 'local', label: 'Agent de dossier', description: 'Reçoit les changements d’un dossier surveillé par un agent local.', kind: 'webhook', authType: 'webhook_hmac', fields: [{ key: 'path', label: 'Chemin surveillé', placeholder: '/Documents/Veille', required: true }, { key: 'extensions', label: 'Extensions', placeholder: 'pdf, docx, txt' }] },
+  { id: 'slack', category: 'collaborative', label: 'Slack', description: 'Reçoit les messages d’un canal via une application Slack.', kind: 'webhook', authType: 'webhook_hmac', fields: [{ key: 'channel', label: 'Canal', placeholder: '#veille', required: true }] },
+  { id: 'teams', category: 'collaborative', label: 'Microsoft Teams', description: 'Reçoit les messages d’un canal via un webhook signé.', kind: 'webhook', authType: 'bearer', fields: [{ key: 'team', label: 'Équipe', placeholder: 'Innovation', required: true }, { key: 'channel', label: 'Canal', placeholder: 'Veille', required: true }] },
+  { id: 'discord', category: 'collaborative', label: 'Discord', description: 'Reçoit les messages d’un salon via un webhook sécurisé.', kind: 'webhook', authType: 'bearer', fields: [{ key: 'channel', label: 'Salon', placeholder: '#veille', required: true }] },
+  { id: 'notion', category: 'knowledge', label: 'Notion', description: 'Interroge une base Notion via son API.', kind: 'api', authType: 'bearer', fields: [urlField('Endpoint Notion', 'https://api.notion.com/v1/databases/…/query'), { key: 'databaseId', label: 'ID de la base', placeholder: 'xxxxxxxx-xxxx-…', required: true }] },
+  { id: 'confluence', category: 'knowledge', label: 'Confluence', description: 'Recherche les pages d’un espace Confluence.', kind: 'api', authType: 'bearer', fields: [urlField('Endpoint Confluence', 'https://exemple.atlassian.net/wiki/api/v2/pages'), { key: 'space', label: 'Espace', placeholder: 'VEILLE', required: true }] },
+  { id: 'knowledge-api', category: 'knowledge', label: 'Wiki / base interne', description: 'Interroge une base de connaissances exposée en JSON.', kind: 'api', authType: 'api_key_header', fields: [urlField('Endpoint de recherche', 'https://knowledge.exemple.fr/api/articles'), { key: 'collection', label: 'Collection', placeholder: 'veille', required: true }] },
+]
+
+export function getCategoryInfo(category: ConnectorCategory) {
+  return CONNECTOR_CATEGORY_CATALOG.find((item) => item.id === category)
+}
+
+export function getConnectorTemplate(templateId: string) {
+  return CONNECTOR_TEMPLATES.find((item) => item.id === templateId)
+}
+
 export function defaultAuthType(kind: ConnectorKind): AuthType {
   return KIND_AUTH_TYPES[kind][0]
 }
@@ -211,7 +298,14 @@ export type M365Config = {
   dateField: string
 }
 
+export type ConnectorIntegrationConfig = {
+  category: ConnectorCategory
+  templateId: string
+  parameters: Record<string, string>
+}
+
 export type ConnectorConfig = {
+  integration: ConnectorIntegrationConfig
   url: string
   auth: { type: AuthType; keyName: string }
   imap: ImapConfig
@@ -268,8 +362,18 @@ export const DEFAULT_M365: M365Config = {
   dateField: '',
 }
 
+const DEFAULT_CATEGORY_BY_KIND: Record<ConnectorKind, ConnectorCategory> = {
+  rss: 'rss',
+  web: 'websites',
+  api: 'websites',
+  imap: 'email',
+  webhook: 'collaborative',
+  m365: 'cloud',
+}
+
 export function defaultConfig(kind: ConnectorKind): ConnectorConfig {
   return {
+    integration: { category: DEFAULT_CATEGORY_BY_KIND[kind], templateId: '', parameters: {} },
     url: '',
     auth: { type: defaultAuthType(kind), keyName: kind === 'api' ? 'X-API-Key' : '' },
     imap: { ...DEFAULT_IMAP },
@@ -293,6 +397,30 @@ export function defaultConfig(kind: ConnectorKind): ConnectorConfig {
       activeEndpointId: '',
     },
   }
+}
+
+export function configFromTemplate(templateId: string): { kind: ConnectorKind; config: ConnectorConfig } | null {
+  const template = getConnectorTemplate(templateId)
+  if (!template) return null
+  const config = defaultConfig(template.kind)
+  config.integration = {
+    category: template.category,
+    templateId: template.id,
+    parameters: Object.fromEntries(template.fields.map((field) => [field.key, ''])),
+  }
+  if (template.authType) {
+    config.auth = {
+      type: template.authType,
+      keyName: template.authType === 'api_key_query' ? 'key' : template.authType === 'api_key_header' ? 'X-API-Key' : '',
+    }
+  }
+  if (template.id === 'gmail') config.imap.host = 'imap.gmail.com'
+  if (template.id === 'outlook') config.imap.host = 'outlook.office365.com'
+  return { kind: template.kind, config }
+}
+
+export function connectorCategoryOf(kind: ConnectorKind, config: ConnectorConfig): ConnectorCategory {
+  return config.integration?.category ?? DEFAULT_CATEGORY_BY_KIND[kind]
 }
 
 const headerName = z
@@ -375,6 +503,11 @@ const m365Schema = z.object({
 })
 
 export const configSchema = z.object({
+  integration: z.object({
+    category: z.enum(CONNECTOR_CATEGORIES),
+    templateId: z.string().trim().max(80),
+    parameters: z.record(z.string().max(60), z.string().trim().max(500)).default({}),
+  }).default({ category: 'websites', templateId: '', parameters: {} }),
   url: z.string().trim().max(2000, 'URL trop longue (2000 caractères maximum).').default(''),
   auth: z.object({
     type: z.enum(AUTH_TYPES),
@@ -405,7 +538,7 @@ export const configSchema = z.object({
   api: z.object({
     method: z.enum(['GET', 'POST']),
     query: z.array(keyValue).max(15, '15 paramètres maximum.'),
-    body: z.string().max(5000, 'Corps trop long (5000 caractères maximum).'),
+    body: z.string().max(5000, 'Corps trop long (5000 caract��res maximum).'),
     itemsPath: path,
     titlePath: path,
     linkPath: path,
@@ -473,6 +606,12 @@ function validateM365(config: ConnectorConfig): ValidationIssue | null {
 }
 
 export function validateKindConfig(kind: ConnectorKind, config: ConnectorConfig): ValidationIssue | null {
+  const template = config.integration.templateId ? getConnectorTemplate(config.integration.templateId) : undefined
+  if (template) {
+    if (template.kind !== kind || template.category !== config.integration.category) return 'Le profil technique du connecteur est incohérent.'
+    const missing = template.fields.find((field) => field.required && !(field.key === 'endpoint' ? config.url : config.integration.parameters[field.key])?.trim())
+    if (missing) return `Le champ « ${missing.label} » est obligatoire.`
+  }
   if (!KIND_AUTH_TYPES[kind].includes(config.auth.type)) return `Ce type d’authentification n’est pas disponible pour un connecteur « ${getKindInfo(kind)?.label ?? kind} ».`
   if (isHttpKind(kind) && !config.url) return 'L’URL est obligatoire.'
   if (kind === 'imap') return validateImap(config)
