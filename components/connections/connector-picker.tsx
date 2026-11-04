@@ -23,28 +23,25 @@ export function ConnectorPicker({ connectors, value, onSelect }: Props) {
   const [kind, setKind] = useState<KindFilter>('all')
   const [active, setActive] = useState(0)
 
-  const usable = useMemo(() => connectors.filter((item) => item.requiresAuth), [connectors])
-  const withoutAuth = connectors.length - usable.length
-  const selected = usable.find((item) => item.id === value)
-  const kinds = useMemo(() => Array.from(new Set(usable.map((item) => item.kind))), [usable])
-  const uncoveredCount = useMemo(() => usable.filter((item) => item.sharedCount === 0).length, [usable])
+  const selected = connectors.find((item) => item.id === value)
+  const kinds = useMemo(() => Array.from(new Set(connectors.map((item) => item.kind))), [connectors])
+  const uncoveredCount = useMemo(() => connectors.filter((item) => item.requiresAuth && item.sharedCount === 0).length, [connectors])
 
   const results = useMemo(() => {
     const needle = query.trim().toLowerCase()
-    return usable
-      .filter((item) => (kind === 'all' ? true : kind === 'uncovered' ? item.sharedCount === 0 : item.kind === kind))
+    return connectors
+      .filter((item) => (kind === 'all' ? true : kind === 'uncovered' ? item.requiresAuth && item.sharedCount === 0 : item.kind === kind))
       .filter((item) => !needle || `${item.name} ${item.host} ${kindLabel(item.kind)}`.toLowerCase().includes(needle))
       .sort((a, b) => a.name.localeCompare(b.name, 'fr'))
-  }, [usable, query, kind])
+  }, [connectors, query, kind])
 
   const chips: { id: KindFilter; label: string; count: number }[] = [
-    { id: 'all', label: 'Tous', count: usable.length },
-    ...(uncoveredCount > 0 && uncoveredCount < usable.length ? [{ id: 'uncovered' as const, label: 'Sans connexion partagée', count: uncoveredCount }] : []),
-    ...(kinds.length > 1 ? kinds.map((item) => ({ id: item, label: kindLabel(item), count: usable.filter((connector) => connector.kind === item).length })) : []),
+    { id: 'all', label: 'Tous', count: connectors.length },
+    ...(uncoveredCount > 0 && uncoveredCount < connectors.length ? [{ id: 'uncovered' as const, label: 'Sans connexion partagée', count: uncoveredCount }] : []),
+    ...(kinds.length > 1 ? kinds.map((item) => ({ id: item, label: kindLabel(item), count: connectors.filter((connector) => connector.kind === item).length })) : []),
   ]
 
   function choose(id: string) {
-    if (!usable.find((item) => item.id === id)?.runtimeAvailable) return
     onSelect(id)
     setOpen(false)
     setQuery('')
@@ -90,7 +87,7 @@ export function ConnectorPicker({ connectors, value, onSelect }: Props) {
             </span>
           </>
         ) : (
-          <span className="flex-1 text-sm text-muted-foreground">Choisir un connecteur parmi {usable.length}…</span>
+          <span className="flex-1 text-sm text-muted-foreground">Choisir un connecteur parmi {connectors.length}…</span>
         )}
         <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />
       </button>
@@ -143,16 +140,14 @@ export function ConnectorPicker({ connectors, value, onSelect }: Props) {
                 <li key={item.id} role="option" aria-selected={item.id === value}>
                   <button
                     type="button"
-                    disabled={!item.runtimeAvailable}
                     onClick={() => choose(item.id)}
                     onMouseEnter={() => setActive(index)}
-                    title={item.runtimeAvailable ? undefined : item.runtimeReason}
-                    className={cn('flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50', index === active ? 'bg-muted' : 'hover:bg-muted/60')}
+                    className={cn('flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors focus-visible:outline-none', index === active ? 'bg-muted' : 'hover:bg-muted/60')}
                   >
                     <ConnectorLogo kind={item.kind} logoUrl={item.logoUrl} className="size-8 rounded-lg" />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium">{item.name}</span>
-                      <span className="block truncate text-xs text-muted-foreground">{item.runtimeAvailable ? `${item.host || 'URL à renseigner'} · ${authLabel(item.authType)}` : `Indisponible · ${item.runtimeReason}`}</span>
+                      <span className="block truncate text-xs text-muted-foreground">{!item.requiresAuth ? 'Sans authentification · aucune connexion nécessaire' : item.runtimeAvailable ? `${item.host || 'URL à renseigner'} · ${authLabel(item.authType)}` : `Configuration requise · ${item.runtimeReason}`}</span>
                     </span>
                     {item.sharedCount === 0 && <span className="hidden shrink-0 rounded-full bg-chart-4/15 px-2 py-0.5 text-[11px] font-medium sm:inline-block">Aucune partagée</span>}
                     {item.id === value && <Check className="size-4 shrink-0 text-primary" aria-label="Sélectionné" />}
@@ -169,8 +164,8 @@ export function ConnectorPicker({ connectors, value, onSelect }: Props) {
           )}
 
           <p className="flex flex-wrap items-center gap-x-1.5 px-1 text-xs text-muted-foreground">
-            <span>{results.length} sur {usable.length}</span>
-            {withoutAuth > 0 && <span className="inline-flex items-center gap-1"><Lock className="size-3" aria-hidden />· {withoutAuth} sans authentification (aucune connexion nécessaire)</span>}
+            <span>{results.length} sur {connectors.length}</span>
+            {connectors.some((item) => !item.requiresAuth) && <span className="inline-flex items-center gap-1"><Lock className="size-3" aria-hidden />· Les connecteurs sans authentification sont affichés pour information.</span>}
           </p>
         </div>
       )}

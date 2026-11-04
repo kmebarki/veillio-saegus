@@ -8,6 +8,8 @@ import { canMutateConnection, canViewConnection } from '../lib/connections/acces
 
 const connectionActions = readFileSync(resolve(process.cwd(), 'app/actions/connections.ts'), 'utf8')
 const connectionModule = readFileSync(resolve(process.cwd(), 'components/connections-module.tsx'), 'utf8')
+const connectorPicker = readFileSync(resolve(process.cwd(), 'components/connections/connector-picker.tsx'), 'utf8')
+const connectionForm = readFileSync(resolve(process.cwd(), 'components/connections/connection-form.tsx'), 'utf8')
 const executionGrants = readFileSync(resolve(process.cwd(), 'lib/connections/execution-grant.ts'), 'utf8')
 
 describe('propriété et visibilité des Connexions', () => {
@@ -61,6 +63,13 @@ describe('parcours de création', () => {
   it('garde le bouton Nouvelle connexion visible même sans runtime qualifié', () => {
     expect(connectionModule).toContain('<Button onClick={() => setForm({ mode: \'create\' })}><Plus data-icon="inline-start" />Nouvelle connexion</Button>')
     expect(connectionModule).not.toContain('{canCreate && <Button')
+  })
+
+  it('affiche tous les connecteurs et rend leur diagnostic sélectionnable', () => {
+    expect(connectorPicker).not.toContain('connectors.filter((item) => item.requiresAuth)')
+    expect(connectorPicker).not.toContain('disabled={!item.runtimeAvailable}')
+    expect(connectionForm).toContain('Configuration requise avant la création')
+    expect(connectionForm).toContain('Aucune connexion nécessaire')
   })
 })
 

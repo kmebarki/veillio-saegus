@@ -1,6 +1,7 @@
 'use client'
 
 import { ChevronDown, Globe2, PlugZap, ShieldCheck, TriangleAlert, User, Users } from 'lucide-react'
+import Link from 'next/link'
 import { useMemo, useState, useTransition } from 'react'
 
 import { createConnection, testConnection, testDraftConnection, updateConnection } from '@/app/actions/connections'
@@ -107,10 +108,28 @@ const [organizationIds, setOrganizationIds] = useState<string[]>(editing?.organi
     </div>
   )
 
-  if (!editing && !connectorId) {
+  if (!editing && (!connectorId || (choice && (!choice.requiresAuth || !choice.runtimeAvailable)))) {
     return (
       <div className="flex flex-col gap-4">
         {connectorField}
+        {choice && (
+          <div role="status" className="flex items-start gap-3 rounded-xl border bg-muted/30 p-4">
+            <TriangleAlert className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+            <div className="flex flex-col gap-2">
+              <div>
+                <p className="text-sm font-semibold">{choice.requiresAuth ? 'Configuration requise avant la création' : 'Aucune connexion nécessaire'}</p>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                  {choice.requiresAuth
+                    ? `La méthode d’authentification de ce connecteur n’est pas encore activable : ${choice.runtimeReason}.`
+                    : 'Ce connecteur fonctionne sans identifiants. Utilisez-le directement lors de la création d’une Source.'}
+                </p>
+              </div>
+              <Link href={choice.requiresAuth ? '/admin/settings/authentication' : '/admin/sources'} className="self-start text-sm font-medium text-primary underline-offset-4 hover:underline">
+                {choice.requiresAuth ? 'Ouvrir le référentiel d’authentification' : 'Créer une Source'}
+              </Link>
+            </div>
+          </div>
+        )}
         <div className="flex justify-end border-t pt-4"><Button type="button" variant="ghost" onClick={onClose}>Annuler</Button></div>
       </div>
     )
