@@ -234,6 +234,45 @@ export type ApiPagination = { type: (typeof PAGINATION_TYPES)[number]; param: st
 
 export const MAX_API_ENDPOINTS = 50
 
+export const OPERATION_AVAILABILITIES = ['to_verify', 'available', 'unsupported'] as const
+export type OperationAvailability = (typeof OPERATION_AVAILABILITIES)[number]
+
+export const OPERATION_CONTENT_KINDS = ['article', 'structured_data', 'text', 'document', 'image', 'audio', 'video', 'message', 'unknown'] as const
+export type OperationContentKind = (typeof OPERATION_CONTENT_KINDS)[number]
+
+export type ApiInputParameter = {
+  name: string
+  in: 'path' | 'query' | 'body' | 'header'
+  type: 'string' | 'number' | 'boolean' | 'array' | 'object' | 'unknown'
+  format: string
+  required: boolean | null
+  description: string
+  enum: Array<string | number | boolean>
+  example?: string | number | boolean | null
+}
+
+export type ApiOperationOutput = {
+  mediaTypes: string[]
+  contentKinds: OperationContentKind[]
+  shapeKnown: boolean
+  retrieval: OperationAvailability
+  processing: OperationAvailability
+}
+
+export type ApiOperationCapabilities = {
+  pagination: (typeof PAGINATION_TYPES)[number]
+  download: OperationAvailability
+  incremental: OperationAvailability
+}
+
+export type ApiOperationQualification = {
+  adapterId: string
+  adapterVersion: string
+  contractRevision: number
+  qualifiedAt: string
+  source: 'adapter-contract-suite'
+}
+
 export type ApiEndpoint = {
   id: string
   label: string
@@ -248,6 +287,14 @@ export type ApiEndpoint = {
   datePath: string
   summaryPath: string
   pagination: ApiPagination
+  pathTemplate: string
+  inputParameters: ApiInputParameter[]
+  output: ApiOperationOutput
+  capabilities: ApiOperationCapabilities
+  availability: OperationAvailability
+  readSafety: 'verified_read' | 'to_verify' | 'unsafe'
+  revision: number
+  qualification?: ApiOperationQualification
 }
 
 export const IMAP_SECURITY = ['tls', 'starttls'] as const
@@ -466,6 +513,37 @@ const paginationSchema = z.object({
   cursorPath: path,
 })
 
+const operationAvailabilitySchema = z.enum(OPERATION_AVAILABILITIES)
+const operationParameterSchema = z.object({
+  name: z.string().trim().min(1).max(160),
+  in: z.enum(['path', 'query', 'body', 'header']),
+  type: z.enum(['string', 'number', 'boolean', 'array', 'object', 'unknown']),
+  format: z.string().trim().max(80).default(''),
+  required: z.boolean().nullable().default(null),
+  description: z.string().trim().max(500).default(''),
+  enum: z.array(z.union([z.string(), z.number(), z.boolean()])).max(100).default([]),
+  example: z.union([z.string(), z.number(), z.boolean(), z.null()]).optional(),
+})
+const operationOutputSchema = z.object({
+  mediaTypes: z.array(z.string().trim().min(1).max(160)).max(20).default([]),
+  contentKinds: z.array(z.enum(OPERATION_CONTENT_KINDS)).max(10).default(['unknown']),
+  shapeKnown: z.boolean().default(false),
+  retrieval: operationAvailabilitySchema.default('to_verify'),
+  processing: operationAvailabilitySchema.default('to_verify'),
+})
+const operationCapabilitiesSchema = z.object({
+  pagination: z.enum(PAGINATION_TYPES).default('none'),
+  download: operationAvailabilitySchema.default('to_verify'),
+  incremental: operationAvailabilitySchema.default('to_verify'),
+})
+const operationQualificationSchema = z.object({
+  adapterId: z.string().trim().min(1).max(120),
+  adapterVersion: z.string().trim().min(1).max(80),
+  contractRevision: z.number().int().min(1),
+  qualifiedAt: z.string().datetime(),
+  source: z.literal('adapter-contract-suite'),
+})
+
 const endpointSchema = z.object({
   id: z.string().trim().min(1).max(64),
   label: z.string().trim().min(1).max(120),
@@ -480,6 +558,14 @@ const endpointSchema = z.object({
   datePath: path,
   summaryPath: path,
   pagination: paginationSchema,
+  pathTemplate: z.string().trim().max(1000).default(''),
+  inputParameters: z.array(operationParameterSchema).max(200).default([]),
+  output: operationOutputSchema.default({ mediaTypes: [], contentKinds: ['unknown'], shapeKnown: false, retrieval: 'to_verify', processing: 'to_verify' }),
+  capabilities: operationCapabilitiesSchema.default({ pagination: 'none', download: 'to_verify', incremental: 'to_verify' }),
+  availability: operationAvailabilitySchema.default('to_verify'),
+  readSafety: z.enum(['verified_read', 'to_verify', 'unsafe']).default('to_verify'),
+  revision: z.number().int().min(1).default(1),
+  qualification: operationQualificationSchema.optional(),
 })
 
 const imapSchema = z.object({

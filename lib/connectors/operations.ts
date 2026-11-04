@@ -1,0 +1,92 @@
+import type { ApiEndpoint, ApiInputParameter, ApiOperationOutput, ApiOperationQualification, ConnectorConfig, OperationAvailability } from '@/lib/connector-catalog'
+
+export type ConnectorOperationContract = {
+  id: string
+  label: string
+  summary: string
+  method: 'GET' | 'POST'
+  pathTemplate: string
+  inputParameters: ApiInputParameter[]
+  output: ApiOperationOutput
+  pagination: ConnectorConfig['api']['pagination']['type']
+  availability: OperationAvailability
+  restrictions: string[]
+  revision: number
+  qualification?: ApiOperationQualification
+}
+
+const UNKNOWN_OUTPUT: ApiOperationOutput = {
+  mediaTypes: [],
+  contentKinds: ['unknown'],
+  shapeKnown: false,
+  retrieval: 'to_verify',
+  processing: 'to_verify',
+}
+
+export function normalizeOperation(endpoint: ApiEndpoint): ConnectorOperationContract {
+  const output = endpoint.output ?? UNKNOWN_OUTPUT
+  const restrictions: string[] = []
+  const readSafety = endpoint.readSafety ?? (endpoint.method === 'GET' ? 'verified_read' : 'to_verify')
+  if (endpoint.method === 'POST' && readSafety !== 'verified_read') restrictions.push('Lecture sans effet de bord non attestée : test automatique bloqué.')
+  if (output.processing === 'unsupported') restrictions.push('Récupération décrite, mais traitement du contenu non pris en charge par cet adaptateur.')
+  if ((endpoint.inputParameters ?? []).some((parameter) => parameter.in === 'path' && parameter.required === true && parameter.example == null)) {
+    restrictions.push('Une valeur de test manque pour au moins un paramètre de chemin obligatoire.')
+  }
+
+  return {
+    id: endpoint.id,
+    label: endpoint.label,
+    summary: endpoint.summary,
+    method: endpoint.method,
+    pathTemplate: endpoint.pathTemplate || safePathname(endpoint.url),
+    inputParameters: endpoint.inputParameters ?? [],
+    output,
+    pagination: endpoint.capabilities?.pagination ?? endpoint.pagination.type,
+    availability: endpoint.availability ?? 'to_verify',
+    restrictions,
+    revision: endpoint.revision ?? 1,
+    qualification: endpoint.qualification,
+  }
+}
+
+export function operationsFromConfig(config: ConnectorConfig): ConnectorOperationContract[] {
+  return config.api.endpoints.map(normalizeOperation)
+}
+
+function bodyValue(config: ConnectorConfig, name: string) {
+  try {
+    const body = JSON.parse(config.api.body) as Record<string, unknown>
+    return body && typeof body === 'object' && body[name] != null
+  } catch {
+    return false
+  }
+}
+
+function hasRequiredValue(config: ConnectorConfig, operation: ApiEndpoint, parameter: ApiInputParameter) {
+  if (parameter.example != null) return true
+  if (parameter.in === 'query') return operation.query.some((item) => item.name === parameter.name && item.value.trim() !== '')
+  if (parameter.in === 'body') return bodyValue(config, parameter.name)
+  return false
+}
+
+export function operationTestRestriction(config: ConnectorConfig): string | null {
+  const operation = config.api.endpoints.find((endpoint) => endpoint.id === config.api.activeEndpointId)
+  if (operation) {
+    const missingParameter = operation.inputParameters.find((parameter) => parameter.required === true && !hasRequiredValue(config, operation, parameter))
+    if (missingParameter) return `Une valeur de test explicite manque pour le paramètre obligatoire « ${missingParameter.name} ». Aucun appel réseau n’a été effectué.`
+    if (operation.availability === 'unsupported') return 'Cette opération n’est pas prise en charge par la version actuelle de l’adaptateur. Aucun appel réseau n’a été effectué.'
+    if (operation.output.processing === 'unsupported') return 'Le format déclaré peut être récupérable, mais son traitement n’est pas pris en charge par ce banc d’essai. Aucun appel réseau n’a été effectué.'
+  }
+  if (config.api.method === 'POST' && (!operation || operation.readSafety !== 'verified_read')) {
+    return 'Ce POST n’est pas attesté comme une opération de lecture sans effet de bord. Aucun appel réseau n’a été effectué.'
+  }
+  return null
+}
+
+function safePathname(url: string) {
+  try {
+    return new URL(url).pathname
+  } catch {
+    return url
+  }
+}

@@ -22,6 +22,17 @@ const AUTH_METHODS: AuthMethodDefinition[] = [
   { id: 'CUSTOM', label: 'Méthode personnalisée', description: 'Méthode proposée, soumise à validation et implémentation technique.', transport: 'À définir', status: 'proposal-only', version: '1.1', sensitive: true },
 ]
 
+export function isAuthMethodSelectable(method: AuthMethodDefinition) {
+  return method.status !== 'proposal-only'
+}
+
+export function updateAuthMethodSelection(current: AuthMethodId[], id: AuthMethodId, checked: boolean): AuthMethodId[] {
+  if (id === 'CUSTOM') return current
+  if (!checked) return current.filter((item) => item !== id)
+  if (id === 'NONE') return ['NONE']
+  return [...current.filter((item) => item !== 'NONE' && item !== id), id]
+}
+
 export interface AuthMethodRegistry {
   list(): AuthMethodDefinition[]
   get(id: AuthMethodId): AuthMethodDefinition | undefined

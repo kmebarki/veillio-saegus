@@ -1,6 +1,7 @@
 'use client'
 
 import { ChevronDown, Globe2, PlugZap, ShieldCheck, TriangleAlert, User, Users } from 'lucide-react'
+import Link from 'next/link'
 import { useMemo, useState, useTransition } from 'react'
 
 import { createConnection, testConnection, testDraftConnection, updateConnection } from '@/app/actions/connections'
@@ -37,8 +38,8 @@ export function ConnectionForm({ target, overview, onClose, onDone }: Props) {
   const [name, setName] = useState(editing?.name ?? '')
   const [description, setDescription] = useState(editing?.description ?? '')
   const [logoUrl, setLogoUrl] = useState(editing?.logoUrl ?? '')
-  const [scope, setScope] = useState<ConnectionScope>(editing?.scope ?? (overview.viewer.canManage ? 'organization' : 'private'))
-  const [organizationIds, setOrganizationIds] = useState<string[]>(editing?.organizationIds ?? (overview.organizations[0] ? [overview.organizations[0].id] : []))
+const [scope, setScope] = useState<ConnectionScope>(editing?.scope ?? 'private')
+const [organizationIds, setOrganizationIds] = useState<string[]>(editing?.organizationIds ?? [])
   const [lifecycle, setLifecycle] = useState<ConnectionLifecycle>(editing?.lifecycle === 'draft' ? 'draft' : 'active')
   const [username, setUsername] = useState(editing?.username ?? '')
   const [secret, setSecret] = useState('')
@@ -107,10 +108,28 @@ export function ConnectionForm({ target, overview, onClose, onDone }: Props) {
     </div>
   )
 
-  if (!editing && !connectorId) {
+  if (!editing && (!connectorId || (choice && (!choice.requiresAuth || !choice.runtimeAvailable)))) {
     return (
       <div className="flex flex-col gap-4">
         {connectorField}
+        {choice && (
+          <div role="status" className="flex items-start gap-3 rounded-xl border bg-muted/30 p-4">
+            <TriangleAlert className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+            <div className="flex flex-col gap-2">
+              <div>
+                <p className="text-sm font-semibold">{choice.requiresAuth ? 'Configuration requise avant la création' : 'Aucune connexion nécessaire'}</p>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                  {choice.requiresAuth
+                    ? `La méthode d’authentification de ce connecteur n’est pas encore activable : ${choice.runtimeReason}.`
+                    : 'Ce connecteur fonctionne sans identifiants. Utilisez-le directement lors de la création d’une Source.'}
+                </p>
+              </div>
+              <Link href={choice.requiresAuth ? '/admin/settings/authentication' : '/admin/sources'} className="self-start text-sm font-medium text-primary underline-offset-4 hover:underline">
+                {choice.requiresAuth ? 'Ouvrir le référentiel d’authentification' : 'Créer une Source'}
+              </Link>
+            </div>
+          </div>
+        )}
         <div className="flex justify-end border-t pt-4"><Button type="button" variant="ghost" onClick={onClose}>Annuler</Button></div>
       </div>
     )
@@ -161,14 +180,14 @@ export function ConnectionForm({ target, overview, onClose, onDone }: Props) {
           <legend className="mb-1 text-sm font-medium">Portée d’utilisation</legend>
           <div className="grid gap-2 sm:grid-cols-3">
             {([
-              { id: 'private', title: 'Privée', text: 'Visible uniquement par vous.', icon: User, disabled: false },
-              { id: 'organization', title: 'Organisation', text: 'Limitée aux organisations choisies.', icon: Users, disabled: !overview.viewer.canManage },
-              { id: 'public', title: 'Publique', text: 'Disponible pour toute la plateforme.', icon: Globe2, disabled: !overview.viewer.canManage },
+              { id: 'private', title: 'Privée', text: 'Visible uniquement par vous.', disabledText: '', icon: User, disabled: false },
+              { id: 'organization', title: 'Organisation', text: 'Limitée à votre organisation actuelle.', disabledText: 'Réservé aux gestionnaires.', icon: Users, disabled: !overview.viewer.canManage },
+              { id: 'public', title: 'Publique', text: 'Disponible pour toute la plateforme.', disabledText: 'Approbation de publication non configurée.', icon: Globe2, disabled: true },
             ] as const).map((option) => (
               <label key={option.id} className={cn('flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm transition-colors', scope === option.id ? 'border-primary bg-primary/5 ring-2 ring-primary/15' : 'bg-card', option.disabled && 'cursor-not-allowed opacity-50')}>
                 <input type="radio" name="scope" value={option.id} checked={scope === option.id} disabled={option.disabled} onChange={() => setScope(option.id)} className="sr-only" />
                 <option.icon className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-                <span><span className="block font-medium">{option.title}</span><span className="text-xs leading-5 text-muted-foreground">{option.disabled ? 'Réservé aux gestionnaires.' : option.text}</span></span>
+                <span><span className="block font-medium">{option.title}</span><span className="text-xs leading-5 text-muted-foreground">{option.disabled ? option.disabledText : option.text}</span></span>
               </label>
             ))}
           </div>

@@ -235,7 +235,7 @@ function ImportDialog({ config, onClose, onApply }: { config: ConnectorConfig; o
       const absolute = result.servers.find(isAbsoluteHttpUrl)
       setBaseUrl(absolute ?? '')
       setApplyAuth(Boolean(result.auth && result.auth.type !== 'none'))
-      setSelected(new Set(result.endpoints.filter((item) => !item.blocked && !item.deprecated && item.confidence !== 'low').slice(0, MAX_API_ENDPOINTS).map((item) => item.id)))
+      setSelected(new Set(result.endpoints.filter((item) => !item.blocked && !item.deprecated && item.confidence !== 'low' && item.template.readSafety === 'verified_read').slice(0, MAX_API_ENDPOINTS).map((item) => item.id)))
     } catch (cause) {
       setSpec(null)
       setError(cause instanceof OpenApiError ? cause.message : 'Impossible de lire cette spécification. Vérifiez qu’il s’agit d’un JSON ou d’un YAML valide.')
@@ -351,6 +351,9 @@ function ImportDialog({ config, onClose, onApply }: { config: ConnectorConfig; o
                       {item.summary && item.summary !== item.label && <span className="block truncate text-xs text-muted-foreground">{item.summary}</span>}
                       <span className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
                         {item.blocked ? <span className="text-destructive">{item.blocked}</span> : <span>{CONFIDENCE_LABELS[item.confidence]}</span>}
+                        <span>{item.template.output.contentKinds.join(', ')} · {item.template.output.mediaTypes.join(', ') || 'format inconnu'}</span>
+                        <span>{item.template.inputParameters.filter((parameter) => parameter.required === true).length} requis · {item.template.inputParameters.filter((parameter) => parameter.required === false).length} facultatifs</span>
+                        <span>À vérifier</span>
                         {item.requiresAuth && <span>Authentification requise</span>}
                         {item.deprecated && <span>Déconseillé</span>}
                         {item.tags.length > 0 && <span>{item.tags.slice(0, 3).join(', ')}</span>}
@@ -362,7 +365,7 @@ function ImportDialog({ config, onClose, onApply }: { config: ConnectorConfig; o
               )
             })}
           </ul>
-          {spec.skippedCount > 0 && <p className="text-xs leading-5 text-muted-foreground">{spec.skippedCount} opération{spec.skippedCount > 1 ? 's' : ''} ignorée{spec.skippedCount > 1 ? 's' : ''} (seules les lectures JSON sont importables).</p>}
+          {spec.skippedCount > 0 && <p className="text-xs leading-5 text-muted-foreground">{spec.skippedCount} opération{spec.skippedCount > 1 ? 's' : ''} ignorée{spec.skippedCount > 1 ? 's' : ''} (PUT, PATCH, DELETE et opérations techniques exclues).</p>}
         </>
       )}
 

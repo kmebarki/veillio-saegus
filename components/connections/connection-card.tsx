@@ -1,4 +1,4 @@
-import { CalendarClock, Globe2, KeyRound, Pencil, PlugZap, ShieldAlert, Trash2, User, Users } from 'lucide-react'
+import { Archive, CalendarClock, Globe2, KeyRound, Pencil, PlugZap, ShieldAlert, User, Users } from 'lucide-react'
 
 import { ageLabel, expiryBadge, STALE_SECRET_DAYS, TONE_CLASSES } from '@/components/connections/helpers'
 import { ConnectorLogo, HealthDot } from '@/components/connector-ui'
@@ -53,11 +53,11 @@ export function ConnectionCard({ connection, busy, onOpen, onEdit, onTest, onDel
         <p className="line-clamp-2 min-h-8 text-xs leading-4 text-muted-foreground">{connection.lastCheckMessage ?? 'Testez la connexion pour vérifier les identifiants.'}{connection.lastCheckAt ? ` (${connection.lastCheckAt})` : ''}</p>
       </div>
 
-      {connection.canEdit && (
+      {(connection.canTest || connection.canEdit || connection.canArchive) && (
         <div className="relative z-10 flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" disabled={busy} onClick={onTest}><PlugZap data-icon="inline-start" />{busy ? 'Test…' : 'Tester'}</Button>
-          <Button size="sm" variant="ghost" disabled={busy} onClick={onEdit}><Pencil data-icon="inline-start" />Modifier</Button>
-          <Button size="sm" variant="ghost" disabled={busy} onClick={onDelete} className="ml-auto text-destructive hover:text-destructive"><Trash2 data-icon="inline-start" />Supprimer</Button>
+          {connection.canTest && <Button size="sm" variant="outline" disabled={busy} onClick={onTest}><PlugZap data-icon="inline-start" />{busy ? 'Test…' : 'Tester'}</Button>}
+          {connection.canEdit && <Button size="sm" variant="ghost" disabled={busy} onClick={onEdit}><Pencil data-icon="inline-start" />Modifier</Button>}
+          {connection.canArchive && <Button size="sm" variant="ghost" disabled={busy} onClick={onDelete} className="ml-auto text-destructive hover:text-destructive"><Archive data-icon="inline-start" />Archiver</Button>}
         </div>
       )}
     </article>

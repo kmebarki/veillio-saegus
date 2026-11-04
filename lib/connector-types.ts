@@ -1,5 +1,6 @@
 import type { ConnectorCategory, ConnectorConfig, ConnectorHealth, ConnectorKind, ConnectorStatus } from '@/lib/connector-catalog'
 import type { ConnectionOption } from '@/lib/connection-types'
+import type { ConnectorOperationContract } from '@/lib/connectors/operations'
 
 export type ConnectorViewer = {
   id: string
@@ -56,6 +57,7 @@ export type ConnectorHistoryEntry = { id: number; label: string; detail: string;
 export type ConnectorDetail = {
   connector: ConnectorSummary
   config: ConnectorConfig
+  operations: ConnectorOperationContract[]
   connections: ConnectionOption[]
   runs: ConnectorRunEntry[]
   history: ConnectorHistoryEntry[]

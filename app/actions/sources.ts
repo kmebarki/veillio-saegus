@@ -6,10 +6,12 @@ import { and, desc, eq, sql } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
-import { getDefaultOrganization, requirePermission } from '@/lib/authorization'
+import { requirePermission } from '@/lib/authorization'
 import { getKindInfo, isConnectorKind, needsSecret, type ConnectorKind } from '@/lib/connector-catalog'
 import { db } from '@/lib/db'
-import { auditEvents, collectionOccurrences, connections, connectors, sources, users } from '@/lib/db/schema'
+import { auditEvents, collectionOccurrences, connectionOrganizationAccess, connections, connectors, sources, users } from '@/lib/db/schema'
+import { lockConnectorMutation } from '@/lib/connectors/mutation-lock'
+import { resolveOperationalRuntime } from '@/lib/connections/registry'
 import type { SourceCollectionEntry, SourceConnectorChoice, SourceDiagnostic, SourceSummary, SourcesOverview } from '@/lib/source-types'
 
 const dateTime = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })
@@ -67,8 +69,8 @@ function formatOccurrence(row: typeof collectionOccurrences.$inferSelect): Sourc
 }
 
 async function organizationFor(actor: Awaited<ReturnType<typeof requirePermission>>) {
-  if (actor.organizationId) return { id: actor.organizationId, name: 'Votre organisation' }
-  return getDefaultOrganization()
+  if (!actor.organizationId) return null
+  return { id: actor.organizationId, name: 'Votre organisation' }
 }
 
 export async function getSourcesOverview(): Promise<SourcesOverview> {
@@ -196,11 +198,14 @@ export async function createSource(input: unknown): Promise<{ ok: true; message:
       const integration = (connector.config as { integration?: { templateId?: unknown; adapterVersion?: unknown } }).integration
       const serviceId = typeof integration?.templateId === 'string' && integration.templateId ? integration.templateId : `custom:${kind}`
       const adapterVersion = typeof integration?.adapterVersion === 'string' && integration.adapterVersion ? integration.adapterVersion : '1.0.0'
+      const runtime = await resolveOperationalRuntime({ methodId: 'NONE', serviceId, adapterId: kind, adapterVersion })
+      if (!runtime.usable || !runtime.methodVersion) return fail(`Accès sans authentification indisponible : ${runtime.reasons.join(', ')}.`)
       const [createdNone] = await db.insert(connections).values({
-        id: randomUUID(), organizationId: organization.id, connectorId: connector.id, serviceId, name: `Accès public · ${connector.name}`, scope: parsed.data.scope === 'user' ? 'private' : 'organization', ownerUserId: parsed.data.scope === 'user' ? actor.id : null, ownerKind: parsed.data.scope === 'user' ? 'user' : 'organization', ownerId: ownerKey, lifecycle: 'active', health: 'unverified', origin: 'automatic_none', methodId: 'NONE', methodVersion: '1.0.0', adapterId: kind, adapterVersion, handlerKey: 'none', handlerVersion: '1.0.0', lastValidatedMethodVersion: '1.0.0', lastValidatedAdapterVersion: adapterVersion, autoReuseKey, createdByUserId: actor.id,
+        id: randomUUID(), organizationId: organization.id, connectorId: connector.id, serviceId, name: `Accès public · ${connector.name}`, scope: parsed.data.scope === 'user' ? 'private' : 'organization', ownerUserId: parsed.data.scope === 'user' ? actor.id : null, ownerKind: parsed.data.scope === 'user' ? 'user' : 'organization', ownerId: ownerKey, lifecycle: 'active', health: 'unverified', origin: 'automatic_none', methodId: 'NONE', methodVersion: runtime.methodVersion, adapterId: kind, adapterVersion, handlerKey: runtime.handlerKey, handlerVersion: runtime.handlerVersion, lastValidatedMethodVersion: runtime.methodVersion, lastValidatedAdapterVersion: adapterVersion, autoReuseKey, createdByUserId: actor.id,
       }).onConflictDoNothing().returning()
       if (createdNone) {
         connection = createdNone
+        if (parsed.data.scope === 'organization') await db.insert(connectionOrganizationAccess).values({ userId: actor.id, connectionId: createdNone.id, organizationId: organization.id })
         await db.insert(auditEvents).values({ actorUserId: actor.id, action: 'connection.none_created', targetType: 'connection', targetId: createdNone.id, metadata: { connectorId: connector.id, sourceScope: parsed.data.scope } })
       } else {
         const [racedNone] = await db.select().from(connections).where(eq(connections.autoReuseKey, autoReuseKey)).limit(1)
@@ -216,11 +221,19 @@ export async function createSource(input: unknown): Promise<{ ok: true; message:
   const [duplicate] = await db.select({ id: sources.id }).from(sources).where(duplicateWhere).limit(1)
   if (duplicate) return fail('Une Source de même nom existe déjà dans ce périmètre.')
 
-  const [created] = await db.transaction(async (tx) => {
-    const rows = await tx.insert(sources).values({ organizationId: organization.id, connectorId: connector.id, connectionId: connection?.id ?? null, name: parsed.data.name, description: parsed.data.description || null, imageUrl: parsed.data.imageUrl || null, endpoint: parsed.data.endpoint, scope: parsed.data.scope, ownerUserId: parsed.data.scope === 'user' ? actor.id : null, createdByUserId: actor.id }).returning({ id: sources.id })
-    await tx.insert(auditEvents).values({ actorUserId: actor.id, action: 'source.created', targetType: 'source', targetId: rows[0].id, metadata: { connectorId: connector.id, scope: parsed.data.scope, connectionScope: connection?.scope ?? null } })
-    return rows
+  const created = await db.transaction(async (tx) => {
+    await lockConnectorMutation(tx, connector.id)
+    const [currentConnector] = await tx
+      .select({ id: connectors.id })
+      .from(connectors)
+      .where(and(eq(connectors.id, connector.id), eq(connectors.organizationId, organization.id)))
+      .limit(1)
+    if (!currentConnector) return null
+    const [row] = await tx.insert(sources).values({ organizationId: organization.id, connectorId: connector.id, connectionId: connection?.id ?? null, name: parsed.data.name, description: parsed.data.description || null, imageUrl: parsed.data.imageUrl || null, endpoint: parsed.data.endpoint, scope: parsed.data.scope, ownerUserId: parsed.data.scope === 'user' ? actor.id : null, createdByUserId: actor.id }).returning({ id: sources.id })
+    await tx.insert(auditEvents).values({ actorUserId: actor.id, action: 'source.created', targetType: 'source', targetId: row.id, metadata: { connectorId: connector.id, scope: parsed.data.scope, connectionScope: connection?.scope ?? null } })
+    return row
   })
+  if (!created) return fail('Le Connecteur n’est plus disponible. Rechargez la liste avant de réessayer.')
   revalidatePath('/admin/sources')
   return { ok: true, message: 'Source ajoutée au catalogue.', id: created.id }
 }

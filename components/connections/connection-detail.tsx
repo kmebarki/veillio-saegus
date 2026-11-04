@@ -67,13 +67,13 @@ export function ConnectionDetail({ connection, activity, busy, onEdit, onTest, o
           {connection.lastCheckMessage && !connection.testedCurrentVersion && <p className="text-xs font-medium text-foreground">Les identifiants ont changé depuis : relancez un test.</p>}
         </section>
 
-        {connection.canEdit && (
-          <div className="flex flex-wrap gap-2 border-t pt-4">
-            <Button variant="outline" disabled={busy} onClick={onTest}><PlugZap data-icon="inline-start" />{busy ? 'Test en cours…' : 'Tester la connexion'}</Button>
-            <Button variant="outline" disabled={busy} onClick={onEdit}><Pencil data-icon="inline-start" />Modifier</Button>
-            <Button variant="ghost" disabled={busy} onClick={onDelete} className="ml-auto text-destructive hover:text-destructive"><Archive data-icon="inline-start" />Archiver</Button>
-          </div>
-        )}
+  {(connection.canTest || connection.canEdit || connection.canArchive) && (
+  <div className="flex flex-wrap gap-2 border-t pt-4">
+  {connection.canTest && <Button variant="outline" disabled={busy} onClick={onTest}><PlugZap data-icon="inline-start" />{busy ? 'Test en cours…' : 'Tester la connexion'}</Button>}
+  {connection.canEdit && <Button variant="outline" disabled={busy} onClick={onEdit}><Pencil data-icon="inline-start" />Modifier</Button>}
+  {connection.canArchive && <Button variant="ghost" disabled={busy} onClick={onDelete} className="ml-auto text-destructive hover:text-destructive"><Archive data-icon="inline-start" />Archiver</Button>}
+  </div>
+  )}
       </div>
 
       <aside className="flex min-w-0 flex-col gap-6 self-start rounded-2xl border bg-muted/30 p-4">
