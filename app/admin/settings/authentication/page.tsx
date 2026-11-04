@@ -4,8 +4,8 @@ import { getAuthenticationOverview } from '@/app/actions/authentication-methods'
 import { AuthenticationModule } from '@/components/authentication/authentication-module'
 
 export const metadata: Metadata = {
-  title: 'Authentification · Paramètres · Veillio',
-  description: 'Référentiel versionné des méthodes d’authentification, gouvernance et preuves runtime.',
+  title: 'Référentiel d’authentification · Veillio',
+  description: 'Schémas d’authentification utilisés par les connecteurs.',
 }
 
 export default async function AuthenticationSettingsPage({ searchParams }: { searchParams: Promise<{ intent?: string }> }) {
