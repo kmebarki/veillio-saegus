@@ -1,6 +1,6 @@
 'use client'
 
-import { ChevronDown, PlugZap, ShieldCheck, TriangleAlert, User, Users } from 'lucide-react'
+import { ChevronDown, Globe2, PlugZap, ShieldCheck, TriangleAlert, User, Users } from 'lucide-react'
 import { useMemo, useState, useTransition } from 'react'
 
 import { createConnection, testConnection, testDraftConnection, updateConnection } from '@/app/actions/connections'
@@ -13,7 +13,7 @@ import { ConnectorLogoField } from '@/components/connector-logo-field'
 import { ConnectorLogo } from '@/components/connector-ui'
 import { Button } from '@/components/ui/button'
 import { analyzeSecret, analyzeUsername } from '@/lib/connection-secret'
-import type { ConnectionScope, ConnectionSummary, ConnectionsOverview } from '@/lib/connection-types'
+import type { ConnectionLifecycle, ConnectionScope, ConnectionSummary, ConnectionsOverview } from '@/lib/connection-types'
 import { AUTH_LABELS, secretLabel, type AuthType } from '@/lib/connector-catalog'
 import type { TestOutcome } from '@/lib/connector-types'
 import { cn } from '@/lib/utils'
@@ -38,6 +38,8 @@ export function ConnectionForm({ target, overview, onClose, onDone }: Props) {
   const [description, setDescription] = useState(editing?.description ?? '')
   const [logoUrl, setLogoUrl] = useState(editing?.logoUrl ?? '')
   const [scope, setScope] = useState<ConnectionScope>(editing?.scope ?? (overview.viewer.canManage ? 'organization' : 'private'))
+  const [organizationIds, setOrganizationIds] = useState<string[]>(editing?.organizationIds ?? (overview.organizations[0] ? [overview.organizations[0].id] : []))
+  const [lifecycle, setLifecycle] = useState<ConnectionLifecycle>(editing?.lifecycle === 'draft' ? 'draft' : 'active')
   const [username, setUsername] = useState(editing?.username ?? '')
   const [secret, setSecret] = useState('')
   const [replacing, setReplacing] = useState(!editing)
@@ -57,7 +59,7 @@ export function ConnectionForm({ target, overview, onClose, onDone }: Props) {
   const userCheck = useMemo(() => analyzeUsername(authType, username), [authType, username])
   const secretReady = editing && !replacing ? true : analysis.valid
   const showUsernameError = authType === 'basic' && username.length > 0 && userCheck.error
-  const canSubmit = !pending && name.trim().length >= 2 && Boolean(connectorId) && secretReady && !userCheck.error
+  const canSubmit = !pending && name.trim().length >= 2 && Boolean(connectorId) && secretReady && !userCheck.error && (scope !== 'organization' || organizationIds.length > 0)
   const canTest = !testing && !pending && secretReady && !userCheck.error && Boolean(connectorId)
 
   function runDraftTest() {
@@ -76,12 +78,13 @@ export function ConnectionForm({ target, overview, onClose, onDone }: Props) {
     setError(null)
     startTransition(async () => {
       if (editing) {
-        const result = await updateConnection({ id: editing.id, version: editing.version, name, description, logoUrl, username, expiresAt, secret: replacing ? { mode: 'set', value: secret } : { mode: 'keep', value: '' } })
+        const result = await updateConnection({ id: editing.id, version: editing.version, name, description, logoUrl, scope, organizationIds, lifecycle, username, expiresAt, secret: replacing ? { mode: 'set', value: secret } : { mode: 'keep', value: '' } })
         if (!result.ok) return setError(result.message)
         return onDone(result.message)
       }
-      const created = await createConnection({ connectorId, name, description, logoUrl, scope, username, secret, expiresAt })
+      const created = await createConnection({ connectorId, name, description, logoUrl, scope, organizationIds, lifecycle, username, secret, expiresAt })
       if (!created.ok) return setError(created.message)
+      if (lifecycle === 'draft') return onDone('Brouillon enregistré.')
       const tested = await testConnection({ id: created.id })
       onDone(tested.ok ? `Connexion créée · ${tested.outcome.status === 'success' ? 'test réussi' : tested.outcome.status === 'warning' ? 'test réussi avec réserves' : 'test en échec, vérifiez les identifiants'}.` : created.message)
     })
@@ -154,23 +157,48 @@ export function ConnectionForm({ target, overview, onClose, onDone }: Props) {
           </div>
         </details>
 
-        {!editing && (
-          <fieldset className="flex flex-col gap-2">
-            <legend className="mb-1.5 text-sm font-medium">Qui peut l’utiliser ?</legend>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {([
-                { id: 'private', title: 'Privée', text: 'Vous seul pouvez la voir et l’utiliser.', icon: User, disabled: false },
-                { id: 'organization', title: 'Organisationnelle', text: 'Toute l’organisation peut l’utiliser.', icon: Users, disabled: !overview.viewer.canManage },
-              ] as const).map((option) => (
-                <label key={option.id} className={cn('flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm transition-colors', scope === option.id ? 'border-primary bg-primary/5 ring-2 ring-primary/15' : 'bg-card', option.disabled && 'cursor-not-allowed opacity-50')}>
-                  <input type="radio" name="scope" value={option.id} checked={scope === option.id} disabled={option.disabled} onChange={() => setScope(option.id)} className="sr-only" />
-                  <option.icon className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-                  <span><span className="block font-medium">{option.title}</span><span className="text-xs text-muted-foreground">{option.disabled ? 'Réservé aux gestionnaires de connexions.' : option.text}</span></span>
-                </label>
-              ))}
+        <fieldset className="flex flex-col gap-3">
+          <legend className="mb-1 text-sm font-medium">Portée d’utilisation</legend>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {([
+              { id: 'private', title: 'Privée', text: 'Visible uniquement par vous.', icon: User, disabled: false },
+              { id: 'organization', title: 'Organisation', text: 'Limitée aux organisations choisies.', icon: Users, disabled: !overview.viewer.canManage },
+              { id: 'public', title: 'Publique', text: 'Disponible pour toute la plateforme.', icon: Globe2, disabled: !overview.viewer.canManage },
+            ] as const).map((option) => (
+              <label key={option.id} className={cn('flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm transition-colors', scope === option.id ? 'border-primary bg-primary/5 ring-2 ring-primary/15' : 'bg-card', option.disabled && 'cursor-not-allowed opacity-50')}>
+                <input type="radio" name="scope" value={option.id} checked={scope === option.id} disabled={option.disabled} onChange={() => setScope(option.id)} className="sr-only" />
+                <option.icon className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+                <span><span className="block font-medium">{option.title}</span><span className="text-xs leading-5 text-muted-foreground">{option.disabled ? 'Réservé aux gestionnaires.' : option.text}</span></span>
+              </label>
+            ))}
+          </div>
+          {scope === 'organization' && (
+            <div className="rounded-xl border bg-muted/30 p-3">
+              <p className="text-sm font-medium">Organisations autorisées</p>
+              <p className="mt-1 text-xs text-muted-foreground">Sélectionnez une ou plusieurs organisations.</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {overview.organizations.map((organization) => (
+                  <label key={organization.id} className="flex cursor-pointer items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={organizationIds.includes(organization.id)}
+                      onChange={(event) => setOrganizationIds((current) => event.target.checked ? [...current, organization.id] : current.filter((id) => id !== organization.id))}
+                      className="size-4 accent-primary"
+                    />
+                    <span className="truncate">{organization.name}</span>
+                  </label>
+                ))}
+              </div>
             </div>
-          </fieldset>
-        )}
+          )}
+          <label className="flex max-w-xs flex-col gap-1.5 text-sm font-medium">
+            Statut initial
+            <select value={lifecycle} onChange={(event) => setLifecycle(event.target.value as ConnectionLifecycle)} className={inputClass}>
+              <option value="active">Active</option>
+              <option value="draft">Brouillon</option>
+            </select>
+          </label>
+        </fieldset>
 
         <fieldset className="flex flex-col gap-4 rounded-2xl border p-4">
           <legend className="px-1.5 text-sm font-semibold">Identifiants</legend>
@@ -224,7 +252,7 @@ export function ConnectionForm({ target, overview, onClose, onDone }: Props) {
         {error && <p role="alert" className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"><TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />{error}</p>}
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose} disabled={pending}>Annuler</Button>
-          <Button type="submit" disabled={!canSubmit}>{pending ? 'Enregistrement…' : editing ? 'Enregistrer' : 'Créer et tester'}</Button>
+          <Button type="submit" disabled={!canSubmit}>{pending ? 'Enregistrement…' : editing ? 'Enregistrer' : lifecycle === 'draft' ? 'Enregistrer le brouillon' : 'Créer et tester'}</Button>
         </div>
       </div>
     </form>

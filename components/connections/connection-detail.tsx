@@ -48,7 +48,7 @@ export function ConnectionDetail({ connection, activity, busy, onEdit, onTest, o
           <Fact label="Authentification">{AUTH_LABELS[authType]?.label.split(' (')[0] ?? 'Clé API'}</Fact>
           {(authType === 'api_key_header' || authType === 'api_key_query') && <Fact label={authType === 'api_key_header' ? 'En-tête' : 'Paramètre'}><span className="font-mono">{connection.keyName}</span></Fact>}
           {connection.username && <Fact label="Identifiant">{connection.username}</Fact>}
-          <Fact label="Portée">{connection.scope === 'private' ? `Privée · ${connection.ownerName}` : connection.scope === 'public' ? 'Plateforme publiée' : 'Organisationnelle'}</Fact>
+          <Fact label="Portée">{connection.scope === 'private' ? `Privée · ${connection.ownerName}` : connection.scope === 'public' ? 'Plateforme publiée' : connection.organizationNames.join(', ') || 'Organisationnelle'}</Fact>
           <Fact label="Cycle de vie">{connection.lifecycle === 'active' ? 'Active' : connection.lifecycle === 'suspended' ? 'Suspendue' : connection.lifecycle === 'archived' ? 'Archivée' : 'Brouillon'}</Fact>
           <Fact label="Santé">{connection.connectionHealth === 'healthy' ? 'Saine' : connection.connectionHealth === 'degraded' ? 'Dégradée' : connection.connectionHealth === 'error' ? 'En erreur' : connection.connectionHealth === 'expired' ? 'Expirée' : 'Non vérifiée'}</Fact>
           <Fact label="Méthode"><span className="font-mono">{connection.methodId}@{connection.methodVersion}</span></Fact>
