@@ -1,6 +1,6 @@
 import { and, desc, eq } from 'drizzle-orm'
 
-import { evaluateAvailability } from '@/lib/authentication/runtime-registry'
+import { evaluateAvailability, resolveBundledOperationalRuntime } from '@/lib/authentication/runtime-registry'
 import { db } from '@/lib/db'
 import { authCompatibilities, authMethodVersions, authRuntimeEvidence } from '@/lib/db/schema'
 
@@ -28,6 +28,17 @@ export async function evaluateConnectionRuntime(target: ConnectionRuntimeTarget)
     .limit(1)
 
   if (!method) return { usable: false, methodVersion: target.methodVersion, handlerKey: null, handlerVersion: null, reasons: ['méthode d’authentification introuvable'] }
+
+  const bundledRuntime = resolveBundledOperationalRuntime(target)
+  if (bundledRuntime) {
+    return {
+      usable: true,
+      methodVersion: method.version,
+      handlerKey: bundledRuntime.handlerKey,
+      handlerVersion: bundledRuntime.handlerVersion,
+      reasons: [],
+    }
+  }
 
   const [evidence] = await db
     .select({
