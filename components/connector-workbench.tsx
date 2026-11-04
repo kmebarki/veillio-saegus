@@ -15,6 +15,7 @@ import type { ConnectorSummary, TestOutcome } from '@/lib/connector-types'
 
 type Props = {
   kind: ConnectorKind
+  initialConfig?: ConnectorConfig
   existing?: { connector: ConnectorSummary; config: ConnectorConfig; connections?: ConnectionOption[] }
   canManage: boolean
   onSaved: (result: { message: string; id?: string }) => void
@@ -26,15 +27,15 @@ function numbersAreValid(config: ConnectorConfig) {
   return values.every((value) => Number.isFinite(value))
 }
 
-export function ConnectorWorkbench({ kind, existing, canManage, onSaved, onCancel }: Props) {
+export function ConnectorWorkbench({ kind, initialConfig, existing, canManage, onSaved, onCancel }: Props) {
   const initial = useMemo<ConnectorDraft>(
     () => ({
       name: existing?.connector.name ?? '',
       description: existing?.connector.description ?? '',
       logoUrl: existing?.connector.logoUrl ?? '',
-      config: existing?.config ?? defaultConfig(kind),
+      config: existing?.config ?? initialConfig ?? defaultConfig(kind),
     }),
-    [existing, kind],
+    [existing, initialConfig, kind],
   )
   const [draft, setDraft] = useState<ConnectorDraft>(initial)
   const [connectionId, setConnectionId] = useState('')
@@ -122,7 +123,7 @@ export function ConnectorWorkbench({ kind, existing, canManage, onSaved, onCance
                 Connexion utilisée pour le test
                 <select value={connectionId} onChange={(event) => setConnectionId(event.target.value)} className={fieldClass}>
                   <option value="">Connexion partagée par défaut</option>
-                  {connections.map((item) => <option key={item.id} value={item.id}>{item.name} ({item.scope === 'user' ? 'personnelle' : 'partagée'})</option>)}
+                  {connections.map((item) => <option key={item.id} value={item.id}>{item.name} ({item.scope === 'private' ? 'privée' : item.scope === 'public' ? 'publique' : 'organisationnelle'})</option>)}
                 </select>
               </label>
             ) : (

@@ -1,4 +1,4 @@
-import { CalendarClock, KeyRound, Pencil, PlugZap, ShieldAlert, Trash2, User, Users } from 'lucide-react'
+import { CalendarClock, Globe2, KeyRound, Pencil, PlugZap, ShieldAlert, Trash2, User, Users } from 'lucide-react'
 
 import { ageLabel, expiryBadge, STALE_SECRET_DAYS, TONE_CLASSES } from '@/components/connections/helpers'
 import { ConnectorLogo, HealthDot } from '@/components/connector-ui'
@@ -10,7 +10,8 @@ import { cn } from '@/lib/utils'
 type Props = { connection: ConnectionSummary; busy: boolean; onOpen: () => void; onEdit: () => void; onTest: () => void; onDelete: () => void }
 
 export function ConnectionCard({ connection, busy, onOpen, onEdit, onTest, onDelete }: Props) {
-  const personal = connection.scope === 'user'
+  const isPrivate = connection.scope === 'private'
+  const isPublic = connection.scope === 'public'
   const expiry = expiryBadge(connection)
   const stale = connection.secretAgeDays >= STALE_SECRET_DAYS
   const authLabel = AUTH_LABELS[connection.authType as AuthType]?.label.split(' (')[0] ?? 'Clé API'
@@ -25,9 +26,9 @@ export function ConnectionCard({ connection, busy, onOpen, onEdit, onTest, onDel
           </h2>
           <p className="mt-0.5 truncate text-sm text-muted-foreground">{connection.connectorName} · {authLabel}</p>
         </div>
-        <span className={cn('inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold', personal ? 'bg-secondary text-secondary-foreground' : 'bg-primary/10 text-primary')}>
-          {personal ? <User className="size-3.5" aria-hidden /> : <Users className="size-3.5" aria-hidden />}
-          {personal ? 'Personnelle' : 'Partagée'}
+        <span className={cn('inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold', isPrivate ? 'bg-secondary text-secondary-foreground' : 'bg-primary/10 text-primary')}>
+          {isPrivate ? <User className="size-3.5" aria-hidden /> : isPublic ? <Globe2 className="size-3.5" aria-hidden /> : <Users className="size-3.5" aria-hidden />}
+          {isPrivate ? 'Privée' : isPublic ? 'Publique' : 'Organisationnelle'}
         </span>
       </div>
 

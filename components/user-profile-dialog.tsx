@@ -87,7 +87,7 @@ export function UserProfileDialog({ profile, onClose, onSaved }: { profile: User
   const fullName = `${profile.firstName} ${profile.lastName}`.trim()
 
   return (
-    <Modal open onClose={onClose} title={fullName || 'Fiche utilisateur'} size="xl" bare>
+    <Modal open onClose={onClose} title={fullName || 'Fiche utilisateur'} size="xl" placement="lower" bare>
       <div className="relative overflow-hidden border-b bg-gradient-to-br from-accent via-card to-card px-6 pb-6 pt-8 sm:px-8">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
           {profile.image ? (

@@ -49,8 +49,17 @@ export const PERMISSION_MODULES: PermissionModule[] = [
     id: 'connections',
     label: 'Connexions',
     permissions: [
-      { key: 'connections.view', label: 'Utiliser les connexions', description: 'Voir les connexions de l’organisation et gérer ses propres connexions personnelles (clés API, jetons).' },
-      { key: 'connections.manage', label: 'Gérer les connexions', description: 'Créer, tester et supprimer les connexions partagées de l’organisation et leurs identifiants.', sensitive: true },
+      { key: 'connections.view', label: 'Consulter les connexions', description: 'Voir les connexions autorisées sans accéder aux secrets.' },
+      { key: 'connections.use', label: 'Utiliser les connexions', description: 'Associer une connexion autorisée à une Source.' },
+      { key: 'connections.create', label: 'Créer des connexions', description: 'Créer une connexion privée ou organisationnelle.' },
+      { key: 'connections.test', label: 'Tester les connexions', description: 'Lancer un test borné de connectivité.', sensitive: true },
+      { key: 'connections.rotate', label: 'Renouveler les secrets', description: 'Préparer et activer une nouvelle génération de secret.', sensitive: true },
+      { key: 'connections.changeScope', label: 'Changer la portée', description: 'Modifier la portée après analyse des impacts.', sensitive: true },
+      { key: 'connections.publish', label: 'Publier les connexions', description: 'Approuver ou révoquer une publication plateforme.', sensitive: true },
+      { key: 'connections.transferOwner', label: 'Transférer la propriété', description: 'Approuver un transfert vers une organisation.', sensitive: true },
+      { key: 'connections.archive', label: 'Suspendre et archiver', description: 'Gérer le cycle de vie sans suppression physique.', sensitive: true },
+      { key: 'connections.auditRead', label: 'Consulter l’historique', description: 'Lire l’historique non sensible des connexions.', sensitive: true },
+      { key: 'connections.manage', label: 'Administrer les connexions', description: 'Capacité de compatibilité regroupant la gestion des connexions.', sensitive: true },
     ],
   },
   {
@@ -78,6 +87,17 @@ export const PERMISSION_MODULES: PermissionModule[] = [
     permissions: [
       { key: 'teams.view', label: 'Consulter les équipes', description: 'Voir les équipes et leurs membres.' },
       { key: 'teams.manage', label: 'Gérer les équipes', description: 'Créer, modifier, archiver des équipes et gérer leurs membres.' },
+    ],
+  },
+  {
+    id: 'authentication',
+    label: 'Référentiel Authentification',
+    permissions: [
+      { key: 'auth.method.view', label: 'Consulter les méthodes', description: 'Consulter le référentiel, ses versions et ses preuves runtime.' },
+      { key: 'auth.method.propose', label: 'Proposer une méthode', description: 'Créer une nouvelle méthode en brouillon.' },
+      { key: 'auth.method.review', label: 'Réviser les méthodes', description: 'Accepter ou renvoyer une proposition dont on n’est pas l’auteur.', sensitive: true },
+      { key: 'auth.method.publish', label: 'Publier les méthodes', description: 'Rendre disponible une version entièrement attestée.', sensitive: true },
+      { key: 'auth.method.deactivate', label: 'Désactiver les méthodes', description: 'Désactiver ou rendre obsolète une version publiée.', sensitive: true },
     ],
   },
   {
@@ -116,7 +136,7 @@ export function normalizePermissions(values: readonly string[]) {
 export const ROLE_PERMISSIONS: Record<RoleKey, string[]> = {
   super_admin: PERMISSION_KEYS,
   admin: PERMISSION_KEYS,
-  pilot: ['watches.view', 'watches.contribute', 'watches.manage', 'watches.publish', 'sources.manage', 'collections.view', 'collections.retry', 'users.view', 'admissions.review', 'teams.view', 'connectors.view', 'connections.view'],
+  pilot: ['watches.view', 'watches.contribute', 'watches.manage', 'watches.publish', 'sources.manage', 'collections.view', 'collections.retry', 'users.view', 'admissions.review', 'teams.view', 'connectors.view', 'connections.view', 'connections.use', 'connections.create', 'connections.test', 'connections.rotate', 'connections.archive', 'connections.auditRead'],
   contributor: ['watches.view', 'watches.contribute'],
   reader: ['watches.view'],
 }

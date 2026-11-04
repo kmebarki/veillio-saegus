@@ -1,0 +1,2274 @@
+{
+  "contractVersion": "1.3.0",
+  "origin": "Veillio Authentification V1.2",
+  "purpose": "Référentiel de définitions ; jamais preuve de capacité runtime",
+  "productionServiceCatalog": null,
+  "serviceCatalogAuthority": "Registre Connecteurs V3 ; 9 catégories et 103 services/variantes selon référence validée (à importer depuis ce registre)",
+  "accessScopeOwner": "Connexions (Privée / Publique / Organisationnelle) ; portée indépendante des méthodes",
+  "families": [
+    {
+      "id": "none",
+      "label": "Aucune authentification",
+      "description": "Aucun secret ni mode de connexion imposé par la ressource.",
+      "variants": []
+    },
+    {
+      "id": "credentials",
+      "label": "Identifiants",
+      "description": "Les identifiants sont saisis dans Connexions et ne sont jamais placés dans Connecteurs.",
+      "variants": [
+        {
+          "id": "username_password",
+          "label": "Identifiant / mot de passe"
+        },
+        {
+          "id": "http_basic",
+          "label": "HTTP Basic"
+        },
+        {
+          "id": "http_digest",
+          "label": "HTTP Digest"
+        }
+      ]
+    },
+    {
+      "id": "api_key",
+      "label": "Clé API",
+      "description": "Le service décide de l’emplacement ; un secret ne doit pas être copié dans le schéma.",
+      "variants": [
+        {
+          "id": "http_header",
+          "label": "En-tête HTTP"
+        },
+        {
+          "id": "http_query_exception",
+          "label": "Paramètre de requête (exception)"
+        },
+        {
+          "id": "http_cookie",
+          "label": "Cookie (si requis)"
+        }
+      ]
+    },
+    {
+      "id": "token",
+      "label": "Jeton d’accès",
+      "description": "La durée, la rotation et le renouvellement dépendent du fournisseur.",
+      "variants": [
+        {
+          "id": "bearer_token",
+          "label": "Bearer Token"
+        },
+        {
+          "id": "personal_access_token",
+          "label": "Personal Access Token (PAT)"
+        },
+        {
+          "id": "provider_token",
+          "label": "Jeton propriétaire"
+        }
+      ]
+    },
+    {
+      "id": "oauth2",
+      "label": "OAuth 2.0",
+      "description": "Tous les grants ne sont pas implémentés : le service et l’adaptateur filtrent réellement les variantes.",
+      "variants": [
+        {
+          "id": "authorization_code_pkce",
+          "label": "Authorization Code + PKCE"
+        },
+        {
+          "id": "client_credentials",
+          "label": "Client Credentials"
+        },
+        {
+          "id": "device_authorization",
+          "label": "Device Authorization"
+        },
+        {
+          "id": "jwt_bearer",
+          "label": "JWT Bearer"
+        }
+      ]
+    },
+    {
+      "id": "oauth1",
+      "label": "OAuth 1.0a",
+      "description": "Usage réservé aux API exigeant encore ce protocole.",
+      "variants": [
+        {
+          "id": "oauth1_signature",
+          "label": "Signature OAuth 1.0a"
+        }
+      ]
+    },
+    {
+      "id": "service",
+      "label": "Compte de service",
+      "description": "Ce modèle peut utiliser OAuth 2.0 et une preuve signée ; éviter le double comptage des méthodes.",
+      "variants": [
+        {
+          "id": "provider_service_account",
+          "label": "Compte de service fournisseur"
+        },
+        {
+          "id": "signed_jwt",
+          "label": "JWT signé (si supporté)"
+        }
+      ]
+    },
+    {
+      "id": "signature",
+      "label": "Signature de requêtes",
+      "description": "Signatures calculées par l’adaptateur, jamais par un en-tête personnalisé libre.",
+      "variants": [
+        {
+          "id": "hmac",
+          "label": "HMAC"
+        },
+        {
+          "id": "aws_sigv4",
+          "label": "AWS Signature V4"
+        }
+      ]
+    },
+    {
+      "id": "certificate",
+      "label": "Certificat client",
+      "description": "Certificat et clé utilisés à la négociation TLS, pas dans un champ HTTP.",
+      "variants": [
+        {
+          "id": "mtls",
+          "label": "mTLS"
+        }
+      ]
+    },
+    {
+      "id": "ssh",
+      "label": "Clé SSH",
+      "description": "Authentification SSH/SFTP ; la clé et sa passphrase relèvent de Connexions.",
+      "variants": [
+        {
+          "id": "ssh_private_key",
+          "label": "Clé privée SSH"
+        }
+      ]
+    },
+    {
+      "id": "windows",
+      "label": "Authentification Windows",
+      "description": "Préciser les exigences de domaine et d’infrastructure ; ne pas présumer le support.",
+      "variants": [
+        {
+          "id": "kerberos",
+          "label": "Kerberos"
+        },
+        {
+          "id": "ntlm_legacy",
+          "label": "NTLM (héritage)"
+        }
+      ]
+    },
+    {
+      "id": "custom",
+      "label": "Personnalisée",
+      "description": "Une proposition non répertoriée reste un brouillon jusqu’à l’implémentation et la revue de sécurité.",
+      "variants": []
+    }
+  ],
+  "methods": [
+    {
+      "methodId": "NONE",
+      "displayName": "Sans authentification",
+      "description": "Aucun identifiant requis par le protocole.",
+      "familyId": "none",
+      "variantId": null,
+      "version": "1.0.0",
+      "legacyVersionLabel": "1.0",
+      "schemaRevision": 1,
+      "lifecycle": {
+        "status": "a_valider",
+        "reason": "Déclaration issue du prototype V1.2, non vérifiée en runtime",
+        "approvedBy": null,
+        "approvedAt": null
+      },
+      "runtime": {
+        "handlerKey": null,
+        "handlerVersion": null,
+        "deployed": false,
+        "securityReviewed": false,
+        "contractTestsPassed": false,
+        "enabled": false
+      },
+      "fieldSchema": {
+        "schemaVersion": "1.3.0",
+        "fields": []
+      },
+      "transmission": {
+        "type": "none",
+        "protocol": "none",
+        "bindings": [],
+        "handlerOperation": "no_authentication",
+        "requiresTls": false,
+        "resolvedBy": "verifiedAdapterAndHandler",
+        "customHeadersAllowed": false,
+        "policyRef": "HTTP_TRANSMISSION_POLICY_V1_3"
+      },
+      "composition": {
+        "identityModel": false,
+        "secondaryFactorsAllowed": [],
+        "requiresAdapterDeclaration": true
+      },
+      "compatibility": {
+        "sourceOfTruth": "connectors.adapterRegistry",
+        "serviceIds": [],
+        "adapterIds": []
+      },
+      "supportedVariantIds": []
+    },
+    {
+      "methodId": "BASIC_AUTH",
+      "displayName": "HTTP Basic",
+      "description": "Authentification Basic HTTP, requise uniquement sur connexion HTTPS.",
+      "familyId": "credentials",
+      "variantId": "http_basic",
+      "version": "1.1.0",
+      "legacyVersionLabel": "1.1",
+      "schemaRevision": 1,
+      "lifecycle": {
+        "status": "a_valider",
+        "reason": "Déclaration issue du prototype V1.2, non vérifiée en runtime",
+        "approvedBy": null,
+        "approvedAt": null
+      },
+      "runtime": {
+        "handlerKey": null,
+        "handlerVersion": null,
+        "deployed": false,
+        "securityReviewed": false,
+        "contractTestsPassed": false,
+        "enabled": false
+      },
+      "fieldSchema": {
+        "schemaVersion": "1.3.0",
+        "fields": [
+          {
+            "code": "username",
+            "label": "Identifiant",
+            "type": "text",
+            "required": true,
+            "secret": false,
+            "description": "",
+            "order": 1,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "valueSource": "connection.config",
+            "editableInConnection": true
+          },
+          {
+            "code": "password",
+            "label": "Mot de passe",
+            "type": "password",
+            "required": true,
+            "secret": true,
+            "description": "",
+            "order": 2,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "storage": {
+              "scope": "connection",
+              "mode": "vaultRef",
+              "readBack": false
+            },
+            "valueSource": "connection.secretRef",
+            "editableInConnection": true
+          }
+        ]
+      },
+      "transmission": {
+        "type": "http_basic",
+        "protocol": "http",
+        "bindings": [
+          {
+            "channel": "http.header",
+            "target": {
+              "name": "Authorization",
+              "nameFixedByAdapter": true
+            },
+            "source": {
+              "kind": "handler.derived",
+              "fromFields": [
+                "username",
+                "password"
+              ]
+            },
+            "format": {
+              "kind": "http_basic_base64"
+            },
+            "required": true,
+            "clientEditable": false
+          }
+        ],
+        "handlerOperation": "server_http_basic",
+        "requiresTls": true,
+        "resolvedBy": "verifiedAdapterAndHandler",
+        "customHeadersAllowed": false,
+        "policyRef": "HTTP_TRANSMISSION_POLICY_V1_3"
+      },
+      "composition": {
+        "identityModel": false,
+        "secondaryFactorsAllowed": [],
+        "requiresAdapterDeclaration": true
+      },
+      "compatibility": {
+        "sourceOfTruth": "connectors.adapterRegistry",
+        "serviceIds": [],
+        "adapterIds": []
+      },
+      "supportedVariantIds": [
+        "http_basic"
+      ]
+    },
+    {
+      "methodId": "USER_PASSWORD",
+      "displayName": "Identifiant / mot de passe",
+      "description": "Identifiant et secret pour les services ayant un mécanisme de login/mot de passe.",
+      "familyId": "credentials",
+      "variantId": "username_password",
+      "version": "1.0.0",
+      "legacyVersionLabel": "1.0",
+      "schemaRevision": 1,
+      "lifecycle": {
+        "status": "a_valider",
+        "reason": "Déclaration issue du prototype V1.2, non vérifiée en runtime",
+        "approvedBy": null,
+        "approvedAt": null
+      },
+      "runtime": {
+        "handlerKey": null,
+        "handlerVersion": null,
+        "deployed": false,
+        "securityReviewed": false,
+        "contractTestsPassed": false,
+        "enabled": false
+      },
+      "fieldSchema": {
+        "schemaVersion": "1.3.0",
+        "fields": [
+          {
+            "code": "username",
+            "label": "Identifiant",
+            "type": "text",
+            "required": true,
+            "secret": false,
+            "description": "",
+            "order": 1,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "valueSource": "connection.config",
+            "editableInConnection": true
+          },
+          {
+            "code": "password",
+            "label": "Mot de passe",
+            "type": "password",
+            "required": true,
+            "secret": true,
+            "description": "",
+            "order": 2,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "storage": {
+              "scope": "connection",
+              "mode": "vaultRef",
+              "readBack": false
+            },
+            "valueSource": "connection.secretRef",
+            "editableInConnection": true
+          },
+          {
+            "code": "host",
+            "label": "Serveur",
+            "type": "url",
+            "required": false,
+            "secret": false,
+            "description": "",
+            "order": 3,
+            "validation": {
+              "format": "url"
+            },
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "valueSource": "connection.config",
+            "editableInConnection": true
+          }
+        ]
+      },
+      "transmission": {
+        "type": "adapter_defined",
+        "protocol": "adapter_protocol",
+        "bindings": [],
+        "handlerOperation": "provider_login",
+        "requiresTls": false,
+        "resolvedBy": "verifiedAdapterAndHandler",
+        "customHeadersAllowed": false,
+        "policyRef": "HTTP_TRANSMISSION_POLICY_V1_3",
+        "note": "Ne jamais déduire Basic : le protocole d’authentification est fourni par l’adaptateur (IMAP, SMTP, protocole propriétaire…)."
+      },
+      "composition": {
+        "identityModel": false,
+        "secondaryFactorsAllowed": [],
+        "requiresAdapterDeclaration": true
+      },
+      "compatibility": {
+        "sourceOfTruth": "connectors.adapterRegistry",
+        "serviceIds": [],
+        "adapterIds": []
+      },
+      "supportedVariantIds": [
+        "username_password"
+      ]
+    },
+    {
+      "methodId": "API_KEY",
+      "displayName": "Clé API",
+      "description": "Secret fournisseur transmis dans le header, la query ou le cookie conformément au Connecteur.",
+      "familyId": "api_key",
+      "variantId": "http_header",
+      "version": "1.2.0",
+      "legacyVersionLabel": "1.2",
+      "schemaRevision": 1,
+      "lifecycle": {
+        "status": "a_valider",
+        "reason": "Déclaration issue du prototype V1.2, non vérifiée en runtime",
+        "approvedBy": null,
+        "approvedAt": null
+      },
+      "runtime": {
+        "handlerKey": null,
+        "handlerVersion": null,
+        "deployed": false,
+        "securityReviewed": false,
+        "contractTestsPassed": false,
+        "enabled": false
+      },
+      "fieldSchema": {
+        "schemaVersion": "1.3.0",
+        "fields": [
+          {
+            "code": "api_key",
+            "label": "Clé API",
+            "type": "password",
+            "required": true,
+            "secret": true,
+            "description": "",
+            "order": 1,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "storage": {
+              "scope": "connection",
+              "mode": "vaultRef",
+              "readBack": false
+            },
+            "valueSource": "connection.secretRef",
+            "editableInConnection": true
+          },
+          {
+            "code": "key_name",
+            "label": "Nom du paramètre",
+            "type": "text",
+            "required": true,
+            "secret": false,
+            "description": "",
+            "order": 2,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "valueSource": "adapter.nonSecretConfig",
+            "editableInConnection": false
+          },
+          {
+            "code": "placement",
+            "label": "Emplacement",
+            "type": "enum",
+            "required": true,
+            "secret": false,
+            "description": "",
+            "order": 3,
+            "validation": {
+              "enum": [
+                "header",
+                "query",
+                "cookie"
+              ]
+            },
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "valueSource": "adapter.nonSecretConfig",
+            "editableInConnection": false
+          }
+        ]
+      },
+      "transmission": {
+        "type": "http_api_key",
+        "protocol": "http",
+        "bindings": [
+          {
+            "channel": "http.header",
+            "target": {
+              "nameFromAdapterField": "key_name",
+              "nameFixedByAdapter": true
+            },
+            "source": {
+              "kind": "connection.secretRef",
+              "fieldCode": "api_key"
+            },
+            "format": {
+              "kind": "raw"
+            },
+            "required": true,
+            "clientEditable": false,
+            "note": "Canal et nom sont validés/fixés par le connecteur ; pas de header libre contenant un secret."
+          }
+        ],
+        "handlerOperation": "api_key",
+        "requiresTls": true,
+        "resolvedBy": "verifiedAdapterAndHandler",
+        "customHeadersAllowed": false,
+        "policyRef": "HTTP_TRANSMISSION_POLICY_V1_3",
+        "placementOptions": [
+          {
+            "variantId": "http_header",
+            "channel": "http.header",
+            "default": true
+          },
+          {
+            "variantId": "http_query_exception",
+            "channel": "http.query",
+            "default": false,
+            "requiresSecurityException": true
+          },
+          {
+            "variantId": "http_cookie",
+            "channel": "http.cookie",
+            "default": false,
+            "requiresSecurityException": true
+          }
+        ]
+      },
+      "composition": {
+        "identityModel": false,
+        "secondaryFactorsAllowed": [],
+        "requiresAdapterDeclaration": true
+      },
+      "compatibility": {
+        "sourceOfTruth": "connectors.adapterRegistry",
+        "serviceIds": [],
+        "adapterIds": []
+      },
+      "supportedVariantIds": [
+        "http_header",
+        "http_query_exception",
+        "http_cookie"
+      ]
+    },
+    {
+      "methodId": "BEARER_TOKEN",
+      "displayName": "Bearer token",
+      "description": "Token transmis dans Authorization: Bearer selon les exigences du fournisseur.",
+      "familyId": "token",
+      "variantId": "bearer_token",
+      "version": "1.0.0",
+      "legacyVersionLabel": "1.0",
+      "schemaRevision": 1,
+      "lifecycle": {
+        "status": "a_valider",
+        "reason": "Déclaration issue du prototype V1.2, non vérifiée en runtime",
+        "approvedBy": null,
+        "approvedAt": null
+      },
+      "runtime": {
+        "handlerKey": null,
+        "handlerVersion": null,
+        "deployed": false,
+        "securityReviewed": false,
+        "contractTestsPassed": false,
+        "enabled": false
+      },
+      "fieldSchema": {
+        "schemaVersion": "1.3.0",
+        "fields": [
+          {
+            "code": "token",
+            "label": "Token",
+            "type": "password",
+            "required": true,
+            "secret": true,
+            "description": "",
+            "order": 1,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "storage": {
+              "scope": "connection",
+              "mode": "vaultRef",
+              "readBack": false
+            },
+            "valueSource": "connection.secretRef",
+            "editableInConnection": true
+          },
+          {
+            "code": "token_expiry",
+            "label": "Expiration",
+            "type": "dateTime",
+            "required": false,
+            "secret": false,
+            "description": "",
+            "order": 2,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "valueSource": "connection.config",
+            "editableInConnection": true
+          }
+        ]
+      },
+      "transmission": {
+        "type": "http_bearer",
+        "protocol": "http",
+        "bindings": [
+          {
+            "channel": "http.header",
+            "target": {
+              "name": "Authorization",
+              "nameFixedByAdapter": true
+            },
+            "source": {
+              "kind": "connection.secretRef",
+              "fieldCode": "token"
+            },
+            "format": {
+              "kind": "prefix_bearer"
+            },
+            "required": true,
+            "clientEditable": false
+          }
+        ],
+        "handlerOperation": "bearer_token",
+        "requiresTls": true,
+        "resolvedBy": "verifiedAdapterAndHandler",
+        "customHeadersAllowed": false,
+        "policyRef": "HTTP_TRANSMISSION_POLICY_V1_3"
+      },
+      "composition": {
+        "identityModel": false,
+        "secondaryFactorsAllowed": [],
+        "requiresAdapterDeclaration": true
+      },
+      "compatibility": {
+        "sourceOfTruth": "connectors.adapterRegistry",
+        "serviceIds": [],
+        "adapterIds": []
+      },
+      "supportedVariantIds": [
+        "bearer_token"
+      ]
+    },
+    {
+      "methodId": "OAUTH2_AUTH_CODE",
+      "displayName": "OAuth 2.0 — utilisateur",
+      "description": "Autorisation interactive, code d’autorisation et éventuellement PKCE.",
+      "familyId": "oauth2",
+      "variantId": "authorization_code_pkce",
+      "version": "1.2.0",
+      "legacyVersionLabel": "1.2",
+      "schemaRevision": 1,
+      "lifecycle": {
+        "status": "a_valider",
+        "reason": "Déclaration issue du prototype V1.2, non vérifiée en runtime",
+        "approvedBy": null,
+        "approvedAt": null
+      },
+      "runtime": {
+        "handlerKey": null,
+        "handlerVersion": null,
+        "deployed": false,
+        "securityReviewed": false,
+        "contractTestsPassed": false,
+        "enabled": false
+      },
+      "fieldSchema": {
+        "schemaVersion": "1.3.0",
+        "fields": [
+          {
+            "code": "client_id",
+            "label": "Client ID",
+            "type": "text",
+            "required": true,
+            "secret": false,
+            "description": "",
+            "order": 1,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "valueSource": "connection.config",
+            "editableInConnection": true
+          },
+          {
+            "code": "auth_url",
+            "label": "URL d’autorisation",
+            "type": "url",
+            "required": true,
+            "secret": false,
+            "description": "",
+            "order": 2,
+            "validation": {
+              "format": "httpsUrl"
+            },
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "valueSource": "adapter.nonSecretConfig",
+            "editableInConnection": false
+          },
+          {
+            "code": "token_url",
+            "label": "URL token",
+            "type": "url",
+            "required": true,
+            "secret": false,
+            "description": "",
+            "order": 3,
+            "validation": {
+              "format": "httpsUrl"
+            },
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "valueSource": "adapter.nonSecretConfig",
+            "editableInConnection": false
+          },
+          {
+            "code": "scopes",
+            "label": "Scopes",
+            "type": "list",
+            "required": false,
+            "secret": false,
+            "description": "",
+            "order": 4,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "valueSource": "connection.config",
+            "editableInConnection": true
+          },
+          {
+            "code": "client_secret",
+            "label": "Client Secret",
+            "type": "password",
+            "required": false,
+            "secret": true,
+            "description": "",
+            "order": 5,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "storage": {
+              "scope": "connection",
+              "mode": "vaultRef",
+              "readBack": false
+            },
+            "valueSource": "connection.secretRef",
+            "editableInConnection": true
+          }
+        ]
+      },
+      "transmission": {
+        "type": "oauth_authorization_code_pkce",
+        "protocol": "oauth2",
+        "bindings": [
+          {
+            "channel": "http.header",
+            "target": {
+              "name": "Authorization",
+              "nameFixedByAdapter": true
+            },
+            "source": {
+              "kind": "handler.tokenRef",
+              "fieldCode": null
+            },
+            "format": {
+              "kind": "prefix",
+              "prefix": "Bearer "
+            },
+            "required": true,
+            "clientEditable": false
+          }
+        ],
+        "handlerOperation": "oauth2_authorization_code_pkce",
+        "requiresTls": true,
+        "resolvedBy": "verifiedAdapterAndHandler",
+        "customHeadersAllowed": false,
+        "policyRef": "HTTP_TRANSMISSION_POLICY_V1_3",
+        "oauthProfileRef": "OAUTH2_SECURITY_V1_3.authorization_code_pkce"
+      },
+      "composition": {
+        "identityModel": false,
+        "secondaryFactorsAllowed": [],
+        "requiresAdapterDeclaration": true
+      },
+      "compatibility": {
+        "sourceOfTruth": "connectors.adapterRegistry",
+        "serviceIds": [],
+        "adapterIds": []
+      },
+      "supportedVariantIds": [
+        "authorization_code_pkce"
+      ]
+    },
+    {
+      "methodId": "OAUTH2_CLIENT",
+      "displayName": "OAuth 2.0 — application",
+      "description": "Client credentials avec secrets applicatifs ou certificats selon le fournisseur.",
+      "familyId": "oauth2",
+      "variantId": "client_credentials",
+      "version": "1.2.0",
+      "legacyVersionLabel": "1.2",
+      "schemaRevision": 1,
+      "lifecycle": {
+        "status": "a_valider",
+        "reason": "Déclaration issue du prototype V1.2, non vérifiée en runtime",
+        "approvedBy": null,
+        "approvedAt": null
+      },
+      "runtime": {
+        "handlerKey": null,
+        "handlerVersion": null,
+        "deployed": false,
+        "securityReviewed": false,
+        "contractTestsPassed": false,
+        "enabled": false
+      },
+      "fieldSchema": {
+        "schemaVersion": "1.3.0",
+        "fields": [
+          {
+            "code": "client_id",
+            "label": "Client ID",
+            "type": "text",
+            "required": true,
+            "secret": false,
+            "description": "",
+            "order": 1,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "valueSource": "connection.config",
+            "editableInConnection": true
+          },
+          {
+            "code": "token_url",
+            "label": "URL token",
+            "type": "url",
+            "required": true,
+            "secret": false,
+            "description": "",
+            "order": 2,
+            "validation": {
+              "format": "httpsUrl"
+            },
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "valueSource": "adapter.nonSecretConfig",
+            "editableInConnection": false
+          },
+          {
+            "code": "client_secret",
+            "label": "Client Secret",
+            "type": "password",
+            "required": true,
+            "secret": true,
+            "description": "",
+            "order": 3,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "storage": {
+              "scope": "connection",
+              "mode": "vaultRef",
+              "readBack": false
+            },
+            "valueSource": "connection.secretRef",
+            "editableInConnection": true
+          },
+          {
+            "code": "scopes",
+            "label": "Scopes",
+            "type": "list",
+            "required": false,
+            "secret": false,
+            "description": "",
+            "order": 4,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "valueSource": "connection.config",
+            "editableInConnection": true
+          }
+        ]
+      },
+      "transmission": {
+        "type": "oauth_client_credentials",
+        "protocol": "oauth2",
+        "bindings": [
+          {
+            "channel": "http.header",
+            "target": {
+              "name": "Authorization",
+              "nameFixedByAdapter": true
+            },
+            "source": {
+              "kind": "handler.tokenRef",
+              "fieldCode": null
+            },
+            "format": {
+              "kind": "prefix",
+              "prefix": "Bearer "
+            },
+            "required": true,
+            "clientEditable": false
+          }
+        ],
+        "handlerOperation": "oauth2_client_credentials",
+        "requiresTls": true,
+        "resolvedBy": "verifiedAdapterAndHandler",
+        "customHeadersAllowed": false,
+        "policyRef": "HTTP_TRANSMISSION_POLICY_V1_3",
+        "oauthProfileRef": "OAUTH2_SECURITY_V1_3.client_credentials"
+      },
+      "composition": {
+        "identityModel": false,
+        "secondaryFactorsAllowed": [],
+        "requiresAdapterDeclaration": true
+      },
+      "compatibility": {
+        "sourceOfTruth": "connectors.adapterRegistry",
+        "serviceIds": [],
+        "adapterIds": []
+      },
+      "supportedVariantIds": [
+        "client_credentials"
+      ]
+    },
+    {
+      "methodId": "SERVICE_ACCOUNT",
+      "displayName": "Compte de service",
+      "description": "Identité de service et preuve adaptée au fournisseur.",
+      "familyId": "service",
+      "variantId": "provider_service_account",
+      "version": "1.0.0",
+      "legacyVersionLabel": "1.0",
+      "schemaRevision": 1,
+      "lifecycle": {
+        "status": "a_valider",
+        "reason": "Déclaration issue du prototype V1.2, non vérifiée en runtime",
+        "approvedBy": null,
+        "approvedAt": null
+      },
+      "runtime": {
+        "handlerKey": null,
+        "handlerVersion": null,
+        "deployed": false,
+        "securityReviewed": false,
+        "contractTestsPassed": false,
+        "enabled": false
+      },
+      "fieldSchema": {
+        "schemaVersion": "1.3.0",
+        "fields": [
+          {
+            "code": "service_account_id",
+            "label": "Identifiant du service",
+            "type": "text",
+            "required": true,
+            "secret": false,
+            "description": "",
+            "order": 1,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "valueSource": "connection.config",
+            "editableInConnection": true
+          },
+          {
+            "code": "service_account_credential",
+            "label": "Secret de service",
+            "type": "secretFile",
+            "required": true,
+            "secret": true,
+            "description": "",
+            "order": 2,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "storage": {
+              "scope": "connection",
+              "mode": "vaultRef",
+              "readBack": false
+            },
+            "valueSource": "connection.secretRef",
+            "editableInConnection": true
+          }
+        ]
+      },
+      "transmission": {
+        "type": "provider_adapter",
+        "protocol": "composed",
+        "bindings": [],
+        "handlerOperation": "service_account_composite",
+        "requiresTls": false,
+        "resolvedBy": "verifiedAdapterAndHandler",
+        "customHeadersAllowed": false,
+        "policyRef": "HTTP_TRANSMISSION_POLICY_V1_3"
+      },
+      "composition": {
+        "identityModel": true,
+        "secondaryFactorsAllowed": [],
+        "requiresAdapterDeclaration": true,
+        "delegatesTo": "adaptateur fournisseur : flux OAuth/JWT/identité cloud explicitement déclaré"
+      },
+      "compatibility": {
+        "sourceOfTruth": "connectors.adapterRegistry",
+        "serviceIds": [],
+        "adapterIds": []
+      },
+      "supportedVariantIds": [
+        "provider_service_account"
+      ]
+    },
+    {
+      "methodId": "CERTIFICATE",
+      "displayName": "Certificat client / mTLS",
+      "description": "Authentification par certificat client et clé privée.",
+      "familyId": "certificate",
+      "variantId": "mtls",
+      "version": "1.0.0",
+      "legacyVersionLabel": "1.0",
+      "schemaRevision": 1,
+      "lifecycle": {
+        "status": "a_valider",
+        "reason": "Déclaration issue du prototype V1.2, non vérifiée en runtime",
+        "approvedBy": null,
+        "approvedAt": null
+      },
+      "runtime": {
+        "handlerKey": null,
+        "handlerVersion": null,
+        "deployed": false,
+        "securityReviewed": false,
+        "contractTestsPassed": false,
+        "enabled": false
+      },
+      "fieldSchema": {
+        "schemaVersion": "1.3.0",
+        "fields": [
+          {
+            "code": "client_certificate",
+            "label": "Certificat client",
+            "type": "file",
+            "required": true,
+            "secret": false,
+            "description": "",
+            "order": 1,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "valueSource": "connection.config",
+            "editableInConnection": true
+          },
+          {
+            "code": "private_key",
+            "label": "Clé privée",
+            "type": "secretFile",
+            "required": true,
+            "secret": true,
+            "description": "",
+            "order": 2,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "storage": {
+              "scope": "connection",
+              "mode": "vaultRef",
+              "readBack": false
+            },
+            "valueSource": "connection.secretRef",
+            "editableInConnection": true
+          },
+          {
+            "code": "passphrase",
+            "label": "Passphrase",
+            "type": "password",
+            "required": false,
+            "secret": true,
+            "description": "",
+            "order": 3,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "storage": {
+              "scope": "connection",
+              "mode": "vaultRef",
+              "readBack": false
+            },
+            "valueSource": "connection.secretRef",
+            "editableInConnection": true
+          }
+        ]
+      },
+      "transmission": {
+        "type": "tls_client_auth",
+        "protocol": "tls",
+        "bindings": [
+          {
+            "channel": "tls.client_certificate",
+            "target": {
+              "name": null,
+              "nameFixedByAdapter": true
+            },
+            "source": {
+              "kind": "connection.config",
+              "fieldCode": "client_certificate"
+            },
+            "format": {
+              "kind": "file_ref"
+            },
+            "required": true,
+            "clientEditable": false
+          },
+          {
+            "channel": "tls.private_key",
+            "target": {
+              "name": null,
+              "nameFixedByAdapter": true
+            },
+            "source": {
+              "kind": "connection.secretRef",
+              "fieldCode": "private_key"
+            },
+            "format": {
+              "kind": "file_ref"
+            },
+            "required": true,
+            "clientEditable": false
+          }
+        ],
+        "handlerOperation": "mtls",
+        "requiresTls": true,
+        "resolvedBy": "verifiedAdapterAndHandler",
+        "customHeadersAllowed": false,
+        "policyRef": "HTTP_TRANSMISSION_POLICY_V1_3"
+      },
+      "composition": {
+        "identityModel": false,
+        "secondaryFactorsAllowed": [],
+        "requiresAdapterDeclaration": true
+      },
+      "compatibility": {
+        "sourceOfTruth": "connectors.adapterRegistry",
+        "serviceIds": [],
+        "adapterIds": []
+      },
+      "supportedVariantIds": [
+        "mtls"
+      ]
+    },
+    {
+      "methodId": "SSH_KEY",
+      "displayName": "Clé SSH",
+      "description": "Accès à un service SSH/SFTP utilisant une clé privée.",
+      "familyId": "ssh",
+      "variantId": "ssh_private_key",
+      "version": "1.0.0",
+      "legacyVersionLabel": "1.0",
+      "schemaRevision": 1,
+      "lifecycle": {
+        "status": "a_valider",
+        "reason": "Déclaration issue du prototype V1.2, non vérifiée en runtime",
+        "approvedBy": null,
+        "approvedAt": null
+      },
+      "runtime": {
+        "handlerKey": null,
+        "handlerVersion": null,
+        "deployed": false,
+        "securityReviewed": false,
+        "contractTestsPassed": false,
+        "enabled": false
+      },
+      "fieldSchema": {
+        "schemaVersion": "1.3.0",
+        "fields": [
+          {
+            "code": "username",
+            "label": "Identifiant SSH",
+            "type": "text",
+            "required": true,
+            "secret": false,
+            "description": "",
+            "order": 1,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "valueSource": "connection.config",
+            "editableInConnection": true
+          },
+          {
+            "code": "private_key",
+            "label": "Clé privée SSH",
+            "type": "secretFile",
+            "required": true,
+            "secret": true,
+            "description": "",
+            "order": 2,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "storage": {
+              "scope": "connection",
+              "mode": "vaultRef",
+              "readBack": false
+            },
+            "valueSource": "connection.secretRef",
+            "editableInConnection": true
+          },
+          {
+            "code": "host_key",
+            "label": "Empreinte serveur",
+            "type": "text",
+            "required": true,
+            "secret": false,
+            "description": "",
+            "order": 3,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "valueSource": "connection.config",
+            "editableInConnection": true
+          }
+        ]
+      },
+      "transmission": {
+        "type": "ssh_public_key",
+        "protocol": "ssh",
+        "bindings": [
+          {
+            "channel": "ssh.private_key",
+            "target": {
+              "name": null,
+              "nameFixedByAdapter": true
+            },
+            "source": {
+              "kind": "connection.secretRef",
+              "fieldCode": "private_key"
+            },
+            "format": {
+              "kind": "file_ref"
+            },
+            "required": true,
+            "clientEditable": false
+          },
+          {
+            "channel": "ssh.username",
+            "target": {
+              "name": null,
+              "nameFixedByAdapter": true
+            },
+            "source": {
+              "kind": "connection.config",
+              "fieldCode": "username"
+            },
+            "format": {
+              "kind": "raw"
+            },
+            "required": true,
+            "clientEditable": false
+          }
+        ],
+        "handlerOperation": "ssh_private_key",
+        "requiresTls": false,
+        "resolvedBy": "verifiedAdapterAndHandler",
+        "customHeadersAllowed": false,
+        "policyRef": "HTTP_TRANSMISSION_POLICY_V1_3"
+      },
+      "composition": {
+        "identityModel": false,
+        "secondaryFactorsAllowed": [],
+        "requiresAdapterDeclaration": true
+      },
+      "compatibility": {
+        "sourceOfTruth": "connectors.adapterRegistry",
+        "serviceIds": [],
+        "adapterIds": []
+      },
+      "supportedVariantIds": [
+        "ssh_private_key"
+      ]
+    },
+    {
+      "methodId": "CUSTOM",
+      "displayName": "Méthode spécifique",
+      "description": "Méthode dédiée soumise à une implémentation d’adaptateur et à une revue de sécurité.",
+      "familyId": "custom",
+      "variantId": null,
+      "version": "0.1.0",
+      "legacyVersionLabel": "Brouillon",
+      "schemaRevision": 1,
+      "lifecycle": {
+        "status": "brouillon",
+        "reason": "Définition candidate V1.2 non activable",
+        "approvedBy": null,
+        "approvedAt": null
+      },
+      "runtime": {
+        "handlerKey": null,
+        "handlerVersion": null,
+        "deployed": false,
+        "securityReviewed": false,
+        "contractTestsPassed": false,
+        "enabled": false
+      },
+      "fieldSchema": {
+        "schemaVersion": "1.3.0",
+        "fields": []
+      },
+      "transmission": {
+        "type": "unassigned",
+        "protocol": "custom",
+        "bindings": [],
+        "handlerOperation": "custom_unassigned",
+        "requiresTls": false,
+        "resolvedBy": "verifiedAdapterAndHandler",
+        "customHeadersAllowed": false,
+        "policyRef": "HTTP_TRANSMISSION_POLICY_V1_3"
+      },
+      "composition": {
+        "identityModel": false,
+        "secondaryFactorsAllowed": [],
+        "requiresAdapterDeclaration": true
+      },
+      "compatibility": {
+        "sourceOfTruth": "connectors.adapterRegistry",
+        "serviceIds": [],
+        "adapterIds": []
+      },
+      "supportedVariantIds": []
+    },
+    {
+      "methodId": "OAUTH1_SIGNATURE",
+      "displayName": "OAuth 1.0a — signature",
+      "description": "Protocole historique signé ; handler spécifique requis.",
+      "familyId": "oauth1",
+      "variantId": "oauth1_signature",
+      "version": "0.1.0",
+      "legacyVersionLabel": "Proposition",
+      "schemaRevision": 1,
+      "lifecycle": {
+        "status": "brouillon",
+        "reason": "Définition candidate V1.2 non activable",
+        "approvedBy": null,
+        "approvedAt": null
+      },
+      "runtime": {
+        "handlerKey": null,
+        "handlerVersion": null,
+        "deployed": false,
+        "securityReviewed": false,
+        "contractTestsPassed": false,
+        "enabled": false
+      },
+      "fieldSchema": {
+        "schemaVersion": "1.3.0",
+        "fields": [
+          {
+            "code": "consumer_key",
+            "label": "Consumer Key",
+            "type": "text",
+            "required": true,
+            "secret": false,
+            "description": "",
+            "order": 1,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "valueSource": "connection.config",
+            "editableInConnection": true
+          },
+          {
+            "code": "consumer_secret",
+            "label": "Consumer Secret",
+            "type": "password",
+            "required": true,
+            "secret": true,
+            "description": "",
+            "order": 2,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "storage": {
+              "scope": "connection",
+              "mode": "vaultRef",
+              "readBack": false
+            },
+            "valueSource": "connection.secretRef",
+            "editableInConnection": true
+          },
+          {
+            "code": "access_token",
+            "label": "Access Token",
+            "type": "password",
+            "required": true,
+            "secret": true,
+            "description": "",
+            "order": 3,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "storage": {
+              "scope": "connection",
+              "mode": "vaultRef",
+              "readBack": false
+            },
+            "valueSource": "connection.secretRef",
+            "editableInConnection": true
+          },
+          {
+            "code": "token_secret",
+            "label": "Token Secret",
+            "type": "password",
+            "required": true,
+            "secret": true,
+            "description": "",
+            "order": 4,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "storage": {
+              "scope": "connection",
+              "mode": "vaultRef",
+              "readBack": false
+            },
+            "valueSource": "connection.secretRef",
+            "editableInConnection": true
+          }
+        ]
+      },
+      "transmission": {
+        "type": "oauth1_signer",
+        "protocol": "signed_http",
+        "bindings": [],
+        "handlerOperation": "oauth1_signature",
+        "requiresTls": true,
+        "resolvedBy": "verifiedAdapterAndHandler",
+        "customHeadersAllowed": false,
+        "policyRef": "HTTP_TRANSMISSION_POLICY_V1_3",
+        "note": "Signature calculée sur la requête canonique par le handler. Ne pas exposer de champ libre pour renseigner le résultat de signature."
+      },
+      "composition": {
+        "identityModel": false,
+        "secondaryFactorsAllowed": [],
+        "requiresAdapterDeclaration": true
+      },
+      "compatibility": {
+        "sourceOfTruth": "connectors.adapterRegistry",
+        "serviceIds": [],
+        "adapterIds": []
+      },
+      "supportedVariantIds": [
+        "oauth1_signature"
+      ]
+    },
+    {
+      "methodId": "OAUTH2_DEVICE",
+      "displayName": "OAuth 2.0 — Device Authorization",
+      "description": "Flux device grant ; usage conditionné au fournisseur et au handler.",
+      "familyId": "oauth2",
+      "variantId": "device_authorization",
+      "version": "0.1.0",
+      "legacyVersionLabel": "Proposition",
+      "schemaRevision": 1,
+      "lifecycle": {
+        "status": "brouillon",
+        "reason": "Définition candidate V1.2 non activable",
+        "approvedBy": null,
+        "approvedAt": null
+      },
+      "runtime": {
+        "handlerKey": null,
+        "handlerVersion": null,
+        "deployed": false,
+        "securityReviewed": false,
+        "contractTestsPassed": false,
+        "enabled": false
+      },
+      "fieldSchema": {
+        "schemaVersion": "1.3.0",
+        "fields": [
+          {
+            "code": "client_id",
+            "label": "Client ID",
+            "type": "text",
+            "required": true,
+            "secret": false,
+            "description": "",
+            "order": 1,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "valueSource": "connection.config",
+            "editableInConnection": true
+          },
+          {
+            "code": "device_auth_url",
+            "label": "URL device authorization",
+            "type": "url",
+            "required": true,
+            "secret": false,
+            "description": "",
+            "order": 2,
+            "validation": {
+              "format": "httpsUrl"
+            },
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "valueSource": "adapter.nonSecretConfig",
+            "editableInConnection": false
+          },
+          {
+            "code": "token_url",
+            "label": "URL token",
+            "type": "url",
+            "required": true,
+            "secret": false,
+            "description": "",
+            "order": 3,
+            "validation": {
+              "format": "httpsUrl"
+            },
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "valueSource": "adapter.nonSecretConfig",
+            "editableInConnection": false
+          },
+          {
+            "code": "scopes",
+            "label": "Scopes",
+            "type": "list",
+            "required": false,
+            "secret": false,
+            "description": "",
+            "order": 4,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "valueSource": "connection.config",
+            "editableInConnection": true
+          }
+        ]
+      },
+      "transmission": {
+        "type": "oauth_device_authorization",
+        "protocol": "oauth2",
+        "bindings": [
+          {
+            "channel": "http.header",
+            "target": {
+              "name": "Authorization",
+              "nameFixedByAdapter": true
+            },
+            "source": {
+              "kind": "handler.tokenRef",
+              "fieldCode": null
+            },
+            "format": {
+              "kind": "prefix",
+              "prefix": "Bearer "
+            },
+            "required": true,
+            "clientEditable": false
+          }
+        ],
+        "handlerOperation": "oauth2_device_authorization",
+        "requiresTls": true,
+        "resolvedBy": "verifiedAdapterAndHandler",
+        "customHeadersAllowed": false,
+        "policyRef": "HTTP_TRANSMISSION_POLICY_V1_3",
+        "oauthProfileRef": "OAUTH2_SECURITY_V1_3.device_authorization"
+      },
+      "composition": {
+        "identityModel": false,
+        "secondaryFactorsAllowed": [],
+        "requiresAdapterDeclaration": true
+      },
+      "compatibility": {
+        "sourceOfTruth": "connectors.adapterRegistry",
+        "serviceIds": [],
+        "adapterIds": []
+      },
+      "supportedVariantIds": [
+        "device_authorization"
+      ]
+    },
+    {
+      "methodId": "OAUTH2_JWT_BEARER",
+      "displayName": "OAuth 2.0 — JWT Bearer",
+      "description": "Assertion JWT signée échangée selon le fournisseur.",
+      "familyId": "oauth2",
+      "variantId": "jwt_bearer",
+      "version": "0.1.0",
+      "legacyVersionLabel": "Proposition",
+      "schemaRevision": 1,
+      "lifecycle": {
+        "status": "brouillon",
+        "reason": "Définition candidate V1.2 non activable",
+        "approvedBy": null,
+        "approvedAt": null
+      },
+      "runtime": {
+        "handlerKey": null,
+        "handlerVersion": null,
+        "deployed": false,
+        "securityReviewed": false,
+        "contractTestsPassed": false,
+        "enabled": false
+      },
+      "fieldSchema": {
+        "schemaVersion": "1.3.0",
+        "fields": [
+          {
+            "code": "issuer",
+            "label": "Issuer / compte de service",
+            "type": "text",
+            "required": true,
+            "secret": false,
+            "description": "",
+            "order": 1,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "valueSource": "connection.config",
+            "editableInConnection": true
+          },
+          {
+            "code": "token_url",
+            "label": "URL token",
+            "type": "url",
+            "required": true,
+            "secret": false,
+            "description": "",
+            "order": 2,
+            "validation": {
+              "format": "httpsUrl"
+            },
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "valueSource": "adapter.nonSecretConfig",
+            "editableInConnection": false
+          },
+          {
+            "code": "private_key",
+            "label": "Clé de signature",
+            "type": "secretFile",
+            "required": true,
+            "secret": true,
+            "description": "",
+            "order": 3,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "storage": {
+              "scope": "connection",
+              "mode": "vaultRef",
+              "readBack": false
+            },
+            "valueSource": "connection.secretRef",
+            "editableInConnection": true
+          }
+        ]
+      },
+      "transmission": {
+        "type": "oauth_jwt_assertion",
+        "protocol": "oauth2",
+        "bindings": [
+          {
+            "channel": "http.header",
+            "target": {
+              "name": "Authorization",
+              "nameFixedByAdapter": true
+            },
+            "source": {
+              "kind": "handler.tokenRef",
+              "fieldCode": null
+            },
+            "format": {
+              "kind": "prefix",
+              "prefix": "Bearer "
+            },
+            "required": true,
+            "clientEditable": false
+          }
+        ],
+        "handlerOperation": "oauth2_jwt_bearer",
+        "requiresTls": true,
+        "resolvedBy": "verifiedAdapterAndHandler",
+        "customHeadersAllowed": false,
+        "policyRef": "HTTP_TRANSMISSION_POLICY_V1_3",
+        "oauthProfileRef": "OAUTH2_SECURITY_V1_3.jwt_bearer"
+      },
+      "composition": {
+        "identityModel": false,
+        "secondaryFactorsAllowed": [],
+        "requiresAdapterDeclaration": true
+      },
+      "compatibility": {
+        "sourceOfTruth": "connectors.adapterRegistry",
+        "serviceIds": [],
+        "adapterIds": []
+      },
+      "supportedVariantIds": [
+        "jwt_bearer"
+      ]
+    },
+    {
+      "methodId": "HMAC_SIGNATURE",
+      "displayName": "Requêtes signées — HMAC",
+      "description": "Signature de requêtes calculée par un handler spécifique.",
+      "familyId": "signature",
+      "variantId": "hmac",
+      "version": "0.1.0",
+      "legacyVersionLabel": "Proposition",
+      "schemaRevision": 1,
+      "lifecycle": {
+        "status": "brouillon",
+        "reason": "Définition candidate V1.2 non activable",
+        "approvedBy": null,
+        "approvedAt": null
+      },
+      "runtime": {
+        "handlerKey": null,
+        "handlerVersion": null,
+        "deployed": false,
+        "securityReviewed": false,
+        "contractTestsPassed": false,
+        "enabled": false
+      },
+      "fieldSchema": {
+        "schemaVersion": "1.3.0",
+        "fields": [
+          {
+            "code": "key_id",
+            "label": "Identifiant de clé",
+            "type": "text",
+            "required": true,
+            "secret": false,
+            "description": "",
+            "order": 1,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "valueSource": "connection.config",
+            "editableInConnection": true
+          },
+          {
+            "code": "signing_secret",
+            "label": "Secret de signature",
+            "type": "password",
+            "required": true,
+            "secret": true,
+            "description": "",
+            "order": 2,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "storage": {
+              "scope": "connection",
+              "mode": "vaultRef",
+              "readBack": false
+            },
+            "valueSource": "connection.secretRef",
+            "editableInConnection": true
+          },
+          {
+            "code": "algorithm",
+            "label": "Algorithme",
+            "type": "text",
+            "required": true,
+            "secret": false,
+            "description": "",
+            "order": 3,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "valueSource": "connection.config",
+            "editableInConnection": true
+          }
+        ]
+      },
+      "transmission": {
+        "type": "hmac_signer",
+        "protocol": "signed_http",
+        "bindings": [],
+        "handlerOperation": "request_hmac",
+        "requiresTls": true,
+        "resolvedBy": "verifiedAdapterAndHandler",
+        "customHeadersAllowed": false,
+        "policyRef": "HTTP_TRANSMISSION_POLICY_V1_3",
+        "note": "Signature calculée sur la requête canonique par le handler. Ne pas exposer de champ libre pour renseigner le résultat de signature."
+      },
+      "composition": {
+        "identityModel": false,
+        "secondaryFactorsAllowed": [],
+        "requiresAdapterDeclaration": true
+      },
+      "compatibility": {
+        "sourceOfTruth": "connectors.adapterRegistry",
+        "serviceIds": [],
+        "adapterIds": []
+      },
+      "supportedVariantIds": [
+        "hmac"
+      ]
+    },
+    {
+      "methodId": "AWS_SIGV4",
+      "displayName": "AWS Signature Version 4",
+      "description": "Signature AWS appliquée par l’adaptateur.",
+      "familyId": "signature",
+      "variantId": "aws_sigv4",
+      "version": "0.1.0",
+      "legacyVersionLabel": "Proposition",
+      "schemaRevision": 1,
+      "lifecycle": {
+        "status": "brouillon",
+        "reason": "Définition candidate V1.2 non activable",
+        "approvedBy": null,
+        "approvedAt": null
+      },
+      "runtime": {
+        "handlerKey": null,
+        "handlerVersion": null,
+        "deployed": false,
+        "securityReviewed": false,
+        "contractTestsPassed": false,
+        "enabled": false
+      },
+      "fieldSchema": {
+        "schemaVersion": "1.3.0",
+        "fields": [
+          {
+            "code": "access_key_id",
+            "label": "Access Key ID",
+            "type": "text",
+            "required": true,
+            "secret": false,
+            "description": "",
+            "order": 1,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "valueSource": "connection.config",
+            "editableInConnection": true
+          },
+          {
+            "code": "secret_access_key",
+            "label": "Secret Access Key",
+            "type": "password",
+            "required": true,
+            "secret": true,
+            "description": "",
+            "order": 2,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "storage": {
+              "scope": "connection",
+              "mode": "vaultRef",
+              "readBack": false
+            },
+            "valueSource": "connection.secretRef",
+            "editableInConnection": true
+          },
+          {
+            "code": "region",
+            "label": "Région",
+            "type": "text",
+            "required": true,
+            "secret": false,
+            "description": "",
+            "order": 3,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "valueSource": "connection.config",
+            "editableInConnection": true
+          },
+          {
+            "code": "service",
+            "label": "Service AWS",
+            "type": "text",
+            "required": true,
+            "secret": false,
+            "description": "",
+            "order": 4,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "valueSource": "connection.config",
+            "editableInConnection": true
+          }
+        ]
+      },
+      "transmission": {
+        "type": "aws_sigv4_signer",
+        "protocol": "signed_http",
+        "bindings": [],
+        "handlerOperation": "aws_signature_v4",
+        "requiresTls": true,
+        "resolvedBy": "verifiedAdapterAndHandler",
+        "customHeadersAllowed": false,
+        "policyRef": "HTTP_TRANSMISSION_POLICY_V1_3",
+        "note": "Signature calculée sur la requête canonique par le handler. Ne pas exposer de champ libre pour renseigner le résultat de signature."
+      },
+      "composition": {
+        "identityModel": false,
+        "secondaryFactorsAllowed": [],
+        "requiresAdapterDeclaration": true
+      },
+      "compatibility": {
+        "sourceOfTruth": "connectors.adapterRegistry",
+        "serviceIds": [],
+        "adapterIds": []
+      },
+      "supportedVariantIds": [
+        "aws_sigv4"
+      ]
+    },
+    {
+      "methodId": "KERBEROS",
+      "displayName": "Kerberos",
+      "description": "Authentification par tickets Kerberos, selon environnement.",
+      "familyId": "windows",
+      "variantId": "kerberos",
+      "version": "0.1.0",
+      "legacyVersionLabel": "Proposition",
+      "schemaRevision": 1,
+      "lifecycle": {
+        "status": "brouillon",
+        "reason": "Définition candidate V1.2 non activable",
+        "approvedBy": null,
+        "approvedAt": null
+      },
+      "runtime": {
+        "handlerKey": null,
+        "handlerVersion": null,
+        "deployed": false,
+        "securityReviewed": false,
+        "contractTestsPassed": false,
+        "enabled": false
+      },
+      "fieldSchema": {
+        "schemaVersion": "1.3.0",
+        "fields": [
+          {
+            "code": "principal",
+            "label": "Principal Kerberos",
+            "type": "text",
+            "required": true,
+            "secret": false,
+            "description": "",
+            "order": 1,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "valueSource": "connection.config",
+            "editableInConnection": true
+          },
+          {
+            "code": "keytab",
+            "label": "Keytab / identité sécurisée",
+            "type": "secretFile",
+            "required": true,
+            "secret": true,
+            "description": "",
+            "order": 2,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "storage": {
+              "scope": "connection",
+              "mode": "vaultRef",
+              "readBack": false
+            },
+            "valueSource": "connection.secretRef",
+            "editableInConnection": true
+          },
+          {
+            "code": "realm",
+            "label": "Realm",
+            "type": "text",
+            "required": false,
+            "secret": false,
+            "description": "",
+            "order": 3,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "valueSource": "connection.config",
+            "editableInConnection": true
+          }
+        ]
+      },
+      "transmission": {
+        "type": "kerberos_spnego",
+        "protocol": "negotiate",
+        "bindings": [],
+        "handlerOperation": "kerberos",
+        "requiresTls": false,
+        "resolvedBy": "verifiedAdapterAndHandler",
+        "customHeadersAllowed": false,
+        "policyRef": "HTTP_TRANSMISSION_POLICY_V1_3"
+      },
+      "composition": {
+        "identityModel": false,
+        "secondaryFactorsAllowed": [],
+        "requiresAdapterDeclaration": true
+      },
+      "compatibility": {
+        "sourceOfTruth": "connectors.adapterRegistry",
+        "serviceIds": [],
+        "adapterIds": []
+      },
+      "supportedVariantIds": [
+        "kerberos"
+      ]
+    },
+    {
+      "methodId": "NTLM",
+      "displayName": "NTLM (héritage)",
+      "description": "Compatibilité héritée ; préférer un mécanisme plus sûr si possible.",
+      "familyId": "windows",
+      "variantId": "ntlm_legacy",
+      "version": "0.1.0",
+      "legacyVersionLabel": "Proposition",
+      "schemaRevision": 1,
+      "lifecycle": {
+        "status": "brouillon",
+        "reason": "Définition candidate V1.2 non activable",
+        "approvedBy": null,
+        "approvedAt": null
+      },
+      "runtime": {
+        "handlerKey": null,
+        "handlerVersion": null,
+        "deployed": false,
+        "securityReviewed": false,
+        "contractTestsPassed": false,
+        "enabled": false
+      },
+      "fieldSchema": {
+        "schemaVersion": "1.3.0",
+        "fields": [
+          {
+            "code": "domain",
+            "label": "Domaine",
+            "type": "text",
+            "required": true,
+            "secret": false,
+            "description": "",
+            "order": 1,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "valueSource": "connection.config",
+            "editableInConnection": true
+          },
+          {
+            "code": "username",
+            "label": "Identifiant",
+            "type": "text",
+            "required": true,
+            "secret": false,
+            "description": "",
+            "order": 2,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "valueSource": "connection.config",
+            "editableInConnection": true
+          },
+          {
+            "code": "password",
+            "label": "Mot de passe",
+            "type": "password",
+            "required": true,
+            "secret": true,
+            "description": "",
+            "order": 3,
+            "validation": {},
+            "visibility": {
+              "operator": "always"
+            },
+            "defaultValue": null,
+            "storage": {
+              "scope": "connection",
+              "mode": "vaultRef",
+              "readBack": false
+            },
+            "valueSource": "connection.secretRef",
+            "editableInConnection": true
+          }
+        ]
+      },
+      "transmission": {
+        "type": "ntlm_handshake",
+        "protocol": "negotiate",
+        "bindings": [],
+        "handlerOperation": "ntlm_legacy",
+        "requiresTls": false,
+        "resolvedBy": "verifiedAdapterAndHandler",
+        "customHeadersAllowed": false,
+        "policyRef": "HTTP_TRANSMISSION_POLICY_V1_3"
+      },
+      "composition": {
+        "identityModel": false,
+        "secondaryFactorsAllowed": [],
+        "requiresAdapterDeclaration": true
+      },
+      "compatibility": {
+        "sourceOfTruth": "connectors.adapterRegistry",
+        "serviceIds": [],
+        "adapterIds": []
+      },
+      "supportedVariantIds": [
+        "ntlm_legacy"
+      ]
+    }
+  ],
+  "runtimeAvailabilityRule": {
+    "mustAllBeTrue": [
+      "lifecycle.status == disponible",
+      "runtime.enabled == true",
+      "runtime.deployed == true",
+      "runtime.securityReviewed == true",
+      "runtime.contractTestsPassed == true",
+      "runtime.handlerKey != null",
+      "runtime.handlerVersion != null",
+      "connectors.adapterRegistry.supports(methodId,version,variantId,adapterId) == true"
+    ],
+    "failClosed": true
+  }
+}

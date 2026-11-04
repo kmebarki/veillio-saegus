@@ -3,3 +3,7 @@ pmOnFail: ignore
 minimumReleaseAgeExclude:
   - '@next/*'
   - next
+
+peerDependencyRules:
+  allowedVersions:
+    '@vercel/analytics>next': 16.5.0-canary.36

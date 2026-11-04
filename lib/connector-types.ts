@@ -1,4 +1,4 @@
-import type { ConnectorConfig, ConnectorHealth, ConnectorKind, ConnectorStatus } from '@/lib/connector-catalog'
+import type { ConnectorCategory, ConnectorConfig, ConnectorHealth, ConnectorKind, ConnectorStatus } from '@/lib/connector-catalog'
 import type { ConnectionOption } from '@/lib/connection-types'
 
 export type ConnectorViewer = {
@@ -12,6 +12,12 @@ export type ConnectorSummary = {
   description: string
   logoUrl: string
   kind: ConnectorKind
+  category: ConnectorCategory
+  provider: string
+  serviceId: string
+  adapter: string
+  authMethods: string[]
+  operational: boolean
   status: ConnectorStatus
   health: ConnectorHealth
   host: string

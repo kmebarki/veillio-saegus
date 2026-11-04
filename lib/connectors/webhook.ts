@@ -4,10 +4,10 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 
 import { and, desc, eq, gte, sql } from 'drizzle-orm'
 
+import { readLegacySecret, readSecret } from '@/lib/authentication/vault'
 import type { ConnectorConfig } from '@/lib/connector-catalog'
 import { db } from '@/lib/db'
 import { connections, connectors, webhookEvents, type WebhookEventPayloadItem } from '@/lib/db/schema'
-import { decryptSecret } from '@/lib/connectors/crypto'
 import { normalizeDate, resolvePath } from '@/lib/connectors/parsers'
 import { TestReport, type TestResult } from '@/lib/connectors/test-types'
 
@@ -144,11 +144,11 @@ export async function handleWebhookRequest({ connectorId, headers, rawBody, sour
     .select()
     .from(connections)
     .where(and(eq(connections.connectorId, connectorId), eq(connections.scope, 'organization')))
-  const secrets = credentialRows.flatMap((row) => {
-    if (row.expiresAt && row.expiresAt.getTime() < Date.now()) return []
-    const secret = decryptSecret(row.secretCiphertext, row.id)
-    return secret ? [secret] : []
-  })
+  const resolvedSecrets = await Promise.all(credentialRows.map(async (row) => {
+    if (row.lifecycle !== 'active' || (row.expiresAt && row.expiresAt.getTime() < Date.now())) return null
+    return await readSecret(row.secretRef, { organizationId: row.organizationId, connectionId: row.id, fieldCode: 'credential', purpose: 'webhook-verify' }) ?? readLegacySecret(row.secretCiphertext, row.id)
+  }))
+  const secrets = resolvedSecrets.filter((secret): secret is string => Boolean(secret))
   if (secrets.length === 0) {
     await log('rejected', 503, 'Aucune connexion (secret) rattachée à ce connecteur.', false)
     return { status: 503, body: { error: 'not_configured' } }

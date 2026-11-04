@@ -1,0 +1,154 @@
+{
+  "contractVersion": "1.3.0",
+  "statuses": {
+    "brouillon": "Définition modifiable, non proposée aux Connecteurs ni Connexions",
+    "a_valider": "En revue technique/sécurité, non activable",
+    "disponible": "Définition approuvée, activation effective sous conditions runtime + adaptateur",
+    "desactivee": "Interdiction de nouvelles utilisations ; protection des connexions existantes selon politique",
+    "obsolete": "Pas de nouvelles sélections ; migration pilotée des connexions existantes"
+  },
+  "transitions": [
+    {
+      "from": "brouillon",
+      "to": "a_valider",
+      "permission": "auth.method.submit",
+      "prerequisites": [
+        "schemaValid",
+        "transmissionDefined",
+        "authorTracked"
+      ]
+    },
+    {
+      "from": "a_valider",
+      "to": "brouillon",
+      "permission": "auth.method.review",
+      "prerequisites": [
+        "reviewReason"
+      ]
+    },
+    {
+      "from": "a_valider",
+      "to": "disponible",
+      "permission": "auth.method.activate",
+      "prerequisites": [
+        "independentSecurityReview",
+        "handlerImplementedDeployedAndVersioned",
+        "contractTestsGreen",
+        "adapterCompatibilityConfirmed",
+        "impactAnalysisApproved",
+        "auditRecorded"
+      ]
+    },
+    {
+      "from": "disponible",
+      "to": "desactivee",
+      "permission": "auth.method.disable",
+      "prerequisites": [
+        "reason",
+        "affectedConnectionsAnalyzed",
+        "auditRecorded"
+      ]
+    },
+    {
+      "from": "disponible",
+      "to": "obsolete",
+      "permission": "auth.method.deprecate",
+      "prerequisites": [
+        "replacementOrExplicitNoReplacement",
+        "migrationPlan",
+        "auditRecorded"
+      ]
+    },
+    {
+      "from": "obsolete",
+      "to": "desactivee",
+      "permission": "auth.method.disable",
+      "prerequisites": [
+        "connectionsMigratedOrExceptionApproved",
+        "auditRecorded"
+      ]
+    },
+    {
+      "from": "desactivee",
+      "to": "a_valider",
+      "permission": "auth.method.reopen",
+      "prerequisites": [
+        "newSecurityReview",
+        "impactAnalysisApproved",
+        "auditRecorded"
+      ]
+    }
+  ],
+  "forbidden": [
+    "brouillon -> disponible",
+    "brouillon -> obsolete",
+    "desactivee -> disponible direct",
+    "obsolete -> disponible direct"
+  ],
+  "capabilities": {
+    "auth.method.view": "Consultation sans valeur sensible",
+    "auth.method.propose": "Créer brouillon",
+    "auth.method.editDraft": "Éditer schéma en brouillon uniquement",
+    "auth.method.submit": "Soumettre à validation",
+    "auth.method.review": "Revue indépendante et retour",
+    "auth.method.activate": "Activation contrôlée après preuves",
+    "auth.method.disable": "Désactivation",
+    "auth.method.deprecate": "Obsolescence",
+    "auth.method.reopen": "Réouverture à valider",
+    "auth.method.auditRead": "Consulter le journal sans secret"
+  },
+  "roleMapping": "À connecter au RBAC Veillio existant. Ne pas créer de nouveaux rôles globaux sans décision.",
+  "separationOfDuties": "L’auteur ne valide pas seul sa proposition : revue indépendante exigée côté serveur.",
+  "auditedEvents": [
+    "AUTH_METHOD_PROPOSED",
+    "AUTH_METHOD_FIELD_SCHEMA_UPDATED",
+    "AUTH_METHOD_SUBMITTED",
+    "AUTH_METHOD_REVIEWED",
+    "AUTH_METHOD_ACTIVATED",
+    "AUTH_METHOD_DISABLED",
+    "AUTH_METHOD_DEPRECATED",
+    "AUTH_METHOD_VERSION_CREATED",
+    "AUTH_METHOD_MIGRATION_APPROVED",
+    "AUTH_METHOD_SECURITY_EXCEPTION_GRANTED"
+  ],
+  "auditFields": [
+    "eventId",
+    "actorId",
+    "at",
+    "methodId",
+    "methodVersion",
+    "fromStatus",
+    "toStatus",
+    "reason",
+    "correlationId",
+    "evidenceRefs"
+  ],
+  "versioning": {
+    "immutableWhenAvailable": true,
+    "pinConnectionToMethodVersion": true,
+    "breakingChangeRequiresNewVersion": true,
+    "breakingChangeExamples": [
+      "field deletion or rename",
+      "required field added",
+      "type or secret flag altered",
+      "transmission channel changed",
+      "OAuth flow changed"
+    ],
+    "migrationRequires": [
+      "impactReport",
+      "mappingPlan",
+      "explicitApprovals",
+      "rollbackPlan",
+      "auditEvent"
+    ],
+    "existingConnectionsOnDisable": "Bloquer toute nouvelle création ; appliquer politique de sécurité explicite aux connexions existantes avec audit ; ne jamais réactiver implicitement",
+    "existingConnectionsOnDeprecation": "Continuité seulement si autorisée, délai/migration explicites, sans nouvelle sélection"
+  },
+  "connectionScopes": [
+    "privee",
+    "publique",
+    "organisationnelle"
+  ],
+  "scopeSemantics": "Privée: propriétaire ; Publique: utilisable par tous les utilisateurs autorisés sans visibilité des secrets ; Organisationnelle: utilisateurs autorisés de la seule organisation propriétaire, sans fuite inter-organisation.",
+  "sources": "Les Sources utilisent une Connexion autorisée, ne manipulent ni méthode ni secret ni portée de Connexion."
+}

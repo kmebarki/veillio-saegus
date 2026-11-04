@@ -12,7 +12,7 @@ import { ConnectionForm, type FormTarget } from '@/components/connections/connec
 import { inputClass, needsAttention } from '@/components/connections/helpers'
 import { TestResult } from '@/components/connections/test-result'
 import { KindIcon } from '@/components/connector-ui'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
 import { UserMenu } from '@/components/user-menu'
 import { Sidebar } from '@/components/veillio-dashboard'
@@ -20,7 +20,7 @@ import type { ConnectionActivityEntry, ConnectionSummary, ConnectionsOverview } 
 import type { TestOutcome } from '@/lib/connector-types'
 import { cn } from '@/lib/utils'
 
-type Filter = 'all' | 'organization' | 'user' | 'attention'
+type Filter = 'all' | 'organization' | 'public' | 'private' | 'attention'
 
 export function ConnectionsModule({ overview }: { overview: ConnectionsOverview }) {
   const router = useRouter()
@@ -39,7 +39,13 @@ export function ConnectionsModule({ overview }: { overview: ConnectionsOverview 
   const detail = connections.find((item) => item.id === detailId) ?? null
   const uncovered = viewer.canManage ? connectors.filter((item) => item.requiresAuth && item.sharedCount === 0) : []
 
-  const counts = useMemo(() => ({ all: connections.length, organization: stats.shared, user: stats.personal, attention: stats.attention }), [connections.length, stats])
+  const counts = useMemo(() => ({
+    all: connections.length,
+    organization: connections.filter((item) => item.scope === 'organization').length,
+    public: connections.filter((item) => item.scope === 'public').length,
+    private: stats.personal,
+    attention: stats.attention,
+  }), [connections, stats.attention, stats.personal])
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase()
     return connections.filter((item) => {
@@ -84,11 +90,12 @@ export function ConnectionsModule({ overview }: { overview: ConnectionsOverview 
 
   const filters: { id: Filter; label: string }[] = [
     { id: 'all', label: 'Toutes' },
-    { id: 'organization', label: 'Partagées' },
-    { id: 'user', label: 'Personnelles' },
+    { id: 'private', label: 'Privées' },
+    { id: 'organization', label: 'Organisationnelles' },
+    { id: 'public', label: 'Publiques' },
     { id: 'attention', label: 'À surveiller' },
   ]
-  const canCreate = connectors.some((item) => item.requiresAuth)
+  const canCreate = connectors.some((item) => item.requiresAuth && item.runtimeAvailable)
 
   return (
     <div className="min-h-dvh bg-background">
@@ -106,15 +113,15 @@ export function ConnectionsModule({ overview }: { overview: ConnectionsOverview 
               <div>
                 <p className="mb-2 text-xs font-medium text-primary">{overview.organizationName}</p>
                 <h1 className="text-2xl font-semibold tracking-[-0.04em] sm:text-[30px]">Connexions</h1>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Une connexion donne l’accès réel à un fournisseur de données : clé API, jeton ou mot de passe, partagés par l’organisation ou propres à un utilisateur. Le <Link href="/admin/connectors" className="font-medium text-primary underline-offset-4 hover:underline">connecteur</Link> définit seulement comment communiquer avec le fournisseur.</p>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Une Connexion est un accès opérationnel versionné à un service, avec une portée privée ou organisationnelle. La publication plateforme suit un parcours d’approbation séparé. Le <Link href="/admin/connectors" className="font-medium text-primary underline-offset-4 hover:underline">Connecteur</Link> définit seulement comment communiquer avec le fournisseur.</p>
               </div>
               {canCreate && <Button onClick={() => setForm({ mode: 'create' })}><Plus data-icon="inline-start" />Nouvelle connexion</Button>}
             </section>
 
             <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Indicateurs">
               <div className="metric-card"><p>Connexions</p><strong>{stats.total}</strong><span>Visibles par vous</span></div>
-              <div className="metric-card"><p>Partagées</p><strong>{stats.shared}</strong><span>Utilisables par l’organisation</span></div>
-              <div className="metric-card"><p>Personnelles</p><strong>{stats.personal}</strong><span>Réservées à leur propriétaire</span></div>
+              <div className="metric-card"><p>Partagées</p><strong>{stats.shared}</strong><span>Organisationnelles ou publiques</span></div>
+              <div className="metric-card"><p>Privées</p><strong>{stats.personal}</strong><span>Réservées à leur propriétaire</span></div>
               <div className="metric-card"><p>À surveiller</p><strong>{stats.attention}</strong><span>{stats.attention > 0 ? 'Échec, expiration proche ou à retester' : 'Rien à signaler'}</span></div>
             </section>
 
@@ -164,11 +171,11 @@ export function ConnectionsModule({ overview }: { overview: ConnectionsOverview 
                       ? 'Modifiez vos filtres ou votre recherche.'
                       : canCreate
                         ? 'Ajoutez la clé API ou le jeton d’un fournisseur pour que les connecteurs authentifiés puissent interroger ses données.'
-                        : 'Aucun connecteur n’exige d’authentification pour l’instant. Configurez l’authentification d’un connecteur (API JSON) pour pouvoir lui associer une connexion.'}
+                        : 'Aucune combinaison méthode, adaptateur et preuve runtime n’est actuellement activable. Publiez et attestez une méthode dans le référentiel Authentification.'}
                   </p>
                 </div>
                 {connections.length === 0 && canCreate && <Button onClick={() => setForm({ mode: 'create' })}><Plus data-icon="inline-start" />Créer une connexion</Button>}
-                {!canCreate && <Button variant="outline" render={<Link href="/admin/connectors" />}>Ouvrir les connecteurs</Button>}
+                {!canCreate && <Link href="/admin/connectors" className={buttonVariants({ variant: 'outline' })}>Ouvrir les connecteurs</Link>}
               </section>
             )}
           </div>
@@ -233,7 +240,7 @@ export function ConnectionsModule({ overview }: { overview: ConnectionsOverview 
         )}
       </Modal>
 
-      <Modal open={toDelete !== null} onClose={() => setToDelete(null)} size="md" title="Supprimer la connexion ?" description={toDelete ? `« ${toDelete.name} » sera supprimée définitivement. Les collectes qui l’utilisent ne pourront plus s’authentifier.` : undefined}>
+      <Modal open={toDelete !== null} onClose={() => setToDelete(null)} size="md" title="Archiver la Connexion ?" description={toDelete ? `« ${toDelete.name} » sera archivée. L’opération est refusée tant qu’une Source active en dépend.` : undefined}>
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={() => setToDelete(null)}>Annuler</Button>
           <Button
@@ -244,7 +251,7 @@ export function ConnectionsModule({ overview }: { overview: ConnectionsOverview 
               if (target) void remove(target)
             }}
           >
-            Supprimer
+            Archiver
           </Button>
         </div>
       </Modal>

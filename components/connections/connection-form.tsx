@@ -30,14 +30,14 @@ const EXPIRY_PRESETS = [
 
 export function ConnectionForm({ target, overview, onClose, onDone }: Props) {
   const editing = target.mode === 'edit' ? target.connection : null
-  const usableConnectors = overview.connectors.filter((item) => item.requiresAuth)
+  const usableConnectors = overview.connectors.filter((item) => item.requiresAuth && item.runtimeAvailable)
   const initialConnector = editing?.connectorId ?? (target.mode === 'create' ? target.connectorId : undefined) ?? (usableConnectors.length === 1 ? usableConnectors[0].id : '')
 
   const [connectorId, setConnectorId] = useState(initialConnector)
   const [name, setName] = useState(editing?.name ?? '')
   const [description, setDescription] = useState(editing?.description ?? '')
   const [logoUrl, setLogoUrl] = useState(editing?.logoUrl ?? '')
-  const [scope, setScope] = useState<ConnectionScope>(editing?.scope ?? (overview.viewer.canManage ? 'organization' : 'user'))
+  const [scope, setScope] = useState<ConnectionScope>(editing?.scope ?? (overview.viewer.canManage ? 'organization' : 'private'))
   const [username, setUsername] = useState(editing?.username ?? '')
   const [secret, setSecret] = useState('')
   const [replacing, setReplacing] = useState(!editing)
@@ -159,8 +159,8 @@ export function ConnectionForm({ target, overview, onClose, onDone }: Props) {
             <legend className="mb-1.5 text-sm font-medium">Qui peut l’utiliser ?</legend>
             <div className="grid gap-2 sm:grid-cols-2">
               {([
-                { id: 'organization', title: 'Partagée', text: 'Toute l’organisation : veilles et collectes.', icon: Users, disabled: !overview.viewer.canManage },
-                { id: 'user', title: 'Personnelle', text: 'Vous seul pouvez la voir et l’utiliser.', icon: User, disabled: false },
+                { id: 'private', title: 'Privée', text: 'Vous seul pouvez la voir et l’utiliser.', icon: User, disabled: false },
+                { id: 'organization', title: 'Organisationnelle', text: 'Toute l’organisation peut l’utiliser.', icon: Users, disabled: !overview.viewer.canManage },
               ] as const).map((option) => (
                 <label key={option.id} className={cn('flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm transition-colors', scope === option.id ? 'border-primary bg-primary/5 ring-2 ring-primary/15' : 'bg-card', option.disabled && 'cursor-not-allowed opacity-50')}>
                   <input type="radio" name="scope" value={option.id} checked={scope === option.id} disabled={option.disabled} onChange={() => setScope(option.id)} className="sr-only" />

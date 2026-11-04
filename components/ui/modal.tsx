@@ -1,7 +1,8 @@
 'use client'
 
 import { X } from 'lucide-react'
-import { useEffect, useId } from 'react'
+import { useEffect, useId, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 import { Button } from '@/components/ui/button'
 
@@ -13,10 +14,14 @@ type ModalProps = {
   children: React.ReactNode
   size?: 'md' | 'xl' | '2xl'
   bare?: boolean
+  placement?: 'center' | 'lower'
 }
 
-export function Modal({ open, onClose, title, description, children, size = 'md', bare = false }: ModalProps) {
+export function Modal({ open, onClose, title, description, children, size = 'md', bare = false, placement = 'center' }: ModalProps) {
   const titleId = useId()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => setMounted(true), [])
 
   useEffect(() => {
     if (!open) return
@@ -27,17 +32,21 @@ export function Modal({ open, onClose, title, description, children, size = 'md'
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [open, onClose])
 
-  if (!open) return null
+  if (!open || !mounted) return null
 
   const width = size === '2xl' ? 'max-w-6xl' : size === 'xl' ? 'max-w-4xl' : 'max-w-lg'
+  const overlayAlignment = placement === 'lower'
+    ? 'items-start justify-items-center overflow-y-auto px-3 pb-3 pt-16 sm:px-4 sm:pb-4 sm:pt-20'
+    : 'place-items-center p-3 sm:p-4'
+  const maxHeight = placement === 'lower' ? 'max-h-[84dvh]' : 'max-h-[92dvh]'
 
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/30 p-3 backdrop-blur-sm sm:p-4" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+  return createPortal(
+    <div className={`fixed inset-0 z-50 grid bg-foreground/30 backdrop-blur-sm ${overlayAlignment}`} role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={`relative max-h-[92dvh] w-full ${width} overflow-y-auto rounded-3xl border bg-card shadow-2xl ${bare ? '' : 'p-6'}`}
+        className={`relative ${maxHeight} w-full ${width} overflow-y-auto rounded-3xl border bg-card shadow-2xl ${bare ? '' : 'p-6'}`}
       >
         {bare ? (
           <>
@@ -58,7 +67,8 @@ export function Modal({ open, onClose, title, description, children, size = 'md'
           </>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 

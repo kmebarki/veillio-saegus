@@ -7,6 +7,7 @@ import { Field, NumberField, Section } from '@/components/connector-form-primiti
 import { ImapSections, M365Sections, WebhookSections } from '@/components/connector-kind-sections'
 import { ConnectorLogoField } from '@/components/connector-logo-field'
 import { EndpointsSection } from '@/components/openapi-import'
+import { headerRulesToStaticHeaders, HttpHeaderPolicyEditor, legacyHeadersToRules } from '@/components/http-header-policy-editor'
 import { Button } from '@/components/ui/button'
 import { fieldClass } from '@/components/ui/modal'
 import {
@@ -15,6 +16,9 @@ import {
   KIND_AUTH_TYPES,
   PAGINATION_TYPES,
   describeTarget,
+  getCategoryInfo,
+  getConnectorTemplate,
+  getKindInfo,
   isHttpKind,
   needsSecret,
   secretLabel,
@@ -74,6 +78,49 @@ function KeyValueEditor({ label, items, max, namePlaceholder, valuePlaceholder, 
   )
 }
 
+function IntegrationParameters({ config, disabled, onChange }: { config: ConnectorConfig; disabled?: boolean; onChange: (config: ConnectorConfig) => void }) {
+  const template = getConnectorTemplate(config.integration.templateId)
+  const category = getCategoryInfo(config.integration.category)
+  if (!template) return null
+  const fields = template.fields.filter((field) => field.key !== 'endpoint')
+
+  return (
+    <Section title="Profil d’intégration" description={`${category?.label ?? 'Connecteur'} · ${template.description}`}>
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="font-semibold">{template.label}</span>
+          <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground">{category?.label}</span>
+          <span className="text-xs text-muted-foreground">Adaptateur {getKindInfo(template.kind)?.label}</span>
+        </div>
+        {fields.length > 0 && (
+          <div className="grid gap-4 sm:grid-cols-2">
+            {fields.map((field) => (
+              <Field key={field.key} label={field.label} hint={field.hint}>
+                <input
+                  type={field.type ?? 'text'}
+                  required={field.required}
+                  disabled={disabled}
+                  maxLength={500}
+                  value={config.integration.parameters[field.key] ?? ''}
+                  onChange={(event) => onChange({
+                    ...config,
+                    integration: {
+                      ...config.integration,
+                      parameters: { ...config.integration.parameters, [field.key]: event.target.value },
+                    },
+                  })}
+                  className={fieldClass}
+                  placeholder={field.placeholder}
+                />
+              </Field>
+            ))}
+          </div>
+        )}
+      </div>
+    </Section>
+  )
+}
+
 function CredentialsNotice({ type }: { type: ConnectorConfig['auth']['type'] }) {
   return (
     <div className="flex items-start gap-2.5 rounded-xl border bg-muted/40 px-3 py-2.5 text-[13px] leading-5 text-muted-foreground">
@@ -124,6 +171,8 @@ export function ConnectorConfigForm({ kind, draft, onChange, disabled, connector
         </Field>
         <ConnectorLogoField kind={kind} value={draft.logoUrl} sourceUrl={logoSourceUrl} onChange={(logoUrl) => set({ logoUrl })} disabled={disabled} />
       </Section>
+
+      <IntegrationParameters config={config} disabled={disabled} onChange={(nextConfig) => set({ config: nextConfig })} />
 
       {kind === 'api' && <EndpointsSection config={config} onChange={(next) => onChange({ ...draft, config: next })} disabled={disabled} />}
 
@@ -257,7 +306,12 @@ export function ConnectorConfigForm({ kind, draft, onChange, disabled, connector
             <input type="checkbox" checked={config.http.followRedirects} onChange={(event) => setHttp({ followRedirects: event.target.checked })} className="mt-0.5 size-4 accent-primary" />
             <span><span className="font-medium">Suivre les redirections</span><span className="block text-xs leading-5 text-muted-foreground">Jusqu’à 5 redirections, chacune revalidée (jamais vers une adresse interne). Les identifiants ne sont pas transmis à un autre domaine.</span></span>
           </label>
-          <KeyValueEditor label="En-têtes personnalisés" items={config.http.headers} max={10} namePlaceholder="X-Exemple" valuePlaceholder="valeur" disabled={disabled} onChange={(headers) => setHttp({ headers })} />
+          <HttpHeaderPolicyEditor
+            rules={config.http.headerPolicy.length > 0 ? config.http.headerPolicy : legacyHeadersToRules(config.http.headers)}
+            endpoints={config.api.endpoints}
+            disabled={disabled}
+            onChange={(headerPolicy) => setHttp({ headerPolicy, headers: headerRulesToStaticHeaders(headerPolicy, config.api.activeEndpointId) })}
+          />
           </>}
         </div>
       </details>}

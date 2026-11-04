@@ -9,8 +9,11 @@ import { z } from 'zod'
 import {
   CONNECTOR_KINDS,
   configSchema,
+  connectorCategoryOf,
   defaultConfig,
   describeTarget,
+  getConnectorTemplate,
+  getKindInfo,
   isConnectorKind,
   isHttpKind,
   needsSecret,
@@ -21,8 +24,10 @@ import {
   type ConnectorStatus,
 } from '@/lib/connector-catalog'
 import type { ConnectionOption } from '@/lib/connection-types'
+import { getServiceDefinition, selectedAuthMethods } from '@/lib/connector-service-catalog'
 import type { ConnectorDetail, ConnectorHistoryEntry, ConnectorRunEntry, ConnectorSummary, ConnectorsOverview, TestOutcome } from '@/lib/connector-types'
-import { decryptSecret } from '@/lib/connectors/crypto'
+import { readLegacySecret, readSecret } from '@/lib/authentication/vault'
+import { evaluateConnectionRuntime } from '@/lib/connections/registry'
 import { runConnectorTest } from '@/lib/connectors/engine'
 import { SafeFetchError, validateTargetUrl } from '@/lib/connectors/safe-fetch'
 import { getDefaultOrganization, requirePermission } from '@/lib/authorization'
@@ -88,7 +93,10 @@ function audit(actorUserId: string, action: string, connectorId: string, metadat
 
 function readConfig(kind: ConnectorKind, raw: unknown): ConnectorConfig {
   const parsed = configSchema.safeParse(raw)
-  if (parsed.success) return parsed.data
+  if (parsed.success) {
+    const stored = (raw ?? {}) as { integration?: unknown }
+    return stored.integration ? parsed.data : { ...parsed.data, integration: defaultConfig(kind).integration }
+  }
   const stored = (raw ?? {}) as { url?: unknown }
   return { ...defaultConfig(kind), url: typeof stored.url === 'string' ? stored.url : '' }
 }
@@ -104,12 +112,19 @@ function hostOf(kind: ConnectorKind, config: ConnectorConfig) {
 function toSummary(row: Row, connectionCount: number): ConnectorSummary {
   const kind: ConnectorKind = isConnectorKind(row.kind) ? row.kind : 'rss'
   const config = readConfig(kind, row.config)
+  const service = getServiceDefinition(config.integration.templateId)
   return {
     id: row.id,
     name: row.name,
     description: row.description ?? '',
     logoUrl: row.logoUrl ?? '',
     kind,
+    category: connectorCategoryOf(kind, config),
+    provider: service?.name ?? getConnectorTemplate(config.integration.templateId)?.label ?? getKindInfo(kind)?.label ?? kind,
+    serviceId: service?.id ?? config.integration.templateId,
+    adapter: service?.adapter ?? config.integration.parameters.adapter ?? getKindInfo(kind)?.label ?? kind,
+    authMethods: service ? selectedAuthMethods(config) : [config.auth.type],
+    operational: config.integration.parameters.operational !== 'false',
     status: (['draft', 'active', 'paused'].includes(row.status) ? row.status : 'draft') as ConnectorStatus,
     health: healthOf(row.lastCheckStatus),
     host: describeTarget(kind, config),
@@ -153,8 +168,8 @@ function checkTarget(kind: ConnectorKind, config: ConnectorConfig): string | nul
 async function visibleConnections(actorId: string, connectorId: string): Promise<ConnectionOption[]> {
   const rows = await db.select().from(connections).where(eq(connections.connectorId, connectorId)).orderBy(connections.name)
   return rows
-    .filter((row) => row.scope === 'organization' || row.ownerUserId === actorId)
-    .map((row) => ({ id: row.id, name: row.name, scope: row.scope === 'user' ? 'user' : 'organization' }))
+    .filter((row) => row.scope !== 'private' || row.ownerUserId === actorId)
+    .map((row) => ({ id: row.id, name: row.name, scope: row.scope === 'private' || row.scope === 'public' ? row.scope : 'organization' }))
 }
 
 async function resolveCredential(actorId: string, connectorId: string | undefined, connectionId: string | undefined) {
@@ -164,10 +179,12 @@ async function resolveCredential(actorId: string, connectorId: string | undefine
     .from(connections)
     .where(and(eq(connections.connectorId, connectorId), connectionId ? eq(connections.id, connectionId) : undefined))
     .orderBy(connections.createdAt)
-  const usable = rows.filter((row) => row.scope === 'organization' || row.ownerUserId === actorId)
-  const row = connectionId ? usable[0] : usable.find((item) => item.scope === 'organization')
-  if (!row) return null
-  const secret = decryptSecret(row.secretCiphertext, row.id)
+  const usable = rows.filter((row) => row.scope !== 'private' || row.ownerUserId === actorId)
+  const row = connectionId ? usable[0] : usable.find((item) => item.scope === 'organization' || item.scope === 'public')
+  if (!row || row.lifecycle !== 'active' || !row.methodId || !row.methodVersion || !row.serviceId || !row.adapterId || !row.adapterVersion) return null
+  const runtime = await evaluateConnectionRuntime({ methodId: row.methodId, methodVersion: row.methodVersion, serviceId: row.serviceId, adapterId: row.adapterId, adapterVersion: row.adapterVersion })
+  if (!runtime.usable) return null
+  const secret = await readSecret(row.secretRef, { organizationId: row.organizationId, connectionId: row.id, fieldCode: 'credential', purpose: 'connector-test' }) ?? readLegacySecret(row.secretCiphertext, row.id)
   return secret ? { secret, username: row.username ?? '' } : null
 }
 
@@ -269,7 +286,7 @@ export async function getConnectorDetail(input: unknown): Promise<{ ok: true; de
   })
 
   const options = await visibleConnections(actor.id, row.id)
-  const sharedCount = (await db.select({ total: count() }).from(connections).where(and(eq(connections.connectorId, row.id), eq(connections.scope, 'organization'))))[0]?.total ?? 0
+  const sharedCount = (await db.select({ total: count() }).from(connections).where(and(eq(connections.connectorId, row.id), ne(connections.scope, 'private'))))[0]?.total ?? 0
   return { ok: true, detail: { connector: toSummary(row, sharedCount), config: readConfig(kind, row.config), connections: options, runs, history } }
 }
 
