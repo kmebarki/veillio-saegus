@@ -23,7 +23,7 @@ import { useMemo, useState, useTransition } from 'react'
 import { createConnector, testConnectorDraft } from '@/app/actions/connectors'
 import { headerRulesToStaticHeaders, HttpHeaderPolicyEditor } from '@/components/http-header-policy-editor'
 import { EndpointsSection } from '@/components/openapi-import'
-import { authMethodRegistry } from '@/lib/auth-method-registry'
+import { authMethodRegistry, isAuthMethodSelectable, updateAuthMethodSelection } from '@/lib/auth-method-registry'
 import {
   SERVICE_CATALOG,
   SERVICE_CATEGORIES,
@@ -157,9 +157,8 @@ export function ConnectorWizard({ onCancel, onCreated }: Props) {
     setOutcome(null)
   }
 
-  function toggleAuth(id: AuthMethodId) {
-    if (id === 'CUSTOM') return
-    setAuthMethods((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current.filter((item) => item !== 'NONE' || id === 'NONE'), id])
+  function toggleAuth(id: AuthMethodId, checked: boolean) {
+    setAuthMethods((current) => updateAuthMethodSelection(current, id, checked))
     setOutcome(null)
   }
 
@@ -185,7 +184,7 @@ export function ConnectorWizard({ onCancel, onCreated }: Props) {
       setError(!service ? 'Sélectionnez un service dans le catalogue V3.' : 'Le nom doit contenir au moins 2 caractères.')
       return false
     }
-    if (step === 2 && authMethods.length === 0 && supportedMethods.some((method) => method.status === 'available')) {
+    if (step === 2 && authMethods.length === 0 && supportedMethods.some(isAuthMethodSelectable)) {
       setError('Sélectionnez au moins une méthode prise en charge par l’adaptateur.')
       return false
     }
@@ -298,10 +297,10 @@ export function ConnectorWizard({ onCancel, onCreated }: Props) {
               <div className="grid gap-3 sm:grid-cols-2">
                 {supportedMethods.map((method) => {
                   const checked = authMethods.includes(method.id)
-                  const unavailable = method.status !== 'available'
+                  const unavailable = !isAuthMethodSelectable(method)
                   return (
                     <label key={method.id} className={cn('flex cursor-pointer items-start gap-3 rounded-xl border p-4', checked && 'border-primary bg-primary/5', unavailable && 'cursor-default bg-muted/40')}>
-                      <Checkbox checked={checked} disabled={unavailable} onCheckedChange={() => toggleAuth(method.id)} aria-label={method.label} />
+                      <Checkbox checked={checked} disabled={unavailable} onCheckedChange={(nextChecked) => toggleAuth(method.id, nextChecked)} aria-label={method.label} />
                       <span className="min-w-0"><span className="flex flex-wrap items-center gap-2"><strong className="text-sm">{method.label}</strong><Badge variant="outline">{method.id}</Badge><Badge variant={unavailable ? 'secondary' : 'default'}>{unavailable ? 'Proposition · non activable' : 'Disponible'}</Badge></span><span className="mt-1 block text-xs leading-5 text-muted-foreground">{method.description}</span><span className="mt-2 block text-xs font-medium">Transmission : {method.transport}</span></span>
                     </label>
                   )
