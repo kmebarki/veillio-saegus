@@ -1,6 +1,6 @@
 'use client'
 
-import { KeyRound, Plus, Search } from 'lucide-react'
+import { KeyRound, Menu, Plus, Search } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
 import { AuthenticationMethodForm } from '@/components/authentication/proposal-wizard'
@@ -78,13 +78,16 @@ export function AuthenticationModule({ overview, openProposal = false }: { overv
 
   return (
     <div className="min-h-dvh bg-background">
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} activeItem="Paramètres" />
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} activeItem="Référentiel authentification" />
       <div className="lg:pl-[288px]">
+        <header className="sticky top-0 z-10 flex h-16 items-center gap-3 border-b bg-background/90 px-4 backdrop-blur-xl sm:px-6 lg:px-8">
+          <Button variant="ghost" size="icon-lg" className="lg:hidden" aria-label="Ouvrir le menu" onClick={() => setSidebarOpen(true)}><Menu /></Button>
+          <div className="text-sm text-muted-foreground">Paramètres <span className="px-2">/</span> <strong className="font-medium text-foreground">Référentiel authentification</strong></div>
+        </header>
         <main className="mx-auto flex max-w-[1500px] flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
           <header className="flex flex-col justify-between gap-4 border-b pb-6 sm:flex-row sm:items-end">
             <div>
-              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><span>Paramètres</span><span>/</span><span className="text-foreground">Authentification</span></div>
-              <h1 className="mt-3 font-serif text-3xl tracking-tight sm:text-4xl">Référentiel d’authentification</h1>
+              <h1 className="font-serif text-3xl tracking-tight sm:text-4xl">Référentiel d’authentification</h1>
               <p className="mt-2 text-sm text-muted-foreground">Schémas utilisés par les connecteurs.</p>
             </div>
             {overview.viewer.canCreate && <Button onClick={() => setCreateOpen(true)}><Plus data-icon="inline-start" />Ajouter une méthode</Button>}

@@ -64,15 +64,20 @@ const steeringItems = [
   { label: 'Diffusion', icon: Send, href: '#' },
 ]
 
-const childHrefs: Record<string, string> = { Connecteurs: '/admin/connectors', Connexions: '/admin/connections', Collectes: '/admin/collections' }
+const childHrefs: Record<string, string> = {
+  Connecteurs: '/admin/connectors',
+  Connexions: '/admin/connections',
+  Collectes: '/admin/collections',
+  'Référentiel authentification': '/admin/settings/authentication',
+}
 const childAccess: Partial<Record<string, keyof ViewerInfo['access']>> = { Connecteurs: 'connectors', Connexions: 'connections', Collectes: 'collections' }
 
-const administrationItems: { label: string; icon: typeof Settings; href: string; access?: keyof ViewerInfo['access'] }[] = [
+const administrationItems: { label: string; icon: typeof Settings; href?: string; children?: string[]; access?: keyof ViewerInfo['access'] }[] = [
   { label: 'Organisations', icon: Building2, href: '/admin/organizations', access: 'organizations' },
   { label: 'Utilisateurs et admissions', icon: UserRoundCheck, href: '/admin/users', access: 'users' },
   { label: 'Équipes', icon: Workflow, href: '/admin/teams', access: 'teams' },
   { label: 'Groupes et permissions', icon: ShieldCheck, href: '/admin/groups', access: 'groups' },
-  { label: 'Paramètres', icon: Settings, href: '/admin/settings/authentication' },
+  { label: 'Paramètres', icon: Settings, children: ['Référentiel authentification'] },
 ]
 
 const sidebarScrollStorageKey = 'veillio:sidebar-scroll-top'
@@ -126,7 +131,7 @@ function Brand() {
 }
 
 export function Sidebar({ open, onClose, activeItem = 'Tableau de bord' }: { open: boolean; onClose: () => void; activeItem?: string }) {
-  const [expandedMenus, setExpandedMenus] = useState(() => new Set(['Intégrations', 'Gestion de l’IA']))
+  const [expandedMenus, setExpandedMenus] = useState(() => new Set(['Intégrations', 'Gestion de l’IA', 'Paramètres']))
   const navigationRef = useRef<HTMLElement>(null)
   const restoredScrollRef = useRef(false)
   const { viewer, isLoading } = useViewer()
