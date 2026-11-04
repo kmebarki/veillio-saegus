@@ -37,8 +37,8 @@ export function ConnectionForm({ target, overview, onClose, onDone }: Props) {
   const [name, setName] = useState(editing?.name ?? '')
   const [description, setDescription] = useState(editing?.description ?? '')
   const [logoUrl, setLogoUrl] = useState(editing?.logoUrl ?? '')
-  const [scope, setScope] = useState<ConnectionScope>(editing?.scope ?? (overview.viewer.canManage ? 'organization' : 'private'))
-  const [organizationIds, setOrganizationIds] = useState<string[]>(editing?.organizationIds ?? (overview.organizations[0] ? [overview.organizations[0].id] : []))
+const [scope, setScope] = useState<ConnectionScope>(editing?.scope ?? 'private')
+const [organizationIds, setOrganizationIds] = useState<string[]>(editing?.organizationIds ?? [])
   const [lifecycle, setLifecycle] = useState<ConnectionLifecycle>(editing?.lifecycle === 'draft' ? 'draft' : 'active')
   const [username, setUsername] = useState(editing?.username ?? '')
   const [secret, setSecret] = useState('')
@@ -161,14 +161,14 @@ export function ConnectionForm({ target, overview, onClose, onDone }: Props) {
           <legend className="mb-1 text-sm font-medium">Portée d’utilisation</legend>
           <div className="grid gap-2 sm:grid-cols-3">
             {([
-              { id: 'private', title: 'Privée', text: 'Visible uniquement par vous.', icon: User, disabled: false },
-              { id: 'organization', title: 'Organisation', text: 'Limitée aux organisations choisies.', icon: Users, disabled: !overview.viewer.canManage },
-              { id: 'public', title: 'Publique', text: 'Disponible pour toute la plateforme.', icon: Globe2, disabled: !overview.viewer.canManage },
+              { id: 'private', title: 'Privée', text: 'Visible uniquement par vous.', disabledText: '', icon: User, disabled: false },
+              { id: 'organization', title: 'Organisation', text: 'Limitée à votre organisation actuelle.', disabledText: 'Réservé aux gestionnaires.', icon: Users, disabled: !overview.viewer.canManage },
+              { id: 'public', title: 'Publique', text: 'Disponible pour toute la plateforme.', disabledText: 'Approbation de publication non configurée.', icon: Globe2, disabled: true },
             ] as const).map((option) => (
               <label key={option.id} className={cn('flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm transition-colors', scope === option.id ? 'border-primary bg-primary/5 ring-2 ring-primary/15' : 'bg-card', option.disabled && 'cursor-not-allowed opacity-50')}>
                 <input type="radio" name="scope" value={option.id} checked={scope === option.id} disabled={option.disabled} onChange={() => setScope(option.id)} className="sr-only" />
                 <option.icon className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-                <span><span className="block font-medium">{option.title}</span><span className="text-xs leading-5 text-muted-foreground">{option.disabled ? 'Réservé aux gestionnaires.' : option.text}</span></span>
+                <span><span className="block font-medium">{option.title}</span><span className="text-xs leading-5 text-muted-foreground">{option.disabled ? option.disabledText : option.text}</span></span>
               </label>
             ))}
           </div>

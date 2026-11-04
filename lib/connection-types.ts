@@ -52,6 +52,8 @@ export type ConnectionSummary = {
   lastCheckMessage: string | null
   testedCurrentVersion: boolean
   canEdit: boolean
+  canTest: boolean
+  canArchive: boolean
   createdAt: string
   updatedAt: string
 }

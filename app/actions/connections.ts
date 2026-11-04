@@ -12,7 +12,8 @@ import type { ConnectionActivityEntry, ConnectionsOverview, ConnectionSummary } 
 import type { TestOutcome } from '@/lib/connector-types'
 import { runConnectorTest } from '@/lib/connectors/engine'
 import { activatePreparedSecret, putSecret, readLegacySecret, readSecret, revokeSecret } from '@/lib/authentication/vault'
-import { getDefaultOrganization, requirePermission } from '@/lib/authorization'
+import { requirePermission } from '@/lib/authorization'
+import { canMutateConnection, canViewConnection } from '@/lib/connections/access-policy'
 import { evaluateConnectionRuntime, resolveOperationalRuntime } from '@/lib/connections/registry'
 import { db } from '@/lib/db'
 import { auditEvents, connectionOrganizationAccess, connectionSecretBindings, connectionTestJobs, connections, connectors, organizations, sources, users } from '@/lib/db/schema'
@@ -143,31 +144,25 @@ async function loadConnector(id: string) {
 type Actor = Awaited<ReturnType<typeof requirePermission>>
 
 async function getActorOrganization(actor: Actor) {
-  if (actor.organizationId) {
-    const [organization] = await db.select({ id: organizations.id, name: organizations.name }).from(organizations).where(eq(organizations.id, actor.organizationId)).limit(1)
-    if (organization) return organization
-  }
-  return getDefaultOrganization()
+  if (!actor.organizationId) return null
+  const [organization] = await db.select({ id: organizations.id, name: organizations.name }).from(organizations).where(eq(organizations.id, actor.organizationId)).limit(1)
+  return organization ?? null
 }
 
 async function canSee(actor: Actor, row: Row) {
-  if (row.scope === 'private') return row.ownerUserId === actor.id
-  if (row.scope === 'public' || actor.permissions.includes('connections.manage')) return true
-  if (!actor.organizationId) return false
-  const [access] = await db
-    .select({ id: connectionOrganizationAccess.id })
+  const access = await db
+    .select({ organizationId: connectionOrganizationAccess.organizationId })
     .from(connectionOrganizationAccess)
-    .where(and(eq(connectionOrganizationAccess.connectionId, row.id), eq(connectionOrganizationAccess.organizationId, actor.organizationId)))
-    .limit(1)
-  if (access) return true
-  const [configuredAccess] = await db.select({ id: connectionOrganizationAccess.id }).from(connectionOrganizationAccess).where(eq(connectionOrganizationAccess.connectionId, row.id)).limit(1)
-  return !configuredAccess && row.organizationId === actor.organizationId
+    .where(eq(connectionOrganizationAccess.connectionId, row.id))
+  return canViewConnection(
+    { userId: actor.id, organizationId: actor.organizationId },
+    row,
+    access.map((item) => item.organizationId),
+  )
 }
 
 function canEdit(actor: Actor, row: Row) {
-  if (row.lifecycle === 'archived') return false
-  if (row.scope !== 'private') return actor.permissions.includes('connections.manage')
-  return row.ownerUserId === actor.id
+  return canMutateConnection({ userId: actor.id, organizationId: actor.organizationId }, row)
 }
 
 function isoDay(date: Date) {
@@ -238,7 +233,9 @@ function toSummary(actor: Actor, row: Row, connectorRow: ConnectorRow, ownerName
     lastCheckAt: row.lastCheckAt ? dateTimeFormatter.format(row.lastCheckAt) : null,
     lastCheckMessage: row.lastCheckMessage,
     testedCurrentVersion: row.lastCheckVersion === row.version,
-    canEdit: canEdit(actor, row),
+    canEdit: canEdit(actor, row) && hasCapability(actor, 'connections.create'),
+    canTest: canEdit(actor, row) && hasCapability(actor, 'connections.test'),
+    canArchive: canEdit(actor, row) && hasCapability(actor, 'connections.archive'),
     createdAt: dateTimeFormatter.format(row.createdAt),
     updatedAt: dateTimeFormatter.format(row.updatedAt),
   }
@@ -272,13 +269,13 @@ export async function getConnectionsOverview(): Promise<ConnectionsOverview> {
     .filter((row) => {
       if (row.scope === 'private') return row.ownerUserId === actor.id
       if (row.scope === 'public') return true
-      const ids = accessByConnection.get(row.id) ?? [row.organizationId]
+      const ids = accessByConnection.get(row.id) ?? []
       return ids.includes(organization.id)
     })
     .flatMap((row) => {
       const connectorRow = connectorById.get(row.connectorId)
       if (!connectorRow) return []
-      const organizationIds = row.scope === 'organization' ? (accessByConnection.get(row.id) ?? [row.organizationId]) : []
+      const organizationIds = row.scope === 'organization' ? (accessByConnection.get(row.id) ?? []) : []
       return [toSummary(actor, row, connectorRow, row.ownerUserId ? (names.get(row.ownerUserId) ?? 'Utilisateur') : 'Organisation', organizationIds, organizationIds.map((id) => organizationNames.get(id) ?? 'Organisation'))]
     })
 
@@ -286,7 +283,7 @@ export async function getConnectionsOverview(): Promise<ConnectionsOverview> {
     const kind = kindOf(row)
     const config = readConfig(kind, row.config)
     const requiresAuth = needsSecret(config.auth.type)
-    const runtime = requiresAuth ? await runtimeDecisionFor(row, methodIdForAuth(config.auth.type)) : { usable: true, reasons: [] as string[] }
+    const runtime = await runtimeDecisionFor(row, methodIdForAuth(config.auth.type))
     return {
       id: row.id,
       name: row.name,
@@ -307,7 +304,7 @@ export async function getConnectionsOverview(): Promise<ConnectionsOverview> {
   return {
     viewer: { id: actor.id, canManage: actor.permissions.includes('connections.manage') },
     organizationName: organization.name,
-    organizations: organizationRows,
+    organizations: organizationRows.filter((item) => item.id === actor.organizationId),
     connections: summaries,
     connectors: choices,
     stats: {
@@ -331,12 +328,9 @@ export async function createConnection(input: unknown): Promise<{ ok: true; mess
   const organizationIds = scope === 'organization' ? [...new Set(parsed.data.organizationIds)] : []
 
   if (scope !== 'private' && !actor.permissions.includes('connections.manage')) return fail('Vous n’avez pas le droit de créer une connexion partagée ou publique.')
+  if (scope === 'public') return fail('La publication publique nécessite une approbation qui n’est pas encore configurée.')
   if (scope === 'organization' && organizationIds.length === 0) return fail('Sélectionnez au moins une organisation.')
-  if (organizationIds.length > 0) {
-    const allowedOrganizations = await db.select({ id: organizations.id }).from(organizations)
-    const allowedIds = new Set(allowedOrganizations.map((item) => item.id))
-    if (organizationIds.some((id) => !allowedIds.has(id))) return fail('Une organisation sélectionnée est introuvable.')
-  }
+  if (organizationIds.some((id) => id !== actor.organizationId)) return fail('Vous ne pouvez autoriser que votre organisation actuelle.')
 
   const connectorRow = await loadConnector(connectorId)
   if (!connectorRow || connectorRow.organizationId !== organization.id) return fail('Connecteur introuvable.')
@@ -361,7 +355,7 @@ export async function createConnection(input: unknown): Promise<{ ok: true; mess
   if (!runtime.usable || !runtime.methodVersion) return fail(`Cette méthode n’est pas disponible au runtime : ${runtime.reasons.join(', ')}.`)
   const methodVersion = runtime.methodVersion
 
-  const secretRef = await putSecret({ organizationId: organization.id, connectionId: id, fieldCode: 'credential', purpose: 'create', ownerUserId: scope === 'private' ? actor.id : null, plaintext: credentials.secret, hint: secretHintOf(credentials.secret) })
+  const secretRef = await putSecret({ organizationId: organization.id, connectionId: id, fieldCode: 'credential', purpose: 'create', ownerUserId: actor.id, plaintext: credentials.secret, hint: secretHintOf(credentials.secret) })
   await db.transaction(async (tx) => {
     await tx.insert(connections).values({
       id,
@@ -372,9 +366,9 @@ export async function createConnection(input: unknown): Promise<{ ok: true; mess
       description: parsed.data.description || null,
       logoUrl: parsed.data.logoUrl || null,
       scope,
-      ownerUserId: scope === 'private' ? actor.id : null,
-      ownerKind: scope === 'private' ? 'user' : 'organization',
-      ownerId: scope === 'private' ? actor.id : organization.id,
+      ownerUserId: actor.id,
+      ownerKind: 'user',
+      ownerId: actor.id,
       lifecycle,
       health: 'unverified',
       origin: 'manual',
@@ -413,12 +407,9 @@ export async function updateConnection(input: unknown): Promise<{ ok: true; mess
 
   const organizationIds = parsed.data.scope === 'organization' ? [...new Set(parsed.data.organizationIds)] : []
   if (parsed.data.scope !== 'private' && !actor.permissions.includes('connections.manage')) return fail('Vous n’avez pas le droit de partager ou publier cette connexion.')
+  if (parsed.data.scope === 'public' && row.scope !== 'public') return fail('La publication publique nécessite une approbation qui n’est pas encore configurée.')
   if (parsed.data.scope === 'organization' && organizationIds.length === 0) return fail('Sélectionnez au moins une organisation.')
-  if (organizationIds.length > 0) {
-    const allowedOrganizations = await db.select({ id: organizations.id }).from(organizations)
-    const allowedIds = new Set(allowedOrganizations.map((item) => item.id))
-    if (organizationIds.some((id) => !allowedIds.has(id))) return fail('Une organisation sélectionnée est introuvable.')
-  }
+  if (organizationIds.some((id) => id !== actor.organizationId)) return fail('Vous ne pouvez autoriser que votre organisation actuelle.')
 
   const connectorRow = await loadConnector(row.connectorId)
   if (!connectorRow) return fail('Le connecteur associé est introuvable.')
@@ -468,9 +459,6 @@ export async function updateConnection(input: unknown): Promise<{ ok: true; mess
         logoUrl: parsed.data.logoUrl || null,
         scope: parsed.data.scope,
         lifecycle: parsed.data.lifecycle,
-        ownerUserId: parsed.data.scope === 'private' ? actor.id : null,
-        ownerKind: parsed.data.scope === 'private' ? 'user' : parsed.data.scope === 'public' ? 'platform' : 'organization',
-        ownerId: parsed.data.scope === 'private' ? actor.id : parsed.data.scope === 'public' ? 'platform' : (organizationIds[0] ?? row.organizationId),
         username: username.value || null,
         config: username.value ? { ...row.config, username: username.value } : row.config,
         secretRef: nextSecretRef,
