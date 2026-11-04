@@ -31,6 +31,15 @@ describe('sélection des méthodes d’authentification', () => {
     })).toEqual({ handlerKey: 'http-basic', handlerVersion: '1.0.0' })
   })
 
+  it('active automatiquement les accès publics RSS sans identifiants', () => {
+    expect(resolveBundledOperationalRuntime({
+      methodId: 'NONE',
+      methodVersion: '1.0.0',
+      adapterId: 'rss',
+      adapterVersion: '1.0.0',
+    })).toEqual({ handlerKey: 'none', handlerVersion: '1.0.0' })
+  })
+
   it('ne contourne pas la qualification pour un adaptateur non intégré', () => {
     expect(resolveBundledOperationalRuntime({
       methodId: 'BASIC_AUTH',

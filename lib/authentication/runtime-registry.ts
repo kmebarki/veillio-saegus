@@ -19,6 +19,9 @@ const BUILTIN_HANDLERS: AuthRuntimeHandler[] = [
 for (const handler of BUILTIN_HANDLERS) handlers.set(`${handler.key}@${handler.version}`, handler)
 
 const BUNDLED_OPERATIONAL_TARGETS = [
+  { methodId: 'NONE', methodVersion: '1.0.0', adapterId: 'rss', adapterVersion: '1.0.0', handlerKey: 'none', handlerVersion: '1.0.0' },
+  { methodId: 'NONE', methodVersion: '1.0.0', adapterId: 'web', adapterVersion: '1.0.0', handlerKey: 'none', handlerVersion: '1.0.0' },
+  { methodId: 'NONE', methodVersion: '1.0.0', adapterId: 'api', adapterVersion: '1.0.0', handlerKey: 'none', handlerVersion: '1.0.0' },
   { methodId: 'BASIC_AUTH', methodVersion: '1.1.0', adapterId: 'imap', adapterVersion: '1.0.0', handlerKey: 'http-basic', handlerVersion: '1.0.0' },
 ] as const
 
