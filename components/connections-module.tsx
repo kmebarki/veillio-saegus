@@ -102,7 +102,7 @@ export function ConnectionsModule({ overview }: { overview: ConnectionsOverview 
     { id: 'public', label: 'Publiques' },
     { id: 'attention', label: 'À surveiller' },
   ]
-  const canCreate = connectors.some((item) => item.requiresAuth && item.runtimeAvailable)
+  const hasEligibleConnector = connectors.some((item) => item.requiresAuth && item.runtimeAvailable)
 
   return (
     <div className="min-h-dvh bg-background">
@@ -122,7 +122,7 @@ export function ConnectionsModule({ overview }: { overview: ConnectionsOverview 
                 <h1 className="text-2xl font-semibold tracking-[-0.04em] sm:text-[30px]">Connexions</h1>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Une Connexion est un accès opérationnel versionné à un service, avec une portée privée ou organisationnelle. La publication plateforme suit un parcours d’approbation séparé. Le <Link href="/admin/connectors" className="font-medium text-primary underline-offset-4 hover:underline">Connecteur</Link> définit seulement comment communiquer avec le fournisseur.</p>
               </div>
-              {canCreate && <Button onClick={() => setForm({ mode: 'create' })}><Plus data-icon="inline-start" />Nouvelle connexion</Button>}
+              <Button onClick={() => setForm({ mode: 'create' })}><Plus data-icon="inline-start" />Nouvelle connexion</Button>
             </section>
 
             <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Indicateurs">
@@ -216,13 +216,13 @@ export function ConnectionsModule({ overview }: { overview: ConnectionsOverview 
                   <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-muted-foreground">
                     {connections.length > 0
                       ? 'Modifiez vos filtres ou votre recherche.'
-                      : canCreate
+                      : hasEligibleConnector
                         ? 'Ajoutez la clé API ou le jeton d’un fournisseur pour que les connecteurs authentifiés puissent interroger ses données.'
-                        : 'Aucune combinaison méthode, adaptateur et preuve runtime n’est actuellement activable. Publiez et attestez une méthode dans le référentiel Authentification.'}
+                        : 'Aucune combinaison méthode, adaptateur et preuve runtime n’est actuellement activable. Vous pouvez ouvrir le parcours pour consulter le motif de chaque indisponibilité.'}
                   </p>
                 </div>
-                {connections.length === 0 && canCreate && <Button onClick={() => setForm({ mode: 'create' })}><Plus data-icon="inline-start" />Créer une connexion</Button>}
-                {!canCreate && <Link href="/admin/connectors" className={buttonVariants({ variant: 'outline' })}>Ouvrir les connecteurs</Link>}
+                {connections.length === 0 && <Button onClick={() => setForm({ mode: 'create' })}><Plus data-icon="inline-start" />Créer une connexion</Button>}
+                {!hasEligibleConnector && <Link href="/admin/connectors" className={buttonVariants({ variant: 'outline' })}>Ouvrir les connecteurs</Link>}
               </section>
             )}
           </div>

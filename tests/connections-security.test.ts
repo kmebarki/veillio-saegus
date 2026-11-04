@@ -7,6 +7,7 @@ import { evaluateAvailability } from '../lib/authentication/runtime-registry'
 import { canMutateConnection, canViewConnection } from '../lib/connections/access-policy'
 
 const connectionActions = readFileSync(resolve(process.cwd(), 'app/actions/connections.ts'), 'utf8')
+const connectionModule = readFileSync(resolve(process.cwd(), 'components/connections-module.tsx'), 'utf8')
 const executionGrants = readFileSync(resolve(process.cwd(), 'lib/connections/execution-grant.ts'), 'utf8')
 
 describe('propriété et visibilité des Connexions', () => {
@@ -53,6 +54,13 @@ describe('gates runtime fail-closed', () => {
     expect(evaluateAvailability({ ...completeEvidence, securityReviewed: false }, 'disponible')).toMatchObject({ available: false, missing: ['revue de sécurité indépendante'] })
     expect(evaluateAvailability({ ...completeEvidence, compatibilityVerified: false }, 'disponible')).toMatchObject({ available: false, missing: ['compatibilité adaptateur'] })
     expect(evaluateAvailability({ ...completeEvidence, handlerKey: 'inconnu' }, 'disponible')).toMatchObject({ available: false, missing: ['handler déployé et enregistré'] })
+  })
+})
+
+describe('parcours de création', () => {
+  it('garde le bouton Nouvelle connexion visible même sans runtime qualifié', () => {
+    expect(connectionModule).toContain('<Button onClick={() => setForm({ mode: \'create\' })}><Plus data-icon="inline-start" />Nouvelle connexion</Button>')
+    expect(connectionModule).not.toContain('{canCreate && <Button')
   })
 })
 
