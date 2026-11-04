@@ -5,6 +5,7 @@
   "packageManager": "pnpm@12.3.4",
   "scripts": {
     "dev": "next dev",
+    "dev:local": "next dev --experimental-https",
     "build": "next build",
     "start": "next start",
     "test": "vitest run"

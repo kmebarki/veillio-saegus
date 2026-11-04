@@ -92,6 +92,7 @@ export const auth = betterAuth({
     ...(process.env.NODE_ENV === 'development'
       ? [
           'http://localhost:3000',
+          'https://localhost:3000',
           ...(process.env.V0_RUNTIME_URL ? [process.env.V0_RUNTIME_URL] : []),
           ...(process.env.V0_DEV_APP_URL ? [process.env.V0_DEV_APP_URL] : []),
           ...(process.env.V0_BUILD_URL ? [process.env.V0_BUILD_URL] : []),
