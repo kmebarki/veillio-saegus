@@ -1,4 +1,4 @@
-import { bigserial, boolean, integer, jsonb, pgTable, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core'
+import { bigserial, boolean, integer, jsonb, pgTable, primaryKey, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core'
 
 export const users = pgTable('user', {
   id: text('id').primaryKey(),
@@ -345,6 +345,18 @@ export const connections = pgTable('connections', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
+
+export const connectionOrganizationAccess = pgTable(
+  'connection_organization_access',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('user_id').notNull(),
+    connectionId: uuid('connection_id').notNull().references(() => connections.id, { onDelete: 'cascade' }),
+    organizationId: uuid('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [unique('connection_organization_access_unique').on(table.userId, table.connectionId, table.organizationId)],
+)
 
 export type StoredSourceDefinition = {
   notes?: string

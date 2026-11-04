@@ -36,7 +36,7 @@ export function ConnectorsModule({ overview }: { overview: ConnectorsOverview })
         </header>
 
         <main className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-          {view.type === 'catalog' && <ConnectorsCatalog overview={overview} onCreate={() => setView({ type: 'create' })} onOpen={(id) => setView({ type: 'detail', id })} />}
+          {view.type === 'catalog' && <ConnectorsCatalog overview={overview} onCreate={() => setView({ type: 'create' })} onOpen={(id) => setView({ type: 'detail', id })} onNotify={notify} />}
           {view.type === 'create' && <ConnectorWizard onCancel={() => setView({ type: 'catalog' })} onCreated={(message, id) => { notify(message); router.refresh(); setView({ type: 'detail', id }) }} />}
           {view.type === 'detail' && <ConnectorDetailPage connectorId={view.id} viewer={overview.viewer} onBack={() => setView({ type: 'catalog' })} onNotify={(message) => { notify(message); router.refresh() }} onOpenConnector={(id) => setView({ type: 'detail', id })} />}
         </main>

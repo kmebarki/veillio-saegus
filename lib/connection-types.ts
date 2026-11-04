@@ -27,6 +27,8 @@ export type ConnectionSummary = {
   authType: string
   keyName: string
   scope: ConnectionScope
+  organizationIds: string[]
+  organizationNames: string[]
   lifecycle: ConnectionLifecycle
   connectionHealth: ConnectionHealth
   origin: 'manual' | 'source' | 'automatic_none' | 'migration'
@@ -70,9 +72,12 @@ export type ConnectorChoice = {
   runtimeReason: string
 }
 
+export type OrganizationChoice = { id: string; name: string }
+
 export type ConnectionsOverview = {
   viewer: { id: string; canManage: boolean }
   organizationName: string
+  organizations: OrganizationChoice[]
   connections: ConnectionSummary[]
   connectors: ConnectorChoice[]
   stats: { total: number; shared: number; personal: number; attention: number }

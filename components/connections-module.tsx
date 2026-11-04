@@ -1,19 +1,20 @@
 'use client'
 
-import { Bell, CircleHelp, KeyRound, Menu, Plus, Search, Settings, TriangleAlert } from 'lucide-react'
+import { Bell, ChevronLeft, ChevronRight, CircleHelp, Globe2, KeyRound, Menu, Pencil, PlugZap, Plus, Search, Settings, Trash2, TriangleAlert, User, Users } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 
 import { deleteConnection, getConnectionActivity, testConnection } from '@/app/actions/connections'
-import { ConnectionCard } from '@/components/connections/connection-card'
 import { ConnectionDetail } from '@/components/connections/connection-detail'
 import { ConnectionForm, type FormTarget } from '@/components/connections/connection-form'
 import { inputClass, needsAttention } from '@/components/connections/helpers'
 import { TestResult } from '@/components/connections/test-result'
-import { KindIcon } from '@/components/connector-ui'
+import { ConnectorLogo, HealthDot, KindIcon } from '@/components/connector-ui'
+import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { UserMenu } from '@/components/user-menu'
 import { Sidebar } from '@/components/veillio-dashboard'
 import type { ConnectionActivityEntry, ConnectionSummary, ConnectionsOverview } from '@/lib/connection-types'
@@ -22,12 +23,15 @@ import { cn } from '@/lib/utils'
 
 type Filter = 'all' | 'organization' | 'public' | 'private' | 'attention'
 
+const PAGE_SIZE = 8
+
 export function ConnectionsModule({ overview }: { overview: ConnectionsOverview }) {
   const router = useRouter()
   const { viewer, connections, connectors, stats } = overview
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
+  const [page, setPage] = useState(1)
   const [form, setForm] = useState<FormTarget | null>(null)
   const [toDelete, setToDelete] = useState<ConnectionSummary | null>(null)
   const [detailId, setDetailId] = useState<string | null>(null)
@@ -53,6 +57,9 @@ export function ConnectionsModule({ overview }: { overview: ConnectionsOverview 
       return inFilter && (!needle || `${item.name} ${item.connectorName} ${item.username} ${item.host}`.toLowerCase().includes(needle))
     })
   }, [connections, query, filter])
+  const pages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
+  const currentPage = Math.min(page, pages)
+  const rows = visible.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
   function notify(message: string) {
     setToast(message)
@@ -143,11 +150,11 @@ export function ConnectionsModule({ overview }: { overview: ConnectionsOverview 
                 <label className="relative flex-1">
                   <span className="sr-only">Rechercher une connexion</span>
                   <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <input value={query} onChange={(event) => setQuery(event.target.value)} className={cn(inputClass, 'pl-9')} placeholder="Rechercher par nom, connecteur, hôte ou identifiant" />
+                  <input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1) }} className={cn(inputClass, 'pl-9')} placeholder="Rechercher par nom, connecteur, hôte ou identifiant" />
                 </label>
                 <div className="flex gap-1 overflow-x-auto" role="tablist" aria-label="Filtrer les connexions">
                   {filters.map((item) => (
-                    <button key={item.id} type="button" role="tab" aria-selected={filter === item.id} onClick={() => setFilter(item.id)} className={cn('inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium transition-colors', filter === item.id ? 'border-primary bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:text-foreground')}>
+                    <button key={item.id} type="button" role="tab" aria-selected={filter === item.id} onClick={() => { setFilter(item.id); setPage(1) }} className={cn('inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium transition-colors', filter === item.id ? 'border-primary bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:text-foreground')}>
                       {item.label}<span className={cn('text-xs', filter === item.id ? 'text-primary-foreground/80' : 'text-muted-foreground')}>{counts[item.id]}</span>
                     </button>
                   ))}
@@ -156,10 +163,50 @@ export function ConnectionsModule({ overview }: { overview: ConnectionsOverview 
             )}
 
             {visible.length > 0 ? (
-              <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" aria-label="Liste des connexions">
-                {visible.map((connection) => (
-                  <ConnectionCard key={connection.id} connection={connection} busy={busyId === connection.id} onOpen={() => openDetail(connection)} onEdit={() => setForm({ mode: 'edit', connection })} onTest={() => void test(connection)} onDelete={() => setToDelete(connection)} />
-                ))}
+              <section className="overflow-hidden rounded-2xl border bg-card" aria-label="Liste des connexions">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Connexion</TableHead>
+                      <TableHead>Portée</TableHead>
+                      <TableHead>Statut</TableHead>
+                      <TableHead>Santé</TableHead>
+                      <TableHead>Dernier contrôle</TableHead>
+                      <TableHead className="text-right"><span className="sr-only">Actions</span></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rows.map((connection) => {
+                      const ScopeIcon = connection.scope === 'private' ? User : connection.scope === 'public' ? Globe2 : Users
+                      const scopeLabel = connection.scope === 'private' ? 'Privée' : connection.scope === 'public' ? 'Publique' : connection.organizationNames.length > 1 ? `${connection.organizationNames.length} organisations` : (connection.organizationNames[0] ?? 'Organisation')
+                      return (
+                        <TableRow key={connection.id} className="group cursor-pointer" onClick={() => openDetail(connection)}>
+                          <TableCell>
+                            <div className="flex max-w-80 items-center gap-3">
+                              <ConnectorLogo kind={connection.connectorKind} logoUrl={connection.logoUrl || connection.connectorLogoUrl} className="size-10 rounded-xl" />
+                              <div className="min-w-0"><p className="truncate font-semibold group-hover:text-primary">{connection.name}</p><p className="mt-1 truncate text-xs text-muted-foreground">{connection.connectorName}{connection.host ? ` · ${connection.host}` : ''}</p></div>
+                            </div>
+                          </TableCell>
+                          <TableCell><span className="inline-flex max-w-48 items-center gap-1.5 text-sm"><ScopeIcon className="size-4 shrink-0 text-primary" aria-hidden /><span className="truncate">{scopeLabel}</span></span></TableCell>
+                          <TableCell><Badge variant={connection.lifecycle === 'active' ? 'default' : 'outline'}>{connection.lifecycle === 'active' ? 'Active' : connection.lifecycle === 'draft' ? 'Brouillon' : connection.lifecycle === 'suspended' ? 'Suspendue' : 'Archivée'}</Badge></TableCell>
+                          <TableCell><HealthDot connector={connection} /></TableCell>
+                          <TableCell><p className="text-sm">{connection.lastCheckAt ?? 'Jamais testée'}</p><p className="mt-1 max-w-48 truncate text-xs text-muted-foreground">{connection.lastCheckMessage ?? 'Test recommandé'}</p></TableCell>
+                          <TableCell className="text-right">
+                            {connection.canEdit && <div className="flex justify-end gap-1">
+                              <Button variant="ghost" size="icon" disabled={busyId === connection.id} aria-label={`Tester ${connection.name}`} onClick={(event) => { event.stopPropagation(); void test(connection) }}><PlugZap /></Button>
+                              <Button variant="ghost" size="icon" disabled={busyId === connection.id} aria-label={`Modifier ${connection.name}`} onClick={(event) => { event.stopPropagation(); setForm({ mode: 'edit', connection }) }}><Pencil /></Button>
+                              <Button variant="ghost" size="icon" disabled={busyId === connection.id} className="text-destructive hover:text-destructive" aria-label={`Archiver ${connection.name}`} onClick={(event) => { event.stopPropagation(); setToDelete(connection) }}><Trash2 /></Button>
+                            </div>}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+                <nav className="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between" aria-label="Pagination des connexions">
+                  <p className="text-sm text-muted-foreground">{(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, visible.length)} sur {visible.length}</p>
+                  <div className="flex items-center gap-2"><Button variant="outline" size="sm" disabled={currentPage === 1} onClick={() => setPage((value) => value - 1)}><ChevronLeft data-icon="inline-start" />Précédent</Button><span className="min-w-20 text-center text-sm font-medium">{currentPage} / {pages}</span><Button variant="outline" size="sm" disabled={currentPage === pages} onClick={() => setPage((value) => value + 1)}>Suivant<ChevronRight data-icon="inline-end" /></Button></div>
+                </nav>
               </section>
             ) : (
               <section className="flex flex-col items-center gap-4 rounded-2xl border border-dashed bg-card px-6 py-16 text-center">

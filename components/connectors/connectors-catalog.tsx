@@ -9,13 +9,17 @@ import {
   Database,
   Download,
   Gauge,
+  Pencil,
   Plus,
   Search,
   ShieldCheck,
   SlidersHorizontal,
+  Trash2,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useMemo, useState, useTransition } from 'react'
 
+import { deleteConnector } from '@/app/actions/connectors'
 import { ConnectorLogo, HealthDot, StatusBadge } from '@/components/connector-ui'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -32,6 +36,7 @@ type Props = {
   overview: ConnectorsOverview
   onCreate: () => void
   onOpen: (id: string) => void
+  onNotify: (message: string) => void
 }
 
 function MetricCard({ label, value, detail, icon: Icon }: { label: string; value: string | number; detail: string; icon: typeof Database }) {
@@ -65,12 +70,16 @@ function exportCsv(connectors: ConnectorSummary[]) {
   URL.revokeObjectURL(url)
 }
 
-export function ConnectorsCatalog({ overview, onCreate, onOpen }: Props) {
+export function ConnectorsCatalog({ overview, onCreate, onOpen, onNotify }: Props) {
+  const router = useRouter()
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState<ServiceCategory | 'all'>('all')
   const [status, setStatus] = useState<'all' | ConnectorSummary['status']>('all')
   const [health, setHealth] = useState<'all' | ConnectorSummary['health']>('all')
   const [page, setPage] = useState(1)
+  const [deleteTarget, setDeleteTarget] = useState<ConnectorSummary | null>(null)
+  const [deleteError, setDeleteError] = useState('')
+  const [isPending, startTransition] = useTransition()
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase('fr')
@@ -88,6 +97,21 @@ export function ConnectorsCatalog({ overview, onCreate, onOpen }: Props) {
 
   function resetPage() {
     setPage(1)
+  }
+
+  function confirmDelete() {
+    if (!deleteTarget || deleteTarget.status === 'active') return
+    setDeleteError('')
+    startTransition(async () => {
+      const result = await deleteConnector({ id: deleteTarget.id })
+      if (!result.ok) {
+        setDeleteError(result.message)
+        return
+      }
+      setDeleteTarget(null)
+      onNotify(result.message)
+      router.refresh()
+    })
   }
 
   return (
@@ -115,8 +139,29 @@ export function ConnectorsCatalog({ overview, onCreate, onOpen }: Props) {
 
         {rows.length > 0 ? (
           <Table>
-            <TableHeader><TableRow><TableHead>Connecteur</TableHead><TableHead>Service / Adaptateur</TableHead><TableHead>Authentification</TableHead><TableHead>Statut</TableHead><TableHead>Dernier contrôle</TableHead><TableHead className="text-right"><span className="sr-only">Ouvrir</span></TableHead></TableRow></TableHeader>
-            <TableBody>{rows.map((connector) => { const service = getServiceDefinition(connector.serviceId); return <TableRow key={connector.id} className="group cursor-pointer" onClick={() => onOpen(connector.id)}><TableCell><div className="flex max-w-72 items-center gap-3"><ConnectorLogo kind={connector.kind} logoUrl={connector.logoUrl} className="size-10 rounded-xl" /><div className="min-w-0"><p className="truncate font-semibold group-hover:text-primary">{connector.name}</p><p className="mt-1 truncate text-xs text-muted-foreground">{connector.host || connector.description || 'Configuration à compléter'}</p></div></div></TableCell><TableCell><p className="text-sm font-medium">{connector.provider}</p><p className="mt-1 text-xs text-muted-foreground">{connector.adapter}</p>{service && <Badge variant="outline" className="mt-2">{service.category}</Badge>}</TableCell><TableCell><p className="max-w-48 truncate text-xs font-mono">{connector.authMethods.join(' · ') || 'NONE'}</p></TableCell><TableCell><StatusBadge status={connector.status} /></TableCell><TableCell><div className="flex flex-col gap-1"><HealthDot connector={connector} /><span className="text-xs text-muted-foreground">{connector.lastCheckAt ?? 'Aucun test'}</span></div></TableCell><TableCell className="text-right"><Button variant="ghost" size="icon" onClick={(event) => { event.stopPropagation(); onOpen(connector.id) }} aria-label={`Ouvrir ${connector.name}`}><ChevronRight /></Button></TableCell></TableRow> })}</TableBody>
+            <TableHeader><TableRow><TableHead>Connecteur</TableHead><TableHead>Service / Adaptateur</TableHead><TableHead>Authentification</TableHead><TableHead>Statut</TableHead><TableHead>Dernier contrôle</TableHead><TableHead className="text-right"><span className="sr-only">Actions</span></TableHead></TableRow></TableHeader>
+            <TableBody>{rows.map((connector) => {
+              const service = getServiceDefinition(connector.serviceId)
+              return (
+                <TableRow key={connector.id} className="group cursor-pointer" onClick={() => onOpen(connector.id)}>
+                  <TableCell><div className="flex max-w-72 items-center gap-3"><ConnectorLogo kind={connector.kind} logoUrl={connector.logoUrl} className="size-10 rounded-xl" /><div className="min-w-0"><p className="truncate font-semibold group-hover:text-primary">{connector.name}</p><p className="mt-1 truncate text-xs text-muted-foreground">{connector.host || connector.description || 'Configuration à compléter'}</p></div></div></TableCell>
+                  <TableCell><p className="text-sm font-medium">{connector.provider}</p><p className="mt-1 text-xs text-muted-foreground">{connector.adapter}</p>{service && <Badge variant="outline" className="mt-2">{service.category}</Badge>}</TableCell>
+                  <TableCell><p className="max-w-48 truncate text-xs font-mono">{connector.authMethods.join(' · ') || 'NONE'}</p></TableCell>
+                  <TableCell><StatusBadge status={connector.status} /></TableCell>
+                  <TableCell><div className="flex flex-col gap-1"><HealthDot connector={connector} /><span className="text-xs text-muted-foreground">{connector.lastCheckAt ?? 'Aucun test'}</span></div></TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1">
+                      {overview.viewer.canManage ? (
+                        <>
+                          <Button variant="ghost" size="icon" aria-label={`Modifier ${connector.name}`} onClick={(event) => { event.stopPropagation(); onOpen(connector.id) }}><Pencil /></Button>
+                          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" aria-label={`Supprimer ${connector.name}`} onClick={(event) => { event.stopPropagation(); setDeleteError(''); setDeleteTarget(connector) }}><Trash2 /></Button>
+                        </>
+                      ) : <Button variant="ghost" size="icon" aria-label={`Ouvrir ${connector.name}`} onClick={(event) => { event.stopPropagation(); onOpen(connector.id) }}><ChevronRight /></Button>}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )
+            })}</TableBody>
           </Table>
         ) : (
           <Empty className="min-h-72"><EmptyHeader><EmptyMedia variant="icon"><Database /></EmptyMedia><EmptyTitle>{overview.connectors.length ? 'Aucun résultat' : 'Aucun connecteur configuré'}</EmptyTitle><EmptyDescription>{overview.connectors.length ? 'Modifiez la recherche ou les filtres.' : 'Créez un premier contrat technique depuis le catalogue V3.'}</EmptyDescription></EmptyHeader>{!overview.connectors.length && overview.viewer.canManage && <EmptyContent><Button onClick={onCreate}><Plus data-icon="inline-start" />Nouveau connecteur</Button></EmptyContent>}</Empty>
@@ -130,6 +175,23 @@ export function ConnectorsCatalog({ overview, onCreate, onOpen }: Props) {
         <div className="flex gap-3"><ShieldCheck className="mt-0.5 shrink-0 text-primary" /><div><p className="text-sm font-semibold">Connexion</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Valeurs d’accès, secrets et portée.</p></div></div>
         <div className="flex gap-3"><Activity className="mt-0.5 shrink-0 text-primary" /><div><p className="text-sm font-semibold">Source</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Origine d’information et Connexions autorisées.</p></div></div>
       </section>
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/30 p-4" role="presentation" onClick={() => { if (!isPending) setDeleteTarget(null) }}>
+          <section role="alertdialog" aria-modal="true" aria-labelledby="delete-connector-title" aria-describedby="delete-connector-description" className="w-full max-w-md rounded-2xl border bg-background p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="grid size-11 place-items-center rounded-xl bg-destructive/10 text-destructive"><Trash2 /></div>
+            <h2 id="delete-connector-title" className="mt-4 text-lg font-semibold">Supprimer {deleteTarget.name} ?</h2>
+            <p id="delete-connector-description" className="mt-2 text-sm leading-6 text-muted-foreground">
+              {deleteTarget.status === 'active' ? 'Ce connecteur est actif. Mettez-le en pause avant de pouvoir le supprimer.' : 'Cette action est définitive. Les tests et les connexions associés seront également supprimés.'}
+            </p>
+            {deleteError && <p role="alert" className="mt-4 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{deleteError}</p>}
+            <div className="mt-6 flex justify-end gap-2">
+              <Button variant="outline" disabled={isPending} onClick={() => setDeleteTarget(null)}>Annuler</Button>
+              <Button variant="destructive" disabled={isPending || deleteTarget.status === 'active'} onClick={confirmDelete}>{isPending ? 'Suppression…' : 'Supprimer définitivement'}</Button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   )
 }
