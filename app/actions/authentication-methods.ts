@@ -1,6 +1,6 @@
 'use server'
 
-import { and, eq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
@@ -59,10 +59,21 @@ export async function getAuthenticationOverview(): Promise<AuthenticationOvervie
       statusReason: definition.lifecycle.reason,
       fields: definition.fieldSchema.fields,
       transmission: { type: definition.transmission.type, protocol: definition.transmission.protocol, requiresTls: definition.transmission.requiresTls, bindingsCount: definition.transmission.bindings.length },
-      runtime: { ...runtime, handlerKey: evidence?.handlerKey ?? null, handlerVersion: evidence?.handlerVersion ?? null },
+      runtime: {
+        ...runtime,
+        handlerKey: evidence?.handlerKey ?? null,
+        handlerVersion: evidence?.handlerVersion ?? null,
+        handlerRegistered: !runtime.missing.includes('handler déployé et enregistré'),
+        deployed: evidence?.deployed ?? false,
+        contractTestsPassed: evidence?.contractTestsPassed ?? false,
+        securityReviewed: evidence?.securityReviewed ?? false,
+        enabled: evidence?.enabled ?? false,
+        updatedAt: evidence?.updatedAt.toISOString() ?? null,
+      },
       compatibilityCount,
       authorUserId: row.authorUserId,
       reviewerUserId: row.reviewerUserId,
+      reviewedAt: row.reviewedAt?.toISOString() ?? null,
       isImmutable: row.isImmutable,
       createdAt: row.createdAt.toISOString(),
     }
@@ -112,13 +123,6 @@ export async function transitionAuthenticationMethod(input: unknown): Promise<{ 
   if (!canTransitionAuthMethod(from, parsed.data.target)) return fail(`Transition ${from} → ${parsed.data.target} interdite.`)
   if ((parsed.data.target === 'disponible' || parsed.data.target === 'brouillon') && row.authorUserId === actor.id) return fail('L’auteur ne peut pas réviser sa propre proposition.')
 
-  if (parsed.data.target === 'disponible') {
-    const [evidence] = await db.select().from(authRuntimeEvidence).where(and(eq(authRuntimeEvidence.methodId, row.methodId), eq(authRuntimeEvidence.methodVersion, row.version))).limit(1)
-    const compatibilities = await db.select({ id: authCompatibilities.id }).from(authCompatibilities).where(and(eq(authCompatibilities.methodId, row.methodId), eq(authCompatibilities.methodVersion, row.version), eq(authCompatibilities.enabled, true))).limit(1)
-    const availability = evaluateAvailability({ handlerKey: evidence?.handlerKey ?? null, handlerVersion: evidence?.handlerVersion ?? null, deployed: evidence?.deployed ?? false, securityReviewed: evidence?.securityReviewed ?? false, contractTestsPassed: evidence?.contractTestsPassed ?? false, enabled: evidence?.enabled ?? false, compatibilityVerified: compatibilities.length > 0 }, 'disponible')
-    if (!availability.available) return fail(`Publication refusée : ${availability.missing.join(', ')}.`)
-  }
-
   const definition = row.definition as AuthMethodDefinitionV13
   definition.lifecycle = { status: parsed.data.target, reason: parsed.data.reason, approvedBy: parsed.data.target === 'disponible' ? actor.id : null, approvedAt: parsed.data.target === 'disponible' ? new Date().toISOString() : null }
   await db.transaction(async (tx) => {
@@ -126,5 +130,12 @@ export async function transitionAuthenticationMethod(input: unknown): Promise<{ 
     await tx.insert(auditEvents).values({ actorUserId: actor.id, action: `auth.method.${parsed.data.target}`, targetType: 'auth_method', targetId: row.methodId, metadata: { version: row.version, reason: parsed.data.reason } })
   })
   revalidatePath('/admin/settings/authentication')
-  return { ok: true, message: 'Statut mis à jour et journalisé.' }
+  const messages: Record<AuthLifecycleStatus, string> = {
+    brouillon: 'Corrections demandées.',
+    a_valider: 'Méthode soumise.',
+    disponible: 'Contrat validé.',
+    desactivee: 'Méthode désactivée.',
+    obsolete: 'Méthode déclarée obsolète.',
+  }
+  return { ok: true, message: messages[parsed.data.target] }
 }

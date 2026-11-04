@@ -66,10 +66,5 @@ export function validateAuthMethodDefinition(value: unknown): ContractValidation
 
   const usesHttpTransport = method.transmission.protocol.toLowerCase().startsWith('http') || method.transmission.bindings.some((binding) => binding.channel.startsWith('http.'))
   if (usesHttpTransport && method.transmission.requiresTls === false && method.fieldSchema.fields.some((field) => field.secret)) errors.push('Une méthode HTTP contenant un secret doit exiger TLS.')
-  if (method.lifecycle.status === 'disponible') {
-    const runtime = method.runtime
-    if (!runtime.handlerKey || !runtime.handlerVersion || !runtime.deployed || !runtime.securityReviewed || !runtime.contractTestsPassed || !runtime.enabled) errors.push('Une méthode disponible doit fournir toutes les preuves runtime.')
-  }
-
   return errors.length ? { ok: false, errors } : { ok: true }
 }

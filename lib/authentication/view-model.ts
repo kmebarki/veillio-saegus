@@ -14,10 +14,22 @@ export type AuthenticationMethodView = {
   statusReason: string
   fields: AuthFieldDefinition[]
   transmission: { type: string; protocol: string; requiresTls: boolean; bindingsCount: number }
-  runtime: { available: boolean; missing: string[]; handlerKey: string | null; handlerVersion: string | null }
+  runtime: {
+    available: boolean
+    missing: string[]
+    handlerKey: string | null
+    handlerVersion: string | null
+    handlerRegistered: boolean
+    deployed: boolean
+    contractTestsPassed: boolean
+    securityReviewed: boolean
+    enabled: boolean
+    updatedAt: string | null
+  }
   compatibilityCount: number
   authorUserId: string | null
   reviewerUserId: string | null
+  reviewedAt: string | null
   isImmutable: boolean
   createdAt: string
 }
