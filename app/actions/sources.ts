@@ -216,11 +216,19 @@ export async function createSource(input: unknown): Promise<{ ok: true; message:
   const [duplicate] = await db.select({ id: sources.id }).from(sources).where(duplicateWhere).limit(1)
   if (duplicate) return fail('Une Source de même nom existe déjà dans ce périmètre.')
 
-  const [created] = await db.transaction(async (tx) => {
-    const rows = await tx.insert(sources).values({ organizationId: organization.id, connectorId: connector.id, connectionId: connection?.id ?? null, name: parsed.data.name, description: parsed.data.description || null, imageUrl: parsed.data.imageUrl || null, endpoint: parsed.data.endpoint, scope: parsed.data.scope, ownerUserId: parsed.data.scope === 'user' ? actor.id : null, createdByUserId: actor.id }).returning({ id: sources.id })
-    await tx.insert(auditEvents).values({ actorUserId: actor.id, action: 'source.created', targetType: 'source', targetId: rows[0].id, metadata: { connectorId: connector.id, scope: parsed.data.scope, connectionScope: connection?.scope ?? null } })
-    return rows
+  const created = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${connector.id}::text, 0))`)
+    const [currentConnector] = await tx
+      .select({ id: connectors.id })
+      .from(connectors)
+      .where(and(eq(connectors.id, connector.id), eq(connectors.organizationId, organization.id)))
+      .limit(1)
+    if (!currentConnector) return null
+    const [row] = await tx.insert(sources).values({ organizationId: organization.id, connectorId: connector.id, connectionId: connection?.id ?? null, name: parsed.data.name, description: parsed.data.description || null, imageUrl: parsed.data.imageUrl || null, endpoint: parsed.data.endpoint, scope: parsed.data.scope, ownerUserId: parsed.data.scope === 'user' ? actor.id : null, createdByUserId: actor.id }).returning({ id: sources.id })
+    await tx.insert(auditEvents).values({ actorUserId: actor.id, action: 'source.created', targetType: 'source', targetId: row.id, metadata: { connectorId: connector.id, scope: parsed.data.scope, connectionScope: connection?.scope ?? null } })
+    return row
   })
+  if (!created) return fail('Le Connecteur n’est plus disponible. Rechargez la liste avant de réessayer.')
   revalidatePath('/admin/sources')
   return { ok: true, message: 'Source ajoutée au catalogue.', id: created.id }
 }

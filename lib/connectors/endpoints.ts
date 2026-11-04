@@ -1,6 +1,8 @@
 import { MAX_API_ENDPOINTS, type ApiEndpoint, type ConnectorConfig } from '@/lib/connector-catalog'
 
-export function readEndpointFields(config: ConnectorConfig): Omit<ApiEndpoint, 'id' | 'label' | 'summary'> {
+type EditableEndpointFields = Pick<ApiEndpoint, 'url' | 'method' | 'query' | 'body' | 'itemsPath' | 'titlePath' | 'linkPath' | 'datePath' | 'summaryPath' | 'pagination'>
+
+export function readEndpointFields(config: ConnectorConfig): EditableEndpointFields {
   const { api } = config
   return {
     url: config.url,
@@ -14,6 +16,33 @@ export function readEndpointFields(config: ConnectorConfig): Omit<ApiEndpoint, '
     summaryPath: api.summaryPath,
     pagination: api.pagination,
   }
+}
+
+function sameFields(endpoint: ApiEndpoint, fields: EditableEndpointFields) {
+  return JSON.stringify(readComparable(endpoint)) === JSON.stringify(readComparable(fields))
+}
+
+function readComparable(fields: EditableEndpointFields) {
+  return {
+    url: fields.url,
+    method: fields.method,
+    query: fields.query,
+    body: fields.body,
+    itemsPath: fields.itemsPath,
+    titlePath: fields.titlePath,
+    linkPath: fields.linkPath,
+    datePath: fields.datePath,
+    summaryPath: fields.summaryPath,
+    pagination: fields.pagination,
+  }
+}
+
+function mergeImportedEndpoint(existing: ApiEndpoint | undefined, incoming: ApiEndpoint): ApiEndpoint {
+  if (!existing) return incoming
+  const unchanged = JSON.stringify({ ...existing, revision: 1, availability: 'to_verify' }) === JSON.stringify({ ...incoming, revision: 1, availability: 'to_verify' })
+  return unchanged
+    ? { ...incoming, revision: existing.revision, availability: existing.availability }
+    : { ...incoming, revision: existing.revision + 1, availability: 'to_verify' }
 }
 
 export function loadEndpoint(config: ConnectorConfig, endpoint: ApiEndpoint): ConnectorConfig {
@@ -41,7 +70,15 @@ export function commitActiveEndpoint(config: ConnectorConfig): ConnectorConfig {
   const { activeEndpointId, endpoints } = config.api
   if (!activeEndpointId || !endpoints.some((endpoint) => endpoint.id === activeEndpointId)) return config
   const fields = readEndpointFields(config)
-  return { ...config, api: { ...config.api, endpoints: endpoints.map((endpoint) => (endpoint.id === activeEndpointId ? { ...endpoint, ...fields } : endpoint)) } }
+  return {
+    ...config,
+    api: {
+      ...config.api,
+      endpoints: endpoints.map((endpoint) => endpoint.id !== activeEndpointId || sameFields(endpoint, fields)
+        ? endpoint
+        : { ...endpoint, ...fields, revision: endpoint.revision + 1, availability: 'to_verify' }),
+    },
+  }
 }
 
 export function switchEndpoint(config: ConnectorConfig, id: string): ConnectorConfig {
@@ -58,9 +95,11 @@ export function removeEndpoint(config: ConnectorConfig, id: string): ConnectorCo
 
 export function addEndpoints(config: ConnectorConfig, incoming: ApiEndpoint[], activateId: string | null): ConnectorConfig {
   const committed = commitActiveEndpoint(config)
+  const existingById = new Map(committed.api.endpoints.map((endpoint) => [endpoint.id, endpoint]))
   const incomingIds = new Set(incoming.map((endpoint) => endpoint.id))
   const kept = committed.api.endpoints.filter((endpoint) => !incomingIds.has(endpoint.id))
-  const endpoints = [...kept, ...incoming].slice(0, MAX_API_ENDPOINTS)
+  const merged = incoming.map((endpoint) => mergeImportedEndpoint(existingById.get(endpoint.id), endpoint))
+  const endpoints = [...kept, ...merged].slice(0, MAX_API_ENDPOINTS)
   const next: ConnectorConfig = { ...committed, api: { ...committed.api, endpoints } }
   const target = activateId ? endpoints.find((endpoint) => endpoint.id === activateId) : undefined
   return target ? loadEndpoint(next, target) : next

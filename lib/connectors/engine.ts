@@ -3,6 +3,7 @@ import 'server-only'
 import { isHttpKind, type ConnectorConfig, type ConnectorKind, type HttpKind } from '@/lib/connector-catalog'
 import { testImap } from '@/lib/connectors/imap'
 import { testM365 } from '@/lib/connectors/m365'
+import { operationTestRestriction } from '@/lib/connectors/operations'
 import { ParseError, parseApi, parseFeed, parseWeb, resolvePath, type ParsedItem } from '@/lib/connectors/parsers'
 import { safeFetch, SafeFetchError, validateTargetUrl } from '@/lib/connectors/safe-fetch'
 import type { CheckStatus, TestCheck, TestResult, TestSample } from '@/lib/connectors/test-types'
@@ -75,6 +76,18 @@ export async function runConnectorTest(kind: ConnectorKind, config: ConnectorCon
   if (kind === 'm365') return testM365(config, secret)
   if (kind === 'webhook') return testWebhook(config, secret, context.connectorId)
   if (!isHttpKind(kind)) throw new Error(`Type de connecteur non pris en charge : ${kind}`)
+  const restriction = kind === 'api' ? operationTestRestriction(config) : null
+  if (restriction) {
+    return {
+      status: 'error',
+      message: restriction,
+      httpStatus: null,
+      durationMs: 0,
+      itemsFound: null,
+      checks: [{ id: 'safety', label: 'Innocuité de l’opération', status: 'error', detail: restriction }],
+      sample: [],
+    }
+  }
   return runHttpTest(kind, config, secret, username)
 }
 

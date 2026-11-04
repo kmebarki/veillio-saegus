@@ -29,10 +29,11 @@ import type { ConnectorDetail, ConnectorHistoryEntry, ConnectorRunEntry, Connect
 import { readLegacySecret, readSecret } from '@/lib/authentication/vault'
 import { evaluateConnectionRuntime } from '@/lib/connections/registry'
 import { runConnectorTest } from '@/lib/connectors/engine'
+import { operationsFromConfig } from '@/lib/connectors/operations'
 import { SafeFetchError, validateTargetUrl } from '@/lib/connectors/safe-fetch'
-import { getDefaultOrganization, requirePermission } from '@/lib/authorization'
+import { requirePermission } from '@/lib/authorization'
 import { db } from '@/lib/db'
-import { auditEvents, connections, connectorRuns, connectors, users, type ConnectorRunDetails } from '@/lib/db/schema'
+import { auditEvents, connections, connectorRuns, connectors, sources, users, type ConnectorRunDetails } from '@/lib/db/schema'
 import { isRateLimited, isUniqueViolation } from '@/lib/rate-limit'
 
 const dateTimeFormatter = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })
@@ -140,8 +141,12 @@ function toSummary(row: Row, connectionCount: number): ConnectorSummary {
   }
 }
 
-async function loadConnector(id: string) {
-  const [row] = await db.select().from(connectors).where(eq(connectors.id, id)).limit(1)
+function organizationIdFor(actor: { organizationId: string | null }) {
+  return actor.organizationId
+}
+
+async function loadConnector(id: string, organizationId: string) {
+  const [row] = await db.select().from(connectors).where(and(eq(connectors.id, id), eq(connectors.organizationId, organizationId))).limit(1)
   return row ?? null
 }
 
@@ -165,23 +170,25 @@ function checkTarget(kind: ConnectorKind, config: ConnectorConfig): string | nul
   return validateKindConfig(kind, config)
 }
 
-async function visibleConnections(actorId: string, connectorId: string): Promise<ConnectionOption[]> {
-  const rows = await db.select().from(connections).where(eq(connections.connectorId, connectorId)).orderBy(connections.name)
+async function visibleConnections(actorId: string, organizationId: string, connectorId: string): Promise<ConnectionOption[]> {
+  const rows = await db
+    .select()
+    .from(connections)
+    .where(and(eq(connections.organizationId, organizationId), eq(connections.connectorId, connectorId)))
+    .orderBy(connections.name)
   return rows
     .filter((row) => row.scope !== 'private' || row.ownerUserId === actorId)
     .map((row) => ({ id: row.id, name: row.name, scope: row.scope === 'private' || row.scope === 'public' ? row.scope : 'organization' }))
 }
 
-async function resolveCredential(actorId: string, connectorId: string | undefined, connectionId: string | undefined) {
-  if (!connectorId) return null
-  const rows = await db
+async function resolveCredential(actorId: string, organizationId: string, connectorId: string | undefined, connectionId: string | undefined) {
+  if (!connectorId || !connectionId) return null
+  const [row] = await db
     .select()
     .from(connections)
-    .where(and(eq(connections.connectorId, connectorId), connectionId ? eq(connections.id, connectionId) : undefined))
-    .orderBy(connections.createdAt)
-  const usable = rows.filter((row) => row.scope !== 'private' || row.ownerUserId === actorId)
-  const row = connectionId ? usable[0] : usable.find((item) => item.scope === 'organization' || item.scope === 'public')
-  if (!row || row.lifecycle !== 'active' || !row.methodId || !row.methodVersion || !row.serviceId || !row.adapterId || !row.adapterVersion) return null
+    .where(and(eq(connections.id, connectionId), eq(connections.organizationId, organizationId), eq(connections.connectorId, connectorId)))
+    .limit(1)
+  if (!row || (row.scope === 'private' && row.ownerUserId !== actorId) || row.lifecycle !== 'active' || !row.methodId || !row.methodVersion || !row.serviceId || !row.adapterId || !row.adapterVersion) return null
   const runtime = await evaluateConnectionRuntime({ methodId: row.methodId, methodVersion: row.methodVersion, serviceId: row.serviceId, adapterId: row.adapterId, adapterVersion: row.adapterVersion })
   if (!runtime.usable) return null
   const secret = await readSecret(row.secretRef, { organizationId: row.organizationId, connectionId: row.id, fieldCode: 'credential', purpose: 'connector-test' }) ?? readLegacySecret(row.secretCiphertext, row.id)
@@ -203,7 +210,8 @@ function describeChanges(before: ConnectorConfig, after: ConnectorConfig) {
 
 export async function getConnectorsOverview(): Promise<ConnectorsOverview> {
   const actor = await requirePermission('connectors.view')
-  const organization = await getDefaultOrganization()
+  const organizationId = organizationIdFor(actor)
+  const organization = organizationId ? { id: organizationId, name: 'Votre organisation' } : null
   const rows = organization ? await db.select().from(connectors).where(eq(connectors.organizationId, organization.id)).orderBy(connectors.name) : []
   const countRows = organization
     ? await db
@@ -232,9 +240,11 @@ export async function getConnectorsOverview(): Promise<ConnectorsOverview> {
 
 export async function getConnectorDetail(input: unknown): Promise<{ ok: true; detail: ConnectorDetail } | Failure> {
   const actor = await requirePermission('connectors.view')
+  const organizationId = organizationIdFor(actor)
+  if (!organizationId) return fail('Aucune organisation active.')
   const parsed = idSchema.safeParse(input)
   if (!parsed.success) return fail('Connecteur invalide.')
-  const row = await loadConnector(parsed.data.id)
+  const row = await loadConnector(parsed.data.id, organizationId)
   if (!row) return fail('Connecteur introuvable.')
   const kind: ConnectorKind = isConnectorKind(row.kind) ? row.kind : 'rss'
 
@@ -285,9 +295,10 @@ export async function getConnectorDetail(input: unknown): Promise<{ ok: true; de
     return { id: entry.id, label: ACTION_LABELS[entry.action] ?? entry.action, detail, actor: entry.actor ?? 'Utilisateur supprimé', at: dateTimeFormatter.format(entry.createdAt) }
   })
 
-  const options = await visibleConnections(actor.id, row.id)
-  const sharedCount = (await db.select({ total: count() }).from(connections).where(and(eq(connections.connectorId, row.id), ne(connections.scope, 'private'))))[0]?.total ?? 0
-  return { ok: true, detail: { connector: toSummary(row, sharedCount), config: readConfig(kind, row.config), connections: options, runs, history } }
+  const config = readConfig(kind, row.config)
+  const options = await visibleConnections(actor.id, organizationId, row.id)
+  const sharedCount = (await db.select({ total: count() }).from(connections).where(and(eq(connections.organizationId, organizationId), eq(connections.connectorId, row.id), ne(connections.scope, 'private'))))[0]?.total ?? 0
+  return { ok: true, detail: { connector: toSummary(row, sharedCount), config, operations: operationsFromConfig(config), connections: options, runs, history } }
 }
 
 export async function createConnector(input: unknown): Promise<{ ok: true; message: string; id: string } | Failure> {
@@ -300,8 +311,9 @@ export async function createConnector(input: unknown): Promise<{ ok: true; messa
   const invalid = checkTarget(kind, config)
   if (invalid) return fail(invalid)
 
-  const organization = await getDefaultOrganization()
-  if (!organization) return fail('Organisation introuvable.')
+  const organizationId = organizationIdFor(actor)
+  if (!organizationId) return fail('Aucune organisation active.')
+  const organization = { id: organizationId }
   if (await findDuplicateName(organization.id, name)) return fail('Un connecteur porte déjà ce nom.')
   const [{ total }] = await db.select({ total: count() }).from(connectors).where(eq(connectors.organizationId, organization.id))
   if (total >= MAX_CONNECTORS) return fail(`Limite atteinte : ${MAX_CONNECTORS} connecteurs maximum par organisation.`)
@@ -326,7 +338,9 @@ export async function updateConnector(input: unknown): Promise<{ ok: true; messa
   const parsed = updateSchema.safeParse(input)
   if (!parsed.success) return fail(firstError(parsed.error))
 
-  const row = await loadConnector(parsed.data.id)
+  const organizationId = organizationIdFor(actor)
+  if (!organizationId) return fail('Aucune organisation active.')
+  const row = await loadConnector(parsed.data.id, organizationId)
   if (!row) return fail('Connecteur introuvable.')
   const kind: ConnectorKind = isConnectorKind(row.kind) ? row.kind : 'rss'
   const config: ConnectorConfig = { ...parsed.data.config, url: parsed.data.config.url.trim() }
@@ -358,7 +372,7 @@ export async function updateConnector(input: unknown): Promise<{ ok: true; messa
           lastCheckVersion: technicalChanged ? row.lastCheckVersion : row.lastCheckVersion === row.version ? row.version + 1 : row.lastCheckVersion,
           updatedAt: new Date(),
         })
-        .where(and(eq(connectors.id, row.id), eq(connectors.version, parsed.data.version)))
+        .where(and(eq(connectors.id, row.id), eq(connectors.organizationId, organizationId), eq(connectors.version, parsed.data.version)))
         .returning({ id: connectors.id })
       if (!updated) return 'conflict' as const
       if (infoChanged) await tx.insert(auditEvents).values(audit(actor.id, 'connector.updated', row.id, { name: parsed.data.name, previousName: row.name }))
@@ -440,13 +454,16 @@ export async function testConnectorDraft(input: unknown): Promise<{ ok: true; ou
   if (!parsed.success) return fail(firstError(parsed.error))
   if (await enforceTestRateLimit(actor.id)) return fail(RATE_MESSAGE)
 
+  const organizationId = organizationIdFor(actor)
+  if (!organizationId) return fail('Aucune organisation active.')
   const { kind } = parsed.data
   const config: ConnectorConfig = { ...parsed.data.config, url: parsed.data.config.url.trim() }
   const invalid = validateKindConfig(kind, config)
   if (invalid) return fail(invalid)
+  if (parsed.data.id && !(await loadConnector(parsed.data.id, organizationId))) return fail('Connecteur introuvable.')
 
   const requiresCredential = needsSecret(config.auth.type)
-  const credential = requiresCredential ? await resolveCredential(actor.id, parsed.data.id, parsed.data.connectionId) : null
+  const credential = requiresCredential ? await resolveCredential(actor.id, organizationId, parsed.data.id, parsed.data.connectionId) : null
 
   const targetId = parsed.data.id ?? 'brouillon'
   const outcome = requiresCredential && !credential ? missingConnectionOutcome(kind) : await runConnectorTest(kind, config, credential?.secret ?? null, credential?.username ?? '', { connectorId: parsed.data.id })
@@ -458,14 +475,16 @@ export async function testConnector(input: unknown): Promise<{ ok: true; outcome
   const actor = await requirePermission('connectors.manage')
   const parsed = testSchema.safeParse(input)
   if (!parsed.success) return fail('Connecteur invalide.')
-  const row = await loadConnector(parsed.data.id)
+  const organizationId = organizationIdFor(actor)
+  if (!organizationId) return fail('Aucune organisation active.')
+  const row = await loadConnector(parsed.data.id, organizationId)
   if (!row) return fail('Connecteur introuvable.')
   if (await enforceTestRateLimit(actor.id)) return fail(RATE_MESSAGE)
 
   const kind: ConnectorKind = isConnectorKind(row.kind) ? row.kind : 'rss'
   const config = readConfig(kind, row.config)
   const requiresCredential = needsSecret(config.auth.type)
-  const credential = requiresCredential ? await resolveCredential(actor.id, row.id, parsed.data.connectionId) : null
+  const credential = requiresCredential ? await resolveCredential(actor.id, organizationId, row.id, parsed.data.connectionId) : null
 
   const outcome: TestOutcome =
     requiresCredential && !credential ? missingConnectionOutcome(kind) : await runConnectorTest(kind, config, credential?.secret ?? null, credential?.username ?? '', { connectorId: row.id })
@@ -491,7 +510,7 @@ export async function testConnector(input: unknown): Promise<{ ok: true; outcome
         lastCheckVersion: row.version,
         lastLatencyMs: outcome.httpStatus ? outcome.durationMs : null,
       })
-      .where(and(eq(connectors.id, row.id), eq(connectors.version, row.version)))
+      .where(and(eq(connectors.id, row.id), eq(connectors.organizationId, organizationId), eq(connectors.version, row.version)))
     await tx.insert(auditEvents).values(audit(actor.id, 'connector.tested', row.id, { status: outcome.status, draft: false, host: hostOf(kind, config) }))
     await tx.execute(sql`delete from connector_runs where "connectorId" = ${row.id} and id not in (select id from connector_runs where "connectorId" = ${row.id} order by "createdAt" desc limit 100)`)
   })
@@ -504,7 +523,9 @@ export async function setConnectorStatus(input: unknown): Promise<{ ok: true; me
   const actor = await requirePermission('connectors.manage')
   const parsed = statusSchema.safeParse(input)
   if (!parsed.success) return fail('Demande invalide.')
-  const row = await loadConnector(parsed.data.id)
+  const organizationId = organizationIdFor(actor)
+  if (!organizationId) return fail('Aucune organisation active.')
+  const row = await loadConnector(parsed.data.id, organizationId)
   if (!row) return fail('Connecteur introuvable.')
   if (row.status === parsed.data.status) return { ok: true, message: parsed.data.status === 'active' ? 'Le connecteur est déjà actif.' : 'Le connecteur est déjà en pause.' }
 
@@ -513,13 +534,13 @@ export async function setConnectorStatus(input: unknown): Promise<{ ok: true; me
     if (row.lastCheckStatus === 'error') return fail('Le dernier test a échoué : corrigez la configuration puis relancez un test avant d’activer.')
     const kind: ConnectorKind = isConnectorKind(row.kind) ? row.kind : 'rss'
     if (needsSecret(readConfig(kind, row.config).auth.type)) {
-      const [{ total }] = await db.select({ total: count() }).from(connections).where(and(eq(connections.connectorId, row.id), eq(connections.scope, 'organization')))
+      const [{ total }] = await db.select({ total: count() }).from(connections).where(and(eq(connections.organizationId, organizationId), eq(connections.connectorId, row.id), eq(connections.scope, 'organization')))
       if (total === 0) return fail('Ce connecteur requiert des identifiants : ajoutez une connexion partagée dans « Connexions » avant de l’activer.')
     }
   }
 
   await db.transaction(async (tx) => {
-    await tx.update(connectors).set({ status: parsed.data.status, updatedAt: new Date() }).where(eq(connectors.id, row.id))
+    await tx.update(connectors).set({ status: parsed.data.status, updatedAt: new Date() }).where(and(eq(connectors.id, row.id), eq(connectors.organizationId, organizationId)))
     await tx.insert(auditEvents).values(audit(actor.id, parsed.data.status === 'active' ? 'connector.activated' : 'connector.paused', row.id, { name: row.name }))
   })
   revalidateConnectors()
@@ -530,10 +551,12 @@ export async function duplicateConnector(input: unknown): Promise<{ ok: true; me
   const actor = await requirePermission('connectors.manage')
   const parsed = idSchema.safeParse(input)
   if (!parsed.success) return fail('Connecteur invalide.')
-  const row = await loadConnector(parsed.data.id)
+  const organizationId = organizationIdFor(actor)
+  if (!organizationId) return fail('Aucune organisation active.')
+  const row = await loadConnector(parsed.data.id, organizationId)
   if (!row) return fail('Connecteur introuvable.')
 
-  const [{ total }] = await db.select({ total: count() }).from(connectors).where(eq(connectors.organizationId, row.organizationId))
+  const [{ total }] = await db.select({ total: count() }).from(connectors).where(eq(connectors.organizationId, organizationId))
   if (total >= MAX_CONNECTORS) return fail(`Limite atteinte : ${MAX_CONNECTORS} connecteurs maximum par organisation.`)
 
   let name = `${row.name} (copie)`
@@ -555,14 +578,50 @@ export async function deleteConnector(input: unknown): Promise<{ ok: true; messa
   const actor = await requirePermission('connectors.manage')
   const parsed = idSchema.safeParse(input)
   if (!parsed.success) return fail('Connecteur invalide.')
-  const row = await loadConnector(parsed.data.id)
-  if (!row) return fail('Connecteur introuvable.')
-  if (row.status === 'active') return fail('Mettez le connecteur en pause avant de le supprimer.')
+  const organizationId = organizationIdFor(actor)
+  if (!organizationId) return fail('Aucune organisation active.')
 
-  await db.transaction(async (tx) => {
-    await tx.delete(connectors).where(eq(connectors.id, row.id))
+  const outcome = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${parsed.data.id}::text, 0))`)
+    const [row] = await tx
+      .select({ id: connectors.id, name: connectors.name, kind: connectors.kind, status: connectors.status })
+      .from(connectors)
+      .where(and(eq(connectors.id, parsed.data.id), eq(connectors.organizationId, organizationId)))
+      .limit(1)
+    if (!row) return { type: 'missing' as const }
+    if (row.status === 'active') return { type: 'active' as const }
+
+    const [[connectionDependency], [sourceDependency]] = await Promise.all([
+      tx.select({ total: count() }).from(connections).where(and(eq(connections.organizationId, organizationId), eq(connections.connectorId, row.id))),
+      tx.select({ total: count() }).from(sources).where(and(eq(sources.organizationId, organizationId), eq(sources.connectorId, row.id))),
+    ])
+    const connectionCount = connectionDependency?.total ?? 0
+    const sourceCount = sourceDependency?.total ?? 0
+    if (connectionCount > 0 || sourceCount > 0) return { type: 'dependencies' as const, connectionCount, sourceCount }
+
+    const [deleted] = await tx
+      .delete(connectors)
+      .where(and(
+        eq(connectors.id, row.id),
+        eq(connectors.organizationId, organizationId),
+        sql`not exists (select 1 from connections where connections."connectorId" = ${row.id})`,
+        sql`not exists (select 1 from sources where sources.connector_id = ${row.id})`,
+      ))
+      .returning({ id: connectors.id })
+    if (!deleted) return { type: 'dependencies' as const, connectionCount: 0, sourceCount: 0 }
     await tx.insert(auditEvents).values(audit(actor.id, 'connector.deleted', row.id, { name: row.name, kind: row.kind }))
+    return { type: 'deleted' as const }
   })
+
+  if (outcome.type === 'missing') return fail('Connecteur introuvable.')
+  if (outcome.type === 'active') return fail('Mettez le connecteur en pause avant de le supprimer.')
+  if (outcome.type === 'dependencies') {
+    const dependencies = [
+      outcome.connectionCount ? `${outcome.connectionCount} Connexion${outcome.connectionCount > 1 ? 's' : ''}` : '',
+      outcome.sourceCount ? `${outcome.sourceCount} Source${outcome.sourceCount > 1 ? 's' : ''}` : '',
+    ].filter(Boolean).join(' et ')
+    return fail(`Suppression impossible : ce Connecteur est encore utilisé${dependencies ? ` par ${dependencies}` : ''}. Retirez d’abord ces dépendances.`)
+  }
   revalidateConnectors()
   return { ok: true, message: 'Connecteur supprimé.' }
 }

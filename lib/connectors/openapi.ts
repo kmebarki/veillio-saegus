@@ -49,6 +49,8 @@ type Shape = {
   props?: Record<string, Shape>
   items?: Shape
   format?: string
+  description?: string
+  required?: string[]
   example?: unknown
   default?: unknown
   enum?: unknown[]
@@ -128,9 +130,11 @@ function toShape(root: Obj, node: unknown, depth: number, seen: string[], budget
 
   const merged: Shape = { type: normalizeType(current.type, current) }
   if (current.format !== undefined) merged.format = text(current.format)
+  if (current.description !== undefined) merged.description = text(current.description)
+  if (Array.isArray(current.required)) merged.required = current.required.map(text).filter(Boolean).slice(0, 100)
   if (current.example !== undefined) merged.example = current.example
   if (current.default !== undefined) merged.default = current.default
-  if (Array.isArray(current.enum)) merged.enum = current.enum.slice(0, 20)
+  if (Array.isArray(current.enum)) merged.enum = current.enum.slice(0, 100)
   if (typeof current.maximum === 'number') merged.maximum = current.maximum
 
   const parts = Array.isArray(current.allOf) ? current.allOf : []
@@ -198,7 +202,7 @@ function exampleFromShape(shape: Shape, depth = 0): unknown {
   }
 }
 
-type ResponseInfo = { shape: Shape | null; nonJson: boolean; declared: boolean }
+type ResponseInfo = { shape: Shape | null; nonJson: boolean; declared: boolean; mediaTypes: string[] }
 
 function firstExample(media: Obj): unknown {
   if (media.example !== undefined) return media.example
@@ -213,33 +217,35 @@ function firstExample(media: Obj): unknown {
 
 function pickResponse(root: Obj, operation: Obj, isV2: boolean, globalProduces: string[], budget: Budget): ResponseInfo {
   const responses = isObj(operation.responses) ? operation.responses : null
-  if (!responses) return { shape: null, nonJson: false, declared: false }
+  if (!responses) return { shape: null, nonJson: false, declared: false, mediaTypes: [] }
   const keys = Object.keys(responses)
   const key = ['200', '201'].find((code) => keys.includes(code)) ?? keys.find((code) => /^2\d\d$/.test(code)) ?? (keys.includes('default') ? 'default' : undefined)
-  if (!key) return { shape: null, nonJson: false, declared: false }
+  if (!key) return { shape: null, nonJson: false, declared: false, mediaTypes: [] }
   const response = deref(root, responses[key])
-  if (!isObj(response)) return { shape: null, nonJson: false, declared: false }
+  if (!isObj(response)) return { shape: null, nonJson: false, declared: false, mediaTypes: [] }
 
   if (isV2) {
-    const produces = Array.isArray(operation.produces) ? (operation.produces as unknown[]).map(text) : globalProduces
-    if (produces.length && !produces.some((mime) => /json/i.test(mime))) return { shape: null, nonJson: true, declared: true }
-    if (response.schema !== undefined) return { shape: toShape(root, response.schema, 0, [], budget), nonJson: false, declared: true }
+    const mediaTypes = (Array.isArray(operation.produces) ? (operation.produces as unknown[]).map(text) : globalProduces).filter(Boolean)
+    const nonJson = mediaTypes.length > 0 && !mediaTypes.some((mime) => /json/i.test(mime))
+    if (nonJson) return { shape: null, nonJson: true, declared: true, mediaTypes }
+    if (response.schema !== undefined) return { shape: toShape(root, response.schema, 0, [], budget), nonJson: false, declared: true, mediaTypes }
     const examples = isObj(response.examples) ? firstExample({ examples: Object.fromEntries(Object.entries(response.examples).map(([mime, value]) => [mime, { value }])) }) : undefined
-    return { shape: examples !== undefined ? shapeFromExample(examples) : null, nonJson: false, declared: true }
+    return { shape: examples !== undefined ? shapeFromExample(examples) : null, nonJson: false, declared: true, mediaTypes }
   }
 
   const content = isObj(response.content) ? response.content : null
-  if (!content || Object.keys(content).length === 0) return { shape: null, nonJson: false, declared: true }
-  const mime = Object.keys(content).find((entry) => entry === 'application/json') ?? Object.keys(content).find((entry) => /json/i.test(entry))
-  if (!mime) return { shape: null, nonJson: true, declared: true }
+  if (!content || Object.keys(content).length === 0) return { shape: null, nonJson: false, declared: true, mediaTypes: [] }
+  const mediaTypes = Object.keys(content)
+  const mime = mediaTypes.find((entry) => entry === 'application/json') ?? mediaTypes.find((entry) => /json/i.test(entry))
+  if (!mime) return { shape: null, nonJson: true, declared: true, mediaTypes }
   const media = content[mime]
-  if (!isObj(media)) return { shape: null, nonJson: false, declared: true }
+  if (!isObj(media)) return { shape: null, nonJson: false, declared: true, mediaTypes }
   if (media.schema !== undefined) {
     const shape = toShape(root, media.schema, 0, [], budget)
-    if (shape.type !== 'unknown') return { shape, nonJson: false, declared: true }
+    if (shape.type !== 'unknown') return { shape, nonJson: false, declared: true, mediaTypes }
   }
   const example = firstExample(media)
-  return { shape: example !== undefined ? shapeFromExample(example) : null, nonJson: false, declared: true }
+  return { shape: example !== undefined ? shapeFromExample(example) : null, nonJson: false, declared: true, mediaTypes }
 }
 
 const CONTAINER_KEYS = ['data', 'response', 'result', 'payload', '_embedded', 'body']
@@ -327,6 +333,56 @@ function paramValue(param: Param): string {
   if (Array.isArray(raw)) return raw.join(',')
   if (typeof raw === 'object') return ''
   return String(raw)
+}
+
+function primitive(value: unknown): string | number | boolean | null | undefined {
+  return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value === null ? value : undefined
+}
+
+function operationParameter(param: Param) {
+  const example = primitive(param.shape.example ?? param.shape.default)
+  return {
+    name: param.name,
+    in: param.location as 'path' | 'query' | 'body' | 'header',
+    type: param.shape.type,
+    format: param.shape.format ?? '',
+    required: param.required,
+    description: param.description,
+    enum: (param.shape.enum ?? []).map(primitive).filter((value): value is string | number | boolean => value !== undefined && value !== null),
+    ...(example !== undefined ? { example } : {}),
+  }
+}
+
+function bodyParameters(shape: Shape | null, requiredBody: boolean) {
+  if (!shape) return []
+  if (shape.type !== 'object' || !shape.props) {
+    return [operationParameter({ name: 'body', location: 'body', required: requiredBody, shape, description: shape.description ?? '' })]
+  }
+  return Object.entries(shape.props).slice(0, 100).map(([name, field]) => operationParameter({
+    name,
+    location: 'body',
+    required: (shape.required ?? []).includes(name),
+    shape: field,
+    description: field.description ?? '',
+  }))
+}
+
+function contentKinds(mediaTypes: string[], shape: Shape | null) {
+  const kinds = new Set<'structured_data' | 'text' | 'document' | 'image' | 'audio' | 'video' | 'message' | 'unknown'>()
+  for (const mediaType of mediaTypes) {
+    const mime = mediaType.toLowerCase()
+    if (/json|xml|yaml|csv/.test(mime)) kinds.add('structured_data')
+    else if (mime.startsWith('text/')) kinds.add('text')
+    else if (mime.startsWith('image/')) kinds.add('image')
+    else if (mime.startsWith('audio/')) kinds.add('audio')
+    else if (mime.startsWith('video/')) kinds.add('video')
+    else if (/pdf|word|officedocument|octet-stream/.test(mime)) kinds.add('document')
+    else if (/message\//.test(mime)) kinds.add('message')
+    else kinds.add('unknown')
+  }
+  if (mediaTypes.length === 0 && shape && shape.type !== 'unknown') kinds.add('structured_data')
+  if (kinds.size === 0) kinds.add('unknown')
+  return [...kinds]
 }
 
 const PAGE_NAMES = /^(page|pagenumber|pageno|pageindex|p)$/
@@ -490,24 +546,29 @@ export function parseOpenApi(source: string): OpenApiImport {
         const param = uniqueParams.find((candidate) => candidate.location === 'path' && candidate.name === match[1])
         const value = param ? paramValue(param) : ''
         if (!value) {
-          blocked = `Paramètre de chemin « ${match[1]} » sans valeur d’exemple : endpoint non collectable tel quel.`
-          break
+          notes.push(`Paramètre de chemin « ${match[1]} » sans valeur d’exemple : un test nécessitera une valeur explicite.`)
+          continue
         }
         resolvedPath = resolvedPath.replace(match[0], encodeURIComponent(value))
       }
 
       const response = pickResponse(root, operation, isV2, globalProduces, budget)
-      if (!blocked && response.nonJson) blocked = 'La réponse déclarée n’est pas du JSON.'
+      if (response.nonJson) notes.push('Réponse non JSON décrite : récupération et traitement sont qualifiés séparément.')
 
       let body = ''
+      let bodyShape: Shape | null = null
+      let requestBodyRequired = false
       if (verb === 'POST' && !blocked) {
-        let bodyShape: Shape | null = null
         if (isV2) {
           const bodyParam = uniqueParams.find((param) => param.location === 'body')
           const rawParam = (Array.isArray(operation.parameters) ? (operation.parameters as unknown[]).map((entry) => deref(root, entry)).find((entry) => isObj(entry) && entry.in === 'body') : undefined) as Obj | undefined
-          if (bodyParam && rawParam) bodyShape = toShape(root, rawParam.schema, 0, [], budget)
+          if (bodyParam && rawParam) {
+            bodyShape = toShape(root, rawParam.schema, 0, [], budget)
+            requestBodyRequired = bodyParam.required
+          }
         } else {
           const requestBody = deref(root, operation.requestBody)
+          requestBodyRequired = isObj(requestBody) && requestBody.required === true
           const content = isObj(requestBody) && isObj(requestBody.content) ? requestBody.content : null
           if (content) {
             const mime = Object.keys(content).find((entry) => /json/i.test(entry))
@@ -568,6 +629,20 @@ export function parseOpenApi(source: string): OpenApiImport {
 
       const opAuth = requirementsNeedAuth(operation.security)
       const requiresAuth = opAuth ?? globalAuthRequired
+      const inputParameters = [
+        ...uniqueParams
+          .filter((param) => ['path', 'query', 'header'].includes(param.location))
+          .map(operationParameter),
+        ...bodyParameters(bodyShape, requestBodyRequired),
+      ]
+      const kinds = contentKinds(response.mediaTypes, response.shape)
+      const structuredOutput = kinds.includes('structured_data')
+      const readSafety = verb === 'GET'
+        ? 'verified_read' as const
+        : operation['x-veillio-read-only'] === true || operation['x-read-only'] === true
+          ? 'verified_read' as const
+          : 'to_verify' as const
+      if (verb === 'POST' && readSafety !== 'verified_read') notes.push('POST non attesté comme lecture sans effet de bord : test automatique bloqué.')
 
       const confidence: ImportedEndpoint['confidence'] = !items || !response.shape ? 'low' : titlePath && linkPath && !blankRequired ? 'high' : 'medium'
 
@@ -600,6 +675,23 @@ export function parseOpenApi(source: string): OpenApiImport {
           datePath,
           summaryPath,
           pagination,
+          pathTemplate: path,
+          inputParameters,
+          output: {
+            mediaTypes: response.mediaTypes,
+            contentKinds: kinds,
+            shapeKnown: Boolean(response.shape && response.shape.type !== 'unknown'),
+            retrieval: 'to_verify',
+            processing: structuredOutput ? 'to_verify' : 'unsupported',
+          },
+          capabilities: {
+            pagination: pagination.type,
+            download: structuredOutput ? 'unsupported' : 'to_verify',
+            incremental: 'to_verify',
+          },
+          availability: 'to_verify',
+          readSafety,
+          revision: 1,
         },
       })
     }
