@@ -3,11 +3,12 @@ import 'server-only'
 import { and, eq } from 'drizzle-orm'
 
 import { configSchema, defaultConfig, isConnectorKind, type ConnectorConfig, type ConnectorKind } from '@/lib/connector-catalog'
+import { operationIsUsableByAdapter } from '@/lib/connectors/operation-qualification'
 import { operationsFromConfig } from '@/lib/connectors/operations'
 import { db } from '@/lib/db'
 import { connectors } from '@/lib/db/schema'
 
-export async function getConnectorOperationsContract(organizationId: string, connectorId: string) {
+export async function getConnectorOperationsContract(organizationId: string, connectorId: string, adapter: { id: string; version: string }) {
   const [connector] = await db
     .select({ id: connectors.id, kind: connectors.kind, config: connectors.config, version: connectors.version })
     .from(connectors)
@@ -22,6 +23,6 @@ export async function getConnectorOperationsContract(organizationId: string, con
   return {
     connectorId: connector.id,
     connectorVersion: connector.version,
-    operations: operationsFromConfig(config),
+    operations: operationsFromConfig(config).filter((operation) => operationIsUsableByAdapter(operation, adapter)),
   }
 }

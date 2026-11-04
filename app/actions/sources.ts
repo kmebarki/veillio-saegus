@@ -10,6 +10,7 @@ import { getDefaultOrganization, requirePermission } from '@/lib/authorization'
 import { getKindInfo, isConnectorKind, needsSecret, type ConnectorKind } from '@/lib/connector-catalog'
 import { db } from '@/lib/db'
 import { auditEvents, collectionOccurrences, connections, connectors, sources, users } from '@/lib/db/schema'
+import { lockConnectorMutation } from '@/lib/connectors/mutation-lock'
 import type { SourceCollectionEntry, SourceConnectorChoice, SourceDiagnostic, SourceSummary, SourcesOverview } from '@/lib/source-types'
 
 const dateTime = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })
@@ -217,7 +218,7 @@ export async function createSource(input: unknown): Promise<{ ok: true; message:
   if (duplicate) return fail('Une Source de même nom existe déjà dans ce périmètre.')
 
   const created = await db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${connector.id}::text, 0))`)
+    await lockConnectorMutation(tx, connector.id)
     const [currentConnector] = await tx
       .select({ id: connectors.id })
       .from(connectors)

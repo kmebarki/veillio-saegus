@@ -28,7 +28,11 @@ import { getServiceDefinition, selectedAuthMethods } from '@/lib/connector-servi
 import type { ConnectorDetail, ConnectorHistoryEntry, ConnectorRunEntry, ConnectorSummary, ConnectorsOverview, TestOutcome } from '@/lib/connector-types'
 import { readLegacySecret, readSecret } from '@/lib/authentication/vault'
 import { evaluateConnectionRuntime } from '@/lib/connections/registry'
+import { connectorScopeAllows } from '@/lib/connectors/access'
+import { connectorDeletionDecision } from '@/lib/connectors/deletion'
 import { runConnectorTest } from '@/lib/connectors/engine'
+import { lockConnectorMutation } from '@/lib/connectors/mutation-lock'
+import { sanitizeClientOperationAttestations } from '@/lib/connectors/operation-qualification'
 import { operationsFromConfig } from '@/lib/connectors/operations'
 import { SafeFetchError, validateTargetUrl } from '@/lib/connectors/safe-fetch'
 import { requirePermission } from '@/lib/authorization'
@@ -147,7 +151,7 @@ function organizationIdFor(actor: { organizationId: string | null }) {
 
 async function loadConnector(id: string, organizationId: string) {
   const [row] = await db.select().from(connectors).where(and(eq(connectors.id, id), eq(connectors.organizationId, organizationId))).limit(1)
-  return row ?? null
+  return row && connectorScopeAllows(organizationId, row) ? row : null
 }
 
 async function findDuplicateName(organizationId: string, name: string, excludeId?: string) {
@@ -306,7 +310,7 @@ export async function createConnector(input: unknown): Promise<{ ok: true; messa
   const parsed = createSchema.safeParse(input)
   if (!parsed.success) return fail(firstError(parsed.error))
   const { kind, name, description } = parsed.data
-  const config: ConnectorConfig = { ...parsed.data.config, url: parsed.data.config.url.trim() }
+  const config = sanitizeClientOperationAttestations({ ...parsed.data.config, url: parsed.data.config.url.trim() })
 
   const invalid = checkTarget(kind, config)
   if (invalid) return fail(invalid)
@@ -343,13 +347,13 @@ export async function updateConnector(input: unknown): Promise<{ ok: true; messa
   const row = await loadConnector(parsed.data.id, organizationId)
   if (!row) return fail('Connecteur introuvable.')
   const kind: ConnectorKind = isConnectorKind(row.kind) ? row.kind : 'rss'
-  const config: ConnectorConfig = { ...parsed.data.config, url: parsed.data.config.url.trim() }
+  const previous = readConfig(kind, row.config)
+  const config = sanitizeClientOperationAttestations({ ...parsed.data.config, url: parsed.data.config.url.trim() }, previous)
 
   const invalid = checkTarget(kind, config)
   if (invalid) return fail(invalid)
   if (await findDuplicateName(row.organizationId, parsed.data.name, row.id)) return fail('Un connecteur porte déjà ce nom.')
 
-  const previous = readConfig(kind, row.config)
   const sections = describeChanges(previous, config)
   const technicalChanged = sections.length > 0
   const description = parsed.data.description || null
@@ -582,14 +586,13 @@ export async function deleteConnector(input: unknown): Promise<{ ok: true; messa
   if (!organizationId) return fail('Aucune organisation active.')
 
   const outcome = await db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${parsed.data.id}::text, 0))`)
+    await lockConnectorMutation(tx, parsed.data.id)
     const [row] = await tx
       .select({ id: connectors.id, name: connectors.name, kind: connectors.kind, status: connectors.status })
       .from(connectors)
       .where(and(eq(connectors.id, parsed.data.id), eq(connectors.organizationId, organizationId)))
       .limit(1)
     if (!row) return { type: 'missing' as const }
-    if (row.status === 'active') return { type: 'active' as const }
 
     const [[connectionDependency], [sourceDependency]] = await Promise.all([
       tx.select({ total: count() }).from(connections).where(and(eq(connections.organizationId, organizationId), eq(connections.connectorId, row.id))),
@@ -597,7 +600,8 @@ export async function deleteConnector(input: unknown): Promise<{ ok: true; messa
     ])
     const connectionCount = connectionDependency?.total ?? 0
     const sourceCount = sourceDependency?.total ?? 0
-    if (connectionCount > 0 || sourceCount > 0) return { type: 'dependencies' as const, connectionCount, sourceCount }
+    const decision = connectorDeletionDecision({ status: row.status, connectionCount, sourceCount })
+    if (decision.type !== 'deletable') return decision
 
     const [deleted] = await tx
       .delete(connectors)

@@ -37,12 +37,17 @@ function readComparable(fields: EditableEndpointFields) {
   }
 }
 
+function comparableImportedEndpoint(endpoint: ApiEndpoint) {
+  const { qualification: _qualification, ...comparable } = endpoint
+  return { ...comparable, revision: 1, availability: 'to_verify' as const }
+}
+
 function mergeImportedEndpoint(existing: ApiEndpoint | undefined, incoming: ApiEndpoint): ApiEndpoint {
   if (!existing) return incoming
-  const unchanged = JSON.stringify({ ...existing, revision: 1, availability: 'to_verify' }) === JSON.stringify({ ...incoming, revision: 1, availability: 'to_verify' })
+  const unchanged = JSON.stringify(comparableImportedEndpoint(existing)) === JSON.stringify(comparableImportedEndpoint(incoming))
   return unchanged
-    ? { ...incoming, revision: existing.revision, availability: existing.availability }
-    : { ...incoming, revision: existing.revision + 1, availability: 'to_verify' }
+    ? { ...incoming, revision: existing.revision, availability: existing.availability, qualification: existing.qualification }
+    : { ...incoming, revision: existing.revision + 1, availability: 'to_verify', qualification: undefined }
 }
 
 export function loadEndpoint(config: ConnectorConfig, endpoint: ApiEndpoint): ConnectorConfig {
@@ -76,7 +81,7 @@ export function commitActiveEndpoint(config: ConnectorConfig): ConnectorConfig {
       ...config.api,
       endpoints: endpoints.map((endpoint) => endpoint.id !== activeEndpointId || sameFields(endpoint, fields)
         ? endpoint
-        : { ...endpoint, ...fields, revision: endpoint.revision + 1, availability: 'to_verify' }),
+        : { ...endpoint, ...fields, revision: endpoint.revision + 1, availability: 'to_verify', qualification: undefined }),
     },
   }
 }

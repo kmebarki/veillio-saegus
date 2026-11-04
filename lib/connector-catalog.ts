@@ -265,6 +265,14 @@ export type ApiOperationCapabilities = {
   incremental: OperationAvailability
 }
 
+export type ApiOperationQualification = {
+  adapterId: string
+  adapterVersion: string
+  contractRevision: number
+  qualifiedAt: string
+  source: 'adapter-contract-suite'
+}
+
 export type ApiEndpoint = {
   id: string
   label: string
@@ -286,6 +294,7 @@ export type ApiEndpoint = {
   availability: OperationAvailability
   readSafety: 'verified_read' | 'to_verify' | 'unsafe'
   revision: number
+  qualification?: ApiOperationQualification
 }
 
 export const IMAP_SECURITY = ['tls', 'starttls'] as const
@@ -527,6 +536,13 @@ const operationCapabilitiesSchema = z.object({
   download: operationAvailabilitySchema.default('to_verify'),
   incremental: operationAvailabilitySchema.default('to_verify'),
 })
+const operationQualificationSchema = z.object({
+  adapterId: z.string().trim().min(1).max(120),
+  adapterVersion: z.string().trim().min(1).max(80),
+  contractRevision: z.number().int().min(1),
+  qualifiedAt: z.string().datetime(),
+  source: z.literal('adapter-contract-suite'),
+})
 
 const endpointSchema = z.object({
   id: z.string().trim().min(1).max(64),
@@ -549,6 +565,7 @@ const endpointSchema = z.object({
   availability: operationAvailabilitySchema.default('to_verify'),
   readSafety: z.enum(['verified_read', 'to_verify', 'unsafe']).default('to_verify'),
   revision: z.number().int().min(1).default(1),
+  qualification: operationQualificationSchema.optional(),
 })
 
 const imapSchema = z.object({

@@ -1,4 +1,4 @@
-import type { ApiEndpoint, ApiInputParameter, ApiOperationOutput, ConnectorConfig, OperationAvailability } from '@/lib/connector-catalog'
+import type { ApiEndpoint, ApiInputParameter, ApiOperationOutput, ApiOperationQualification, ConnectorConfig, OperationAvailability } from '@/lib/connector-catalog'
 
 export type ConnectorOperationContract = {
   id: string
@@ -12,6 +12,7 @@ export type ConnectorOperationContract = {
   availability: OperationAvailability
   restrictions: string[]
   revision: number
+  qualification?: ApiOperationQualification
 }
 
 const UNKNOWN_OUTPUT: ApiOperationOutput = {
@@ -44,6 +45,7 @@ export function normalizeOperation(endpoint: ApiEndpoint): ConnectorOperationCon
     availability: endpoint.availability ?? 'to_verify',
     restrictions,
     revision: endpoint.revision ?? 1,
+    qualification: endpoint.qualification,
   }
 }
 
@@ -51,11 +53,27 @@ export function operationsFromConfig(config: ConnectorConfig): ConnectorOperatio
   return config.api.endpoints.map(normalizeOperation)
 }
 
+function bodyValue(config: ConnectorConfig, name: string) {
+  try {
+    const body = JSON.parse(config.api.body) as Record<string, unknown>
+    return body && typeof body === 'object' && body[name] != null
+  } catch {
+    return false
+  }
+}
+
+function hasRequiredValue(config: ConnectorConfig, operation: ApiEndpoint, parameter: ApiInputParameter) {
+  if (parameter.example != null) return true
+  if (parameter.in === 'query') return operation.query.some((item) => item.name === parameter.name && item.value.trim() !== '')
+  if (parameter.in === 'body') return bodyValue(config, parameter.name)
+  return false
+}
+
 export function operationTestRestriction(config: ConnectorConfig): string | null {
   const operation = config.api.endpoints.find((endpoint) => endpoint.id === config.api.activeEndpointId)
   if (operation) {
-    const missingPathValue = operation.inputParameters.some((parameter) => parameter.in === 'path' && parameter.required === true && parameter.example == null)
-    if (missingPathValue) return 'Une valeur de test explicite manque pour un paramètre de chemin obligatoire. Aucun appel réseau n’a été effectué.'
+    const missingParameter = operation.inputParameters.find((parameter) => parameter.required === true && !hasRequiredValue(config, operation, parameter))
+    if (missingParameter) return `Une valeur de test explicite manque pour le paramètre obligatoire « ${missingParameter.name} ». Aucun appel réseau n’a été effectué.`
     if (operation.availability === 'unsupported') return 'Cette opération n’est pas prise en charge par la version actuelle de l’adaptateur. Aucun appel réseau n’a été effectué.'
     if (operation.output.processing === 'unsupported') return 'Le format déclaré peut être récupérable, mais son traitement n’est pas pris en charge par ce banc d’essai. Aucun appel réseau n’a été effectué.'
   }
